@@ -1,4 +1,4 @@
-"""Unit tests for the subprocess retry helper in cis_azure_audit.
+"""Unit tests for the subprocess retry helper in azure_helpers.
 
 These tests mock ``subprocess.run`` so no real Azure CLI calls are made.  The
 focus is on verifying retry/backoff behaviour in the face of throttling,
@@ -9,7 +9,7 @@ suite during backoff loops.
 import unittest
 from typing import Any
 from unittest.mock import patch, MagicMock
-import cis_azure_audit
+import azure_helpers
 import subprocess
 
 
@@ -32,14 +32,14 @@ class TestRunCmdWithRetries(unittest.TestCase):
         m2.stdout = '{"ok": true}'
         m2.stderr = ""
 
-        with patch("cis_azure_audit.subprocess.run", side_effect=[m1, m2]) as run_mock:
-            rc, out, err = cis_azure_audit._run_cmd_with_retries(["az", "dummy"], timeout=1)
+        with patch("azure_helpers.subprocess.run", side_effect=[m1, m2]) as run_mock:
+            rc, out, err = azure_helpers._run_cmd_with_retries(["az", "dummy"], timeout=1)
             self.assertEqual(rc, 0)
             self.assertIn('"ok": true', out)
             self.assertEqual(err, "")
             self.assertEqual(run_mock.call_count, 2)
 
-    @patch("cis_azure_audit.time.sleep", lambda s: None)
+    @patch("azure_helpers.time.sleep", lambda s: None)
     def test_timeout_then_fail(self) -> None:
         # If the subprocess call times out repeatedly, the helper should back
         # off a few times and ultimately return an error code with a timeout
@@ -47,8 +47,8 @@ class TestRunCmdWithRetries(unittest.TestCase):
         def raise_timeout(*args: Any, **kwargs: Any) -> None:
             raise subprocess.TimeoutExpired(cmd=args[0], timeout=kwargs.get("timeout", 1))
 
-        with patch("cis_azure_audit.subprocess.run", side_effect=raise_timeout):
-            rc, out, err = cis_azure_audit._run_cmd_with_retries(["az", "dummy"], timeout=1)
+        with patch("azure_helpers.subprocess.run", side_effect=raise_timeout):
+            rc, out, err = azure_helpers._run_cmd_with_retries(["az", "dummy"], timeout=1)
             self.assertEqual(rc, 1)
             self.assertEqual(out, "")
             self.assertTrue(err.startswith("Timed out"))
@@ -60,8 +60,8 @@ class TestRunCmdWithRetries(unittest.TestCase):
         def raise_fnf(*args: Any, **kwargs: Any) -> None:
             raise FileNotFoundError()
 
-        with patch("cis_azure_audit.subprocess.run", side_effect=raise_fnf):
-            rc, out, err = cis_azure_audit._run_cmd_with_retries(["az", "dummy"], timeout=1)
+        with patch("azure_helpers.subprocess.run", side_effect=raise_fnf):
+            rc, out, err = azure_helpers._run_cmd_with_retries(["az", "dummy"], timeout=1)
             self.assertEqual(rc, 1)
             self.assertEqual(out, "")
             self.assertEqual(err, "az CLI not found")

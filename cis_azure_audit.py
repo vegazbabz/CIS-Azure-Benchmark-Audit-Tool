@@ -72,12 +72,10 @@ from typing import Any
 
 # ─── Standard library imports ─────────────────────────────────────────────────
 # No third-party packages required — everything ships with Python 3.8+
-import subprocess  # noqa: F401
 import json  # Parsing az CLI JSON output
 import sys  # sys.exit(), sys.platform (Windows vs Unix az path)
 import argparse  # CLI argument parsing
 import datetime  # Timestamps in checkpoints and reports
-import time  # noqa: F401
 import logging
 import html  # HTML entity escaping for safe output in the report
 import os  # operating system interfaces (environment variables)
@@ -98,7 +96,6 @@ from azure_helpers import (
     list_role_names_for_user,
     check_user_permissions,
 )
-from azure_helpers import _run_cmd_with_retries  # noqa: F401
 
 # Optional rich progress bar (used if installed). Falls back to builtin UI
 try:
@@ -145,8 +142,8 @@ ROLE_UAA = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9"  # User Access Administrator
 
 # ── Source address values that mean "open to the internet" in NSG rules ───────
 # Used by nsg_bad_rules() to identify inbound rules that are publicly accessible.
-# Note: "0.0.0.0/0" is caught by the endswith("/0") check, not this set.
-INTERNET_SRCS = {"*", "0.0.0.0", "internet", "any", "0.0.0.0/0"}
+# Note: "0.0.0.0/0" is covered by the endswith("/0") check below, not this set.
+INTERNET_SRCS = {"*", "0.0.0.0", "internet", "any"}
 
 # ── Platform-managed subnets that Azure prohibits NSGs on ─────────────────────
 # check_7_11 skips these subnets to avoid false FAIL results.

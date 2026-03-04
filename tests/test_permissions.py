@@ -23,7 +23,7 @@ class TestPermissionHelpers(unittest.TestCase):
         mock_az.return_value = (0, "abcd-1234\n")
         uid = azure_helpers.get_signed_in_user_id()
         self.assertEqual(uid, "abcd-1234")
-        mock_az.assert_called_with(["ad", "signed-in-user", "show", "--query", "objectId", "-o", "tsv"])
+        mock_az.assert_called_with(["ad", "signed-in-user", "show", "--query", "objectId"])
 
     @patch("azure_helpers.az")
     def test_get_signed_in_user_id_upn_fallback(self, mock_az: Any) -> None:
@@ -34,9 +34,9 @@ class TestPermissionHelpers(unittest.TestCase):
         self.assertEqual(uid, "abcd-5678")
         # verify the sequence of CLI invocations
         expected = [
-            ["ad", "signed-in-user", "show", "--query", "objectId", "-o", "tsv"],
-            ["account", "show", "--query", "user.name", "-o", "tsv"],
-            ["ad", "user", "show", "--id", "user@contoso.com", "--query", "objectId", "-o", "tsv"],
+            ["ad", "signed-in-user", "show", "--query", "objectId"],
+            ["account", "show", "--query", "user.name"],
+            ["ad", "user", "show", "--id", "user@contoso.com", "--query", "objectId"],
         ]
         self.assertEqual(mock_az.call_args_list, [unittest.mock.call(x) for x in expected])
 

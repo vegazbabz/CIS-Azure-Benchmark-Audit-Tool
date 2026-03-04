@@ -3,6 +3,7 @@ checks_s7.py — CIS Azure Benchmark Section 7 checks.
 
 SECTION 7 — NETWORKING SERVICES
 """
+
 from __future__ import annotations
 
 from typing import Any

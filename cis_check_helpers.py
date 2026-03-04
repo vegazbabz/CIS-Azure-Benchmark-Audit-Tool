@@ -5,6 +5,7 @@ These three small functions are used by every section module to construct
 R (Result) instances for error, info, and indexed-lookup cases without
 repeating the constructor boilerplate in every check function.
 """
+
 from __future__ import annotations
 
 from typing import Any

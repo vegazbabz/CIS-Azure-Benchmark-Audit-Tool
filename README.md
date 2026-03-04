@@ -1,6 +1,6 @@
 # CIS Microsoft Azure Foundations Benchmark v5.0.0 — Audit Tool
 
-**Version:** 2.0.0
+**Version:** 1.0.0
 **Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
 **Coverage:** 93 of 95 automated controls · 2 manual controls noted in output
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-A single-file Python script that audits an Azure tenant against the CIS Microsoft Azure Foundations Benchmark v5.0.0. It requires no pip installs — only Python 3.8+ and the Azure CLI.
+A single-file Python script that audits an Azure tenant against the CIS Microsoft Azure Foundations Benchmark v5.0.0. It requires no pip installs — only Python 3.10+ and the Azure CLI.
 
 Results are saved as checkpoints after each subscription completes, so a failed or interrupted run can be resumed without re-running completed work. Output is a self-contained HTML report with filtering, compliance scoring, and per-finding remediation guidance.
 
@@ -43,7 +43,7 @@ breakdown chart:
 
 | Requirement | Details |
 |---|---|
-| Python | 3.8 or higher |
+| Python | 3.10 or higher |
 | Azure CLI | Any recent version — https://aka.ms/install-azure-cli |
 | resource-graph extension | Installed automatically on first run |
 | Azure login | `az login` completed before running |
@@ -68,7 +68,7 @@ breakdown chart:
 
 A minimal GitHub Actions pipeline performs:
 
-* `python -m unittest` (all Python versions 3.8–3.11)
+* `python -m unittest` (all Python versions 3.10–3.13)
 * `flake8` linting
 * `mypy` static type checks (missing imports are ignored)
 
@@ -202,8 +202,8 @@ python cis_azure_audit.py [options]
 |---|---|
 | `-s`, `--subscription` | Audit a single subscription by name or ID |
 | `-o`, `--output` | Output HTML filename (default: `cis_azure_audit_report.html`) |
-| `-p`, `--parallel` | Concurrent subscription workers (default: 3) |
-| `--executor` | Worker backend: `thread` (default) or `process` |
+| `-p`, `--parallel` | Concurrent subscription workers (default: 2) |
+| `--executor` | Worker backend: `process` (default) or `thread` |
 | `--no-adaptive-concurrency` | Disable dynamic worker tuning when throttling is detected |
 | `-l`, `--level` | Filter output to Level 1 or Level 2 controls only |
 | `--fresh` | Clear all checkpoints and start from scratch |
@@ -233,9 +233,54 @@ is detected:
 * Reduces workers when transient throttling retries spike.
 * Gradually increases workers again after stable batches without throttling.
 
+Default execution uses `--executor process --parallel 2`, based on benchmark results in this environment.
+Users can still override both defaults at runtime.
+
+#### Environment-specific defaults
+
+These defaults were chosen from measured runs in this repository's target environment
+(not as a universal best setting for all tenants).
+
+Use the default when:
+
+* Running audits similar in size/shape to the benchmarked production subscription.
+* You want a conservative, stable baseline with predictable runtime.
+
+Override when:
+
+* Your tenant mix is significantly different (very small or very large subscriptions).
+* You observe frequent throttling or under-utilization and want to tune throughput.
+* You are running on different hardware/OS where executor behavior may differ.
+
 Use `--no-adaptive-concurrency` to keep worker count fixed.
-For most tenants, `--executor thread` is recommended because Azure CLI subprocess calls are I/O-bound.
-`--executor process` is available, but can be slower on Windows due to process spawn/serialization overhead.
+If your tenant or machine differs, benchmark and tune `--executor` and `--parallel` as needed.
+
+#### Benchmark your own defaults
+
+Use a representative subscription and compare elapsed time across candidate
+settings, then pick the fastest *stable* option (few/no throttling retries).
+
+```powershell
+$py = "python"
+$sub = "<YOUR-LARGEST-SUBSCRIPTION-NAME>"
+$runs = @(
+  @{executor="process"; parallel=2},
+  @{executor="process"; parallel=4},
+  @{executor="thread";  parallel=2}
+)
+
+foreach ($r in $runs) {
+  $label = "$($r.executor)-p$($r.parallel)"
+  $log = "bench_$label.log"
+  $elapsed = Measure-Command {
+    & $py cis_azure_audit.py --subscription "$sub" --executor $r.executor --parallel $r.parallel --level 1 --fresh --skip-preflight --output "bench_$label.html" --log-file $log *> $null
+  }
+  $transient = (Select-String -Path $log -Pattern "transient error detected" -SimpleMatch | Measure-Object).Count
+  Write-Output "$label : $([Math]::Round($elapsed.TotalSeconds,2))s ; transient_retries=$transient"
+}
+```
+
+Tip: run each candidate 2–3 times and compare median runtime, not a single run.
 
 ### Examples
 
@@ -246,11 +291,14 @@ python cis_azure_audit.py
 # Audit one subscription
 python cis_azure_audit.py -s "Production"
 
+# Explicitly override defaults (example)
+python cis_azure_audit.py --executor process --parallel 2
+
 # Run faster with more parallel workers
 python cis_azure_audit.py --parallel 5
 
-# Use process workers instead of threads (experimental)
-python cis_azure_audit.py --executor process --parallel 4
+# Use thread workers instead of the process default
+python cis_azure_audit.py --executor thread --parallel 4
 
 # Keep a fixed worker count (disable adaptive throttling response)
 python cis_azure_audit.py --parallel 6 --no-adaptive-concurrency

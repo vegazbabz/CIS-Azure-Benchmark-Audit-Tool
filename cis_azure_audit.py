@@ -93,6 +93,7 @@ from azure_helpers import (
     get_and_reset_rate_limit_retry_count,
     graph_query,
     get_signed_in_user_id,
+    is_firewall_error,
     list_role_names_for_user,
     check_user_permissions,
 )
@@ -3022,7 +3023,6 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 timeout=TIMEOUTS["default"],
             )
             if rc != 0:
-                # Permission denied or other error; report as ERROR result
                 error_msg = str(keys) if isinstance(keys, str) else "Access denied or error listing keys"
                 results.append(
                     R(
@@ -3030,7 +3030,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         f"Key Vault keys have expiration date set ({label})",
                         1,
                         "8 - Security Services",
-                        ERROR,
+                        INFO if is_firewall_error(error_msg) else ERROR,
                         f"Vault '{vname}': Failed to enumerate keys - {_friendly_error(error_msg)}",
                         "",
                         sid,
@@ -3078,7 +3078,6 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 timeout=TIMEOUTS["default"],
             )
             if rc != 0:
-                # Permission denied or other error; report as ERROR result
                 error_msg = str(secrets) if isinstance(secrets, str) else "Access denied or error listing secrets"
                 results.append(
                     R(
@@ -3086,7 +3085,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         f"Key Vault secrets have expiration date set ({label})",
                         1,
                         "8 - Security Services",
-                        ERROR,
+                        INFO if is_firewall_error(error_msg) else ERROR,
                         f"Vault '{vname}': Failed to enumerate secrets - {_friendly_error(error_msg)}",
                         "",
                         sid,
@@ -3120,7 +3119,6 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             ["keyvault", "key", "list", "--vault-name", vname, "--query", "[].name"], sid, timeout=TIMEOUTS["default"]
         )
         if rc != 0:
-            # Permission denied or other error; report as ERROR result
             error_msg = str(keys2) if isinstance(keys2, str) else "Access denied or error listing keys"
             results.append(
                 R(
@@ -3128,7 +3126,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "Key Vault automatic key rotation enabled",
                     2,
                     "8 - Security Services",
-                    ERROR,
+                    INFO if is_firewall_error(error_msg) else ERROR,
                     f"Vault '{vname}': Failed to enumerate keys - {_friendly_error(error_msg)}",
                     "",
                     sid,
@@ -3144,7 +3142,6 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     timeout=TIMEOUTS["default"],
                 )
                 if rc2 != 0:
-                    # Permission denied or other error for this specific key
                     error_msg = str(pol) if isinstance(pol, str) else "Access denied"
                     results.append(
                         R(
@@ -3152,7 +3149,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             "Key Vault automatic key rotation enabled",
                             2,
                             "8 - Security Services",
-                            ERROR,
+                            INFO if is_firewall_error(error_msg) else ERROR,
                             (
                                 f"Vault '{vname}' key '{kname}': "
                                 f"Failed to fetch rotation policy - {_friendly_error(error_msg)}"
@@ -3196,7 +3193,6 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             timeout=TIMEOUTS["default"],
         )
         if rc != 0:
-            # Permission denied or other error; report as ERROR result
             error_msg = str(certs) if isinstance(certs, str) else "Access denied or error listing certificates"
             results.append(
                 R(
@@ -3204,7 +3200,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "Certificate validity period <= 12 months",
                     1,
                     "8 - Security Services",
-                    ERROR,
+                    INFO if is_firewall_error(error_msg) else ERROR,
                     f"Vault '{vname}': Failed to enumerate certificates - {_friendly_error(error_msg)}",
                     "",
                     sid,
@@ -3229,7 +3225,6 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     timeout=TIMEOUTS["default"],
                 )
                 if rc2 != 0:
-                    # Permission denied or other error for this specific certificate
                     error_msg = str(cert) if isinstance(cert, str) else "Access denied"
                     cname = cert_id.split("/")[-1]
                     results.append(
@@ -3238,7 +3233,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             "Certificate validity period <= 12 months",
                             1,
                             "8 - Security Services",
-                            ERROR,
+                            INFO if is_firewall_error(error_msg) else ERROR,
                             (
                                 f"Vault '{vname}' cert '{cname}': "
                                 f"Failed to fetch certificate - {_friendly_error(error_msg)}"

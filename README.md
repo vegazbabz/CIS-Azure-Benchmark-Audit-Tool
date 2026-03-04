@@ -1,6 +1,6 @@
 # CIS Microsoft Azure Foundations Benchmark v5.0.0 — Audit Tool
 
-**Version:** 2.0.0
+**Version:** 1.0.0
 **Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
 **Coverage:** 93 of 95 automated controls · 2 manual controls noted in output
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-A single-file Python script that audits an Azure tenant against the CIS Microsoft Azure Foundations Benchmark v5.0.0. It requires no pip installs — only Python 3.8+ and the Azure CLI.
+A single-file Python script that audits an Azure tenant against the CIS Microsoft Azure Foundations Benchmark v5.0.0. It requires no pip installs — only Python 3.10+ and the Azure CLI.
 
 Results are saved as checkpoints after each subscription completes, so a failed or interrupted run can be resumed without re-running completed work. Output is a self-contained HTML report with filtering, compliance scoring, and per-finding remediation guidance.
 
@@ -43,7 +43,7 @@ breakdown chart:
 
 | Requirement | Details |
 |---|---|
-| Python | 3.8 or higher |
+| Python | 3.10 or higher |
 | Azure CLI | Any recent version — https://aka.ms/install-azure-cli |
 | resource-graph extension | Installed automatically on first run |
 | Azure login | `az login` completed before running |
@@ -68,7 +68,7 @@ breakdown chart:
 
 A minimal GitHub Actions pipeline performs:
 
-* `python -m unittest` (all Python versions 3.8–3.11)
+* `python -m unittest` (all Python versions 3.10–3.13)
 * `flake8` linting
 * `mypy` static type checks (missing imports are ignored)
 

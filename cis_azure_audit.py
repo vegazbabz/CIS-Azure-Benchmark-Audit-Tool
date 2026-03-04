@@ -4080,8 +4080,18 @@ def load_checkpoints() -> dict[str, Any]:
             with open(p, encoding="utf-8") as f:
                 data = json.load(f)
             # Only load checkpoints that successfully completed
-            if data.get("status") == "completed":
-                loaded[data["subscription_id"]] = data
+            if data.get("status") != "completed":
+                continue
+            cp_ver = data.get("tool_version", "unknown")
+            if cp_ver != VERSION:
+                LOGGER.warning(
+                    "   ⚠️  Checkpoint %s was written by tool v%s (current: v%s) — "
+                    "results may differ if the schema changed. Use --fresh to re-audit.",
+                    p.name,
+                    cp_ver,
+                    VERSION,
+                )
+            loaded[data["subscription_id"]] = data
         except (json.JSONDecodeError, KeyError) as e:
             LOGGER.warning("   ⚠️  Skipping corrupt checkpoint %s: %s", p.name, e)
 

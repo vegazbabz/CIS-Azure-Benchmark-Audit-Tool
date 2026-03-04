@@ -180,41 +180,56 @@ class TestPreflight(unittest.TestCase):
         # should not raise
         mod.preflight_permissions(subs)
 
-    def test_skip_preflight_flag(self) -> None:
-        """Skip flag prevents preflight invocation in the control flow guard."""
+    @patch("cis_azure_audit.generate_html")
+    @patch("cis_azure_audit.run_audit", return_value=[])
+    @patch("cis_azure_audit.get_subscriptions", return_value=[{"name": "sub1", "id": "s1"}])
+    @patch("cis_azure_audit.check_user_permissions")
+    @patch("cis_azure_audit.az")
+    def test_skip_preflight_flag(
+        self,
+        mock_az: Any,
+        mock_cpu: Any,
+        mock_subs: Any,
+        mock_audit: Any,
+        mock_html: Any,
+    ) -> None:
+        """--skip-preflight prevents check_user_permissions from being called in main()."""
+        mock_az.side_effect = [
+            (0, {"azure-cli": "2.0"}),  # az version
+            (0, ["resource-graph"]),  # extension list (non-empty → skip install)
+            (0, {"user": "u", "tenant": "t"}),  # account show
+        ]
         import cis_azure_audit as mod
 
-        called = False
+        with patch("sys.argv", ["prog", "--skip-preflight"]):
+            mod.main()
+        mock_cpu.assert_not_called()
 
-        def fake(subs_list: list[dict[str, Any]]) -> None:
-            nonlocal called
-            called = True
-
-        mod.preflight_permissions = fake
-
-        class A:
-            skip_preflight = True
-
-        args = A()
-        subs = [{"name": "any", "id": "x"}]
-        if not args.skip_preflight and not False:
-            mod.preflight_permissions(subs)
-        self.assertFalse(called)
-
-    def test_skip_preflight_envvar(self) -> None:
-        """Environment-variable skip also prevents preflight invocation."""
+    @patch("cis_azure_audit.generate_html")
+    @patch("cis_azure_audit.run_audit", return_value=[])
+    @patch("cis_azure_audit.get_subscriptions", return_value=[{"name": "sub1", "id": "s1"}])
+    @patch("cis_azure_audit.check_user_permissions")
+    @patch("cis_azure_audit.az")
+    def test_skip_preflight_envvar(
+        self,
+        mock_az: Any,
+        mock_cpu: Any,
+        mock_subs: Any,
+        mock_audit: Any,
+        mock_html: Any,
+    ) -> None:
+        """SKIP_PREFLIGHT env var prevents check_user_permissions from being called in main()."""
+        mock_az.side_effect = [
+            (0, {"azure-cli": "2.0"}),
+            (0, ["resource-graph"]),
+            (0, {"user": "u", "tenant": "t"}),
+        ]
         import cis_azure_audit as mod
 
-        called = False
-
-        def fake(subs_list: list[dict[str, Any]]) -> None:
-            nonlocal called
-            called = True
-
-        mod.preflight_permissions = fake
         os.environ["SKIP_PREFLIGHT"] = "1"
-        subs = [{"name": "any", "id": "x"}]
-        if not False and not os.environ.get("SKIP_PREFLIGHT"):
-            mod.preflight_permissions(subs)
-        self.assertFalse(called)
-        del os.environ["SKIP_PREFLIGHT"]
+        try:
+            with patch("sys.argv", ["prog"]):
+                mod.main()
+        finally:
+            del os.environ["SKIP_PREFLIGHT"]
+        mock_cpu.assert_not_called()

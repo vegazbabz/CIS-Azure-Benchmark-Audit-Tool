@@ -4522,7 +4522,7 @@ def run_audit(
     _total = len(subs)  # Total including already-checkpointed
     _done_n = len(done)  # Already completed from checkpoints
     _counter = threading.Lock()
-    _started = [_done_n]  # Mutable list used as a thread-safe integer counter
+    _started: int = _done_n  # Incremented under _counter before each submission
 
     completed_in_todo = 0
     stable_batches = 0
@@ -4539,8 +4539,8 @@ def run_audit(
             futures: dict[Any, tuple[dict[str, Any], int]] = {}
             for sub in batch:
                 with _counter:
-                    _started[0] += 1
-                    n = _started[0]
+                    _started += 1
+                    n = _started
 
                 if progress is not None:
                     progress.update(task_id, description=sub.get("name", ""))

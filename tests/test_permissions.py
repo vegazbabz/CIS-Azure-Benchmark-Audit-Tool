@@ -1,3 +1,9 @@
+"""Unit tests for identity, role listing, and preflight permission checks.
+
+These tests validate helper behavior without calling real Azure APIs by
+mocking CLI wrappers and selected functions in the audit module.
+"""
+
 from __future__ import annotations
 
 import os
@@ -9,8 +15,11 @@ import azure_helpers
 
 
 class TestPermissionHelpers(unittest.TestCase):
+    """Covers low-level identity and role helper functions."""
+
     @patch("azure_helpers.az")
     def test_get_signed_in_user_id_success(self, mock_az: Any) -> None:
+        """Returns object ID when signed-in-user query succeeds immediately."""
         mock_az.return_value = (0, "abcd-1234\n")
         uid = azure_helpers.get_signed_in_user_id()
         self.assertEqual(uid, "abcd-1234")
@@ -18,6 +27,7 @@ class TestPermissionHelpers(unittest.TestCase):
 
     @patch("azure_helpers.az")
     def test_get_signed_in_user_id_upn_fallback(self, mock_az: Any) -> None:
+        """Falls back from object-id lookup to UPN resolution path."""
         # first call fails, second returns UPN, third resolves to objectId
         mock_az.side_effect = [(1, "error"), (0, "user@contoso.com\n"), (0, "abcd-5678\n")]
         uid = azure_helpers.get_signed_in_user_id()
@@ -32,11 +42,13 @@ class TestPermissionHelpers(unittest.TestCase):
 
     @patch("azure_helpers.az")
     def test_get_signed_in_user_id_failure(self, mock_az: Any) -> None:
+        """Returns ``None`` when all identity lookup attempts fail."""
         mock_az.return_value = (1, "error")
         self.assertIsNone(azure_helpers.get_signed_in_user_id())
 
     @patch("azure_helpers.az")
     def test_list_roles_per_subscription(self, mock_az: Any) -> None:
+        """Lists role assignments for a GUID assignee in subscription scope."""
         mock_az.return_value = (0, ["Reader", "Security Reader"])
         # Test with GUID (should use --assignee)
         guid = "abcd1234-5678-1234-5678-abcdefabcdef"
@@ -61,6 +73,7 @@ class TestPermissionHelpers(unittest.TestCase):
 
     @patch("azure_helpers.az")
     def test_list_roles_no_subscription(self, mock_az: Any) -> None:
+        """Lists role assignments for UPN assignee without subscription scope."""
         mock_az.return_value = (0, ["Reader"])
         # Test with a UPN (non-GUID) — should use --assignee with --include-groups
         rc, roles = azure_helpers.list_role_names_for_user("user@contoso.com")
@@ -82,6 +95,7 @@ class TestPermissionHelpers(unittest.TestCase):
 
     @patch("azure_helpers.az")
     def test_list_roles_error_passthrough(self, mock_az: Any) -> None:
+        """Propagates CLI error output unchanged to the caller."""
         mock_az.return_value = (2, "boom")
         rc, out = azure_helpers.list_role_names_for_user("u", "sub")
         self.assertEqual(rc, 2)
@@ -89,10 +103,13 @@ class TestPermissionHelpers(unittest.TestCase):
 
 
 class TestPreflight(unittest.TestCase):
+    """Covers preflight gate behavior before running a full audit."""
+
     @patch("builtins.print")
     @patch("cis_azure_audit.get_signed_in_user_id")
     @patch("cis_azure_audit.list_role_names_for_user")
     def test_preflight_success(self, mock_list: Any, mock_user: Any, mock_print: Any) -> None:
+        """Preflight passes when Reader + Security Reader are present."""
         mock_user.return_value = "u"
 
         # return both needed roles for sub1 (tenant roles are ignored)
@@ -112,6 +129,7 @@ class TestPreflight(unittest.TestCase):
     @patch("cis_azure_audit.get_signed_in_user_id")
     @patch("cis_azure_audit.list_role_names_for_user")
     def test_preflight_missing(self, mock_list: Any, mock_user: Any, mock_print: Any) -> None:
+        """Preflight exits with error when signed-in identity is unavailable."""
         # return None to exercise the "unable to determine" message
         mock_user.return_value = None
         import cis_azure_audit as mod
@@ -125,6 +143,7 @@ class TestPreflight(unittest.TestCase):
     @patch("cis_azure_audit.get_signed_in_user_id")
     @patch("cis_azure_audit.list_role_names_for_user")
     def test_preflight_roles_missing(self, mock_list: Any, mock_user: Any, mock_print: Any) -> None:
+        """Preflight exits with error when no security-prefixed role exists."""
         mock_user.return_value = "u"
 
         # simulate missing any security-related role on sub
@@ -145,6 +164,7 @@ class TestPreflight(unittest.TestCase):
     @patch("cis_azure_audit.get_signed_in_user_id")
     @patch("cis_azure_audit.list_role_names_for_user")
     def test_preflight_with_security_admin(self, mock_list: Any, mock_user: Any, mock_print: Any) -> None:
+        """Preflight passes when Security Admin is present instead of Reader role variant."""
         mock_user.return_value = "u"
 
         # Reader plus Security Admin should satisfy the check
@@ -161,6 +181,7 @@ class TestPreflight(unittest.TestCase):
         mod.preflight_permissions(subs)
 
     def test_skip_preflight_flag(self) -> None:
+        """Skip flag prevents preflight invocation in the control flow guard."""
         import cis_azure_audit as mod
 
         called = False
@@ -181,6 +202,7 @@ class TestPreflight(unittest.TestCase):
         self.assertFalse(called)
 
     def test_skip_preflight_envvar(self) -> None:
+        """Environment-variable skip also prevents preflight invocation."""
         import cis_azure_audit as mod
 
         called = False

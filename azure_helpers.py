@@ -26,6 +26,8 @@ import threading
 # module-level logger; this will inherit the level set by the caller
 logger = logging.getLogger(__name__)
 
+# Tracks transient throttling retries across command calls so the orchestrator
+# can adapt worker concurrency between subscription batches.
 _rate_limit_retries = 0
 _rate_limit_lock = threading.Lock()
 
@@ -45,7 +47,14 @@ def _first_error_line(msg: str) -> str:
 
 
 _AUTHZ_TOKENS = frozenset(
-    ["forbidden", "not authorized", "authorizationfailed", "does not have authorization", "caller is not authorized"]
+    [
+        "forbidden",
+        "forbiddenbyrbac",
+        "not authorized",
+        "authorizationfailed",
+        "does not have authorization",
+        "caller is not authorized",
+    ]
 )
 
 
@@ -60,7 +69,7 @@ def _friendly_error(msg: str) -> str:
         return "Unknown error"
     lowered = str(msg).lower()
     if any(t in lowered for t in _AUTHZ_TOKENS):
-        return "Insufficient permissions (data-plane role required on this Key Vault)"
+        return "Insufficient permissions"
     first = _first_error_line(msg)
     return first[:160] if len(first) > 160 else first
 
@@ -113,14 +122,7 @@ def _run_cmd_with_retries(
                 # Permission denials (Forbidden/Unauthorized) are expected in
                 # many read-only audit scenarios and should not spam console
                 # output as runtime "errors".
-                authz_tokens = (
-                    "forbidden",
-                    "forbiddenbyrbac",
-                    "not authorized",
-                    "authorizationfailed",
-                    "does not have authorization",
-                )
-                is_authz = any(tok in low for tok in authz_tokens)
+                is_authz = any(tok in low for tok in _AUTHZ_TOKENS)
                 summary = _first_error_line(stderr)
                 if is_authz:
                     logger.debug("command denied by permissions (rc=%d): %s", r.returncode, summary)
@@ -229,17 +231,15 @@ def graph_query(query: str, sub_ids: list[str]) -> tuple[int, Any]:
                 + batch
                 + (["--skip-token", skip] if skip else [])
             )
+            rc, stdout, stderr = _run_cmd_with_retries(cmd, timeout=120)
+            if rc != 0:
+                return 1, stderr.strip() if stderr else "Graph query failed"
             try:
-                r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-                if r.returncode != 0:
-                    return 1, r.stderr.strip()
-                d = json.loads(r.stdout)
+                d = json.loads(stdout)
                 all_data.extend(d.get("data", []))
                 skip = d.get("skipToken")
                 if not skip:
                     break
-            except subprocess.TimeoutExpired:
-                return 1, "Graph query timed out"
             except (json.JSONDecodeError, KeyError) as e:
                 return 1, f"Parse error: {e}"
 
@@ -257,7 +257,7 @@ def _upn_to_objectid(upn: str) -> str | None:
     Useful when ``get_signed_in_user_id`` only manages to obtain a UPN.
     If the lookup fails (permissions, not found) ``None`` is returned.
     """
-    rc, out = az(["ad", "user", "show", "--id", upn, "--query", "objectId", "-o", "tsv"])
+    rc, out = az(["ad", "user", "show", "--id", upn, "--query", "objectId"])
     if rc == 0 and isinstance(out, str) and out:
         return out.strip()
     logger.debug("unable to resolve UPN to objectId: %s (rc=%d out=%r)", upn, rc, out)
@@ -277,12 +277,12 @@ def get_signed_in_user_id() -> str | None:
     ``None`` is returned if we cannot determine any identifier, which usually
     means the CLI is not authenticated.
     """
-    rc, out = az(["ad", "signed-in-user", "show", "--query", "objectId", "-o", "tsv"])
+    rc, out = az(["ad", "signed-in-user", "show", "--query", "objectId"])
     if rc == 0 and isinstance(out, str) and out:
         return out.strip()
     # try fallback to account show (UPN or service principal name)
     logger.debug("primary signed-in-user query failed (rc=%d), trying account show", rc)
-    rc2, upn = az(["account", "show", "--query", "user.name", "-o", "tsv"])
+    rc2, upn = az(["account", "show", "--query", "user.name"])
     if rc2 == 0 and isinstance(upn, str) and upn:
         upn = upn.strip()
         obj = _upn_to_objectid(upn)

@@ -1,0 +1,218 @@
+"""az_client.py — Low-level Azure CLI subprocess layer.
+
+Provides:
+- az(args, sub, timeout)       — run any az command, returns (rc, parsed_json)
+- az_rest(url, timeout)        — call az rest, returns (rc, parsed_json)
+- graph_query(query, sub_ids)  — paginated Resource Graph query
+- get_and_reset_rate_limit_retry_count() — throttle-signal for the orchestrator
+- is_firewall_error(msg)       — detect firewall-blocked responses
+- _friendly_error(msg)         — collapse multi-line errors to one line
+- _run_cmd_with_retries(...)   — subprocess with exponential backoff
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import random
+import subprocess
+import sys
+import threading
+import time
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+# Tracks transient throttling retries across command calls so the orchestrator
+# can adapt worker concurrency between subscription batches.
+_rate_limit_retries = 0
+_rate_limit_lock = threading.Lock()
+
+# On Windows, Python cannot find 'az' without the .cmd extension.
+AZ = "az.cmd" if sys.platform == "win32" else "az"
+
+# Timeout (seconds) for Resource Graph bulk queries — longer because the response
+# payload can be large and pagination adds round-trips.
+_GRAPH_TIMEOUT = 120
+
+
+def _first_error_line(msg: str) -> str:
+    """Return the first non-empty line of an error message."""
+    if not msg:
+        return ""
+    for line in str(msg).splitlines():
+        line = line.strip()
+        if line:
+            return line
+    return str(msg).strip()
+
+
+_AUTHZ_TOKENS = frozenset(
+    [
+        "forbiddenbyrbac",
+        "not authorized",
+        "authorizationfailed",
+        "does not have authorization",
+        "caller is not authorized",
+    ]
+)
+
+# Firewall-block tokens must be checked BEFORE generic auth tokens because
+# "ForbiddenByFirewall" contains "forbidden" which would otherwise match _AUTHZ_TOKENS.
+_FIREWALL_TOKENS = frozenset(
+    [
+        "forbiddenbyFirewall",
+        "public network access is disabled",
+        "not allowed by its firewall rules",
+        "caller's ip address",
+    ]
+)
+
+
+def is_firewall_error(msg: str) -> bool:
+    """Return True if the error message indicates a network firewall block."""
+    lowered = str(msg).lower()
+    return any(t.lower() in lowered for t in _FIREWALL_TOKENS)
+
+
+def _friendly_error(msg: str) -> str:
+    """Return a short, human-readable version of an Azure CLI error string.
+
+    Permission/auth errors are collapsed to a single tidy phrase so reports
+    don't contain truncated multi-line CLI blobs.  All other errors are
+    reduced to their first meaningful line.
+    """
+    if not msg:
+        return "Unknown error"
+    if is_firewall_error(msg):
+        return "Firewall blocked — vault not reachable from this runner IP"
+    lowered = str(msg).lower()
+    if any(t in lowered for t in _AUTHZ_TOKENS):
+        return "Insufficient permissions"
+    first = _first_error_line(msg)
+    return first[:160] if len(first) > 160 else first
+
+
+def _run_cmd_with_retries(
+    cmd: list[str],
+    timeout: int = 25,
+    max_retries: int = 3,
+    base_backoff: float = 1.0,
+) -> tuple[int, str, str]:
+    """Run a subprocess command with retries and exponential backoff.
+
+    Returns
+    -------
+    tuple[int, str, str]
+        ``(returncode, stdout, stderr)``
+    """
+    for attempt in range(1, max_retries + 1):
+        logger.debug("running command attempt %d: %s", attempt, cmd)
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            stdout = r.stdout or ""
+            stderr = r.stderr or ""
+            if r.returncode != 0:
+                low = stderr.lower() if isinstance(stderr, str) else ""
+                transient_tokens = ("429", "too many requests", "rate limit", "throttl")
+                is_transient = any(tok in low for tok in transient_tokens)
+                if attempt < max_retries and is_transient:
+                    with _rate_limit_lock:
+                        global _rate_limit_retries
+                        _rate_limit_retries += 1
+                    sleep_for = base_backoff * (2 ** (attempt - 1)) + random.random() * 0.5
+                    logger.warning("transient error detected, sleeping %.1fs before retry", sleep_for)
+                    time.sleep(sleep_for)
+                    continue
+                is_authz = any(tok in low for tok in _AUTHZ_TOKENS)
+                summary = _first_error_line(stderr)
+                if is_authz:
+                    logger.debug("command denied by permissions (rc=%d): %s", r.returncode, summary)
+                else:
+                    logger.error("command failed (rc=%d): %s", r.returncode, summary)
+                return r.returncode, stdout, stderr
+            logger.debug("command succeeded")
+            return 0, stdout, stderr
+
+        except subprocess.TimeoutExpired:
+            if attempt < max_retries:
+                sleep_for = base_backoff * (2 ** (attempt - 1))
+                time.sleep(sleep_for)
+                continue
+            return 1, "", f"Timed out ({timeout}s)"
+        except FileNotFoundError:
+            return 1, "", "az CLI not found"
+
+    return 1, "", "No command attempts were made"
+
+
+def az(args: list[str], sub: str | None = None, timeout: int = 25) -> tuple[int, Any]:
+    """Execute an az CLI command and return (returncode, parsed_output)."""
+    cmd = [AZ] + args + ["--output", "json"]
+    if sub:
+        cmd += ["--subscription", sub]
+    logger.debug("az() invoking: %s", cmd)
+    rc, stdout, stderr = _run_cmd_with_retries(cmd, timeout=timeout)
+    if rc != 0:
+        return rc, (stderr or "").strip()
+    if not (stdout or "").strip():
+        return 0, None
+    try:
+        return 0, json.loads(stdout)
+    except json.JSONDecodeError:
+        return 0, stdout.strip()
+
+
+def get_and_reset_rate_limit_retry_count() -> int:
+    """Return and reset the transient retry counter."""
+    with _rate_limit_lock:
+        global _rate_limit_retries
+        count = _rate_limit_retries
+        _rate_limit_retries = 0
+        return count
+
+
+def az_rest(url: str, timeout: int = 25) -> tuple[int, Any]:
+    """Call an Azure REST or Microsoft Graph endpoint via ``az rest``."""
+    cmd = [AZ, "rest", "--method", "get", "--url", url, "--output", "json"]
+    rc, stdout, stderr = _run_cmd_with_retries(cmd, timeout=timeout)
+    if rc != 0:
+        return rc, (stderr or "").strip()
+    if not (stdout or "").strip():
+        return 0, None
+    try:
+        return 0, json.loads(stdout)
+    except json.JSONDecodeError:
+        return 0, stdout.strip()
+
+
+def graph_query(query: str, sub_ids: list[str]) -> tuple[int, Any]:
+    """Execute a Kusto query against Azure Resource Graph and return all results.
+
+    Transparently follows ``skipToken`` cursors and batches subscription IDs
+    in groups of 10 (Resource Graph limit).
+    """
+    all_data = []
+
+    for batch in [sub_ids[i : i + 10] for i in range(0, len(sub_ids), 10)]:
+        skip = None
+        while True:
+            cmd = (
+                [AZ, "graph", "query", "-q", query.strip(), "--first", "1000", "--output", "json"]
+                + ["--subscriptions"]
+                + batch
+                + (["--skip-token", skip] if skip else [])
+            )
+            rc, stdout, stderr = _run_cmd_with_retries(cmd, timeout=_GRAPH_TIMEOUT)
+            if rc != 0:
+                return 1, stderr.strip() if stderr else "Graph query failed"
+            try:
+                d = json.loads(stdout)
+                all_data.extend(d.get("data", []))
+                skip = d.get("skipToken")
+                if not skip:
+                    break
+            except (json.JSONDecodeError, KeyError) as e:
+                return 1, f"Parse error: {e}"
+
+    return 0, all_data

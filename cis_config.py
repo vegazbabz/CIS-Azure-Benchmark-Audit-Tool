@@ -35,7 +35,7 @@ if sys.version_info >= (3, 11):
     import tomllib as _tomllib
 else:
     try:
-        import tomli as _tomllib  # type: ignore[import-not-found]
+        import tomli as _tomllib
     except ImportError:
         _tomllib = None  # type: ignore[assignment]
 

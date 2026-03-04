@@ -15,7 +15,8 @@ cis_checkpoints/
 
 # ── Local notes / AI session files ────────────────────────────────────────────
 .claude/
-*.txt
+Claude improvements.txt
+GitHub Copilot improvements.txt
 
 # ── Editor / OS ───────────────────────────────────────────────────────────────
 .vscode/

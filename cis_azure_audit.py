@@ -82,7 +82,7 @@ import os  # operating system interfaces (environment variables)
 import threading  # Lock for thread-safe console output in parallel runs
 import shutil  # shutil.rmtree() used by --fresh to clear checkpoints
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed  # Parallel workers
-from dataclasses import dataclass, asdict  # Result data model + JSON serialisation
+from dataclasses import asdict  # R → dict serialisation for checkpoints
 from pathlib import Path  # Cross-platform file paths
 
 # Configuration constants (version, timeouts, status codes, role GUIDs, etc.)
@@ -106,6 +106,9 @@ from cis_config import (
     EXEMPT_SUBNETS,
     load_config_file,
 )
+
+# Audit result data model
+from cis_models import R
 
 # Azure CLI helpers delegated to azure_helpers.py
 from azure_helpers import (
@@ -137,47 +140,6 @@ except Exception:
     HAS_RICH = False
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DATA MODEL
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-@dataclass
-class R:
-    """
-    A single audit finding. One R instance is created per resource per control.
-
-    For example: if a subscription has 20 storage accounts and there are 10
-    storage checks, up to 200 R instances are produced for that subscription.
-
-    Named R (short) rather than Result because it appears hundreds of times
-    in check functions — brevity makes the check code readable.
-
-    Fields
-    ──────
-    control_id        CIS control number, e.g. "7.11" or "9.3.1.2"
-    title             Human-readable control title (from CIS benchmark PDF)
-    level             CIS Profile Applicability: 1 (basic) or 2 (advanced)
-    section           Section name used for grouping in the report
-    status            One of the five constants: PASS / FAIL / ERROR / INFO / MANUAL
-    details           Explanation shown in the report — what was found
-    remediation       Azure portal path to fix the issue (empty string for PASS/INFO)
-    subscription_id   Azure subscription GUID (empty for tenant-level checks)
-    subscription_name Display name of the subscription
-    resource          Specific resource name (NSG, vault, storage account, etc.)
-                      Empty string means the finding applies to the subscription overall.
-    """
-
-    control_id: str
-    title: str
-    level: int
-    section: str
-    status: str
-    details: str = ""
-    remediation: str = ""
-    subscription_id: str = ""
-    subscription_name: str = ""
-    resource: str = ""
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # THREAD-SAFE CONSOLE OUTPUT

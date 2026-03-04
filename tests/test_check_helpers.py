@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import unittest
 
-from cis_azure_audit import _ctrl_sort_key, nsg_bad_rules, port_in_range
+from cis_helpers import _ctrl_sort_key, nsg_bad_rules, port_in_range
 
 # ---------------------------------------------------------------------------
 # port_in_range

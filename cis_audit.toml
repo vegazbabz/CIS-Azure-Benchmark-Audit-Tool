@@ -1,0 +1,21 @@
+# CIS Azure Audit Tool — configuration file
+# Place this file next to cis_azure_audit.py, or set CIS_AUDIT_CONFIG=/path/to/file.
+# All values are optional — comment out or remove any line to keep the built-in default.
+
+[audit]
+# Number of subscriptions audited in parallel (1–20 recommended)
+parallel = 3
+
+# Executor backend: "thread" (recommended on Windows) or "process"
+executor = "thread"
+
+# Directory where per-subscription checkpoint files are saved
+checkpoint_dir = "cis_checkpoints"
+
+[timeouts]
+# Azure CLI call timeout in seconds.  Increase if you see frequent timeout errors.
+default      = 20   # Most az CLI calls
+storage_list = 30   # az storage account list
+storage_svc  = 15   # Per-account blob/file/table service queries
+activity_log = 25   # Activity log queries (90-day window)
+graph        = 120  # Resource Graph bulk queries

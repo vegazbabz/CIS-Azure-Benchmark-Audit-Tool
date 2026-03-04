@@ -85,6 +85,28 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from dataclasses import dataclass, asdict  # Result data model + JSON serialisation
 from pathlib import Path  # Cross-platform file paths
 
+# Configuration constants (version, timeouts, status codes, role GUIDs, etc.)
+from cis_config import (
+    VERSION,
+    BENCHMARK_VER,
+    CHECKPOINT_DIR,
+    TIMEOUTS,
+    DEFAULT_PARALLEL,
+    DEFAULT_EXECUTOR,
+    PASS,
+    FAIL,
+    ERROR,
+    INFO,
+    MANUAL,
+    TRACE_LEVEL,
+    LOGGER,
+    ROLE_OWNER,
+    ROLE_UAA,
+    INTERNET_SRCS,
+    EXEMPT_SUBNETS,
+    load_config_file,
+)
+
 # Azure CLI helpers delegated to azure_helpers.py
 from azure_helpers import (
     _friendly_error,
@@ -113,57 +135,6 @@ try:
     HAS_RICH = True
 except Exception:
     HAS_RICH = False
-
-# ══════════════════════════════════════════════════════════════════════════════
-# CONSTANTS
-# ══════════════════════════════════════════════════════════════════════════════
-
-VERSION = "1.0.0"  # Tool version (written into checkpoints for change detection)
-BENCHMARK_VER = "5.0.0"  # CIS Benchmark version this tool targets
-CHECKPOINT_DIR = Path("cis_checkpoints")  # Directory where per-subscription results are saved
-
-# ── Azure CLI call timeouts (seconds) ─────────────────────────────────────────
-TIMEOUTS: dict[str, int] = {
-    "default": 20,  # Most az CLI calls (diagnostics, security, keyvault, network)
-    "storage_list": 30,  # az storage account list — larger payload per subscription
-    "storage_svc": 15,  # Per-account blob/file/table service property queries
-    "activity_log": 25,  # Activity log queries with 90-day window
-    "graph": 120,  # Resource Graph bulk queries (az graph query)
-}
-
-# ── Audit result status values ────────────────────────────────────────────────
-# These are the only five valid statuses a Result can have.
-PASS = "PASS"  # Control requirement is met
-FAIL = "FAIL"  # Control requirement is NOT met — action required
-ERROR = "ERROR"  # Could not evaluate — az CLI call failed or timed out
-INFO = "INFO"  # Not applicable (e.g. no resources of this type in subscription)
-MANUAL = "MANUAL"  # Requires human review — cannot be automated via az CLI
-
-# Custom log level below DEBUG for very chatty execution traces.
-TRACE_LEVEL = 5
-
-# Module logger. Effective level/handlers are configured in setup_logging().
-LOGGER = logging.getLogger("cis_audit")
-
-# ── Azure built-in role definition GUIDs (stable, defined by Microsoft) ──────
-# These GUIDs are the same in every tenant — safe to hardcode.
-ROLE_OWNER = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635"  # Owner
-ROLE_UAA = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9"  # User Access Administrator
-
-# ── Source address values that mean "open to the internet" in NSG rules ───────
-# Used by nsg_bad_rules() to identify inbound rules that are publicly accessible.
-# Note: "0.0.0.0/0" is covered by the endswith("/0") check below, not this set.
-INTERNET_SRCS = {"*", "0.0.0.0", "internet", "any"}
-
-# ── Platform-managed subnets that Azure prohibits NSGs on ─────────────────────
-# check_7_11 skips these subnets to avoid false FAIL results.
-EXEMPT_SUBNETS = {
-    "gatewaysubnet",  # VPN / ExpressRoute Gateway
-    "azurebastionsubnet",  # Azure Bastion
-    "azurefirewallsubnet",  # Azure Firewall
-    "azurefirewallmanagementsubnet",  # Azure Firewall management traffic
-    "routeserversubnet",  # Azure Route Server
-}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DATA MODEL
@@ -2307,14 +2278,8 @@ def check_7_11(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             )
         ]
 
-    # Lowercase set for O(1) exempt check
-    SKIP = {
-        "gatewaysubnet",
-        "azurebastionsubnet",
-        "azurefirewallsubnet",
-        "azurefirewallmanagementsubnet",
-        "routeserversubnet",
-    }
+    # Lowercase set for O(1) exempt check (platform-managed subnets, no NSG allowed)
+    SKIP = EXEMPT_SUBNETS
 
     results = []
     for s in subnets:
@@ -4395,9 +4360,9 @@ def _audit_subscription_worker(
 
 def run_audit(
     subs: list[dict[str, Any]],
-    parallel: int = 3,
+    parallel: int = DEFAULT_PARALLEL,
     resume: bool = True,
-    executor_mode: str = "thread",
+    executor_mode: str = DEFAULT_EXECUTOR,
     adaptive_concurrency: bool = True,
 ) -> list[R]:
     """
@@ -5073,6 +5038,10 @@ def main() -> None:
       2. resource-graph extension is installed (auto-installs if missing)
       3. az login has been completed (account show succeeds)
     """
+    # Load cis_audit.toml (if present) before building argparse so that
+    # DEFAULT_PARALLEL / DEFAULT_EXECUTOR reflect any user overrides.
+    load_config_file()
+
     parser = argparse.ArgumentParser(
         description=f"CIS Azure Foundations Benchmark v{BENCHMARK_VER} — Audit Tool v{VERSION}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -5105,14 +5074,14 @@ Examples:
         "--parallel",
         "-p",
         type=int,
-        default=3,
-        help="Number of concurrent subscription workers (default: 3, max recommended: 5)",
+        default=DEFAULT_PARALLEL,
+        help=f"Number of concurrent subscription workers (default: {DEFAULT_PARALLEL}, max recommended: 5)",
     )
     parser.add_argument(
         "--executor",
         choices=["thread", "process"],
-        default="thread",
-        help="Worker backend for per-subscription audits (default: thread)",
+        default=DEFAULT_EXECUTOR,
+        help=f"Worker backend for per-subscription audits (default: {DEFAULT_EXECUTOR})",
     )
     parser.add_argument(
         "--no-adaptive-concurrency",

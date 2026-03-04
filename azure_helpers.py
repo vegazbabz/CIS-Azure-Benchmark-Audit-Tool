@@ -34,6 +34,10 @@ _rate_limit_lock = threading.Lock()
 # On Windows, Python cannot find 'az' without the .cmd extension.
 AZ = "az.cmd" if sys.platform == "win32" else "az"
 
+# Timeout (seconds) for Resource Graph bulk queries — longer because the response
+# payload can be large and pagination adds round-trips.
+_GRAPH_TIMEOUT = 120
+
 
 def _first_error_line(msg: str) -> str:
     """Return the first non-empty line of an error message."""
@@ -231,7 +235,7 @@ def graph_query(query: str, sub_ids: list[str]) -> tuple[int, Any]:
                 + batch
                 + (["--skip-token", skip] if skip else [])
             )
-            rc, stdout, stderr = _run_cmd_with_retries(cmd, timeout=120)
+            rc, stdout, stderr = _run_cmd_with_retries(cmd, timeout=_GRAPH_TIMEOUT)
             if rc != 0:
                 return 1, stderr.strip() if stderr else "Graph query failed"
             try:

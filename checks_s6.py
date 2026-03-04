@@ -3,6 +3,7 @@ checks_s6.py — CIS Azure Benchmark Section 6 checks.
 
 SECTION 6 — MANAGEMENT & GOVERNANCE (MONITORING)
 """
+
 from __future__ import annotations
 
 from typing import Any

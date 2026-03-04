@@ -3,6 +3,7 @@ checks_s8.py — CIS Azure Benchmark Section 8 checks.
 
 SECTION 8 — SECURITY SERVICES
 """
+
 from __future__ import annotations
 
 from typing import Any

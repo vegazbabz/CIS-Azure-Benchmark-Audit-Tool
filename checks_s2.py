@@ -3,6 +3,7 @@ checks_s2.py — CIS Azure Benchmark Section 2 checks.
 
 SECTION 2 — AZURE DATABRICKS
 """
+
 from __future__ import annotations
 
 from typing import Any

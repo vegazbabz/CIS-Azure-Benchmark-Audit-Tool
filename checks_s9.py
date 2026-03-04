@@ -3,6 +3,7 @@ checks_s9.py — CIS Azure Benchmark Section 9 checks.
 
 SECTION 9 — STORAGE SERVICES
 """
+
 from __future__ import annotations
 
 from typing import Any

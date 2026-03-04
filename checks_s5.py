@@ -5,6 +5,7 @@ SECTION 5 — IDENTITY SERVICES
 These checks target the Entra ID tenant and run ONCE (not per subscription).
 Most use the Microsoft Graph API via az_rest rather than az CLI.
 """
+
 from __future__ import annotations
 
 from typing import Any

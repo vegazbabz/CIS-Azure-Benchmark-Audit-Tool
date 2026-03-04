@@ -365,7 +365,14 @@ def nsg_bad_rules(rules: list[Any], port: int, protos: tuple[str, ...] = ("tcp",
         # They are not internet wildcards, so skip them to avoid false positives.
         if src.startswith("/"):
             continue
-        if src not in INTERNET_SRCS and not src.endswith("/0"):
+
+        # Azure NSG rules use EITHER sourceAddressPrefix (singular) OR
+        # sourceAddressPrefixes (plural list) — never both.  Combine them so
+        # rules that specify multiple sources are not silently skipped.
+        srcs_extra = pr.get("sourceAddressPrefixes", [])
+        all_srcs = ([src] if src else []) + (srcs_extra if isinstance(srcs_extra, list) else [])
+
+        if not any(s in INTERNET_SRCS or s.endswith("/0") for s in all_srcs):
             continue
 
         # Collect all destination ports — Azure allows either a single value

@@ -41,10 +41,11 @@ during a write never produces a corrupt checkpoint file.
 
 PARALLEL EXECUTION
 ───────────────────
-Subscriptions are audited concurrently using a ThreadPoolExecutor. The
-default is 3 parallel workers (--parallel). Increasing this speeds up large
-tenants but risks hitting Azure API rate limits (HTTP 429). A warning is
-printed if you exceed 5 workers.
+Subscriptions are audited concurrently using either a ThreadPoolExecutor or
+ProcessPoolExecutor. The default is process mode with 2 workers
+(`--executor process --parallel 2`). You can override both values via CLI.
+Higher parallelism can speed up large tenants but may increase Azure API
+throttling (HTTP 429).
 
 REQUIREMENTS
 ─────────────
@@ -71,12 +72,10 @@ from typing import Any
 
 # ─── Standard library imports ─────────────────────────────────────────────────
 # No third-party packages required — everything ships with Python 3.8+
-import subprocess  # noqa: F401
 import json  # Parsing az CLI JSON output
 import sys  # sys.exit(), sys.platform (Windows vs Unix az path)
 import argparse  # CLI argument parsing
 import datetime  # Timestamps in checkpoints and reports
-import time  # noqa: F401
 import logging
 import html  # HTML entity escaping for safe output in the report
 import os  # operating system interfaces (environment variables)
@@ -97,7 +96,6 @@ from azure_helpers import (
     list_role_names_for_user,
     check_user_permissions,
 )
-from azure_helpers import _run_cmd_with_retries  # noqa: F401
 
 # Optional rich progress bar (used if installed). Falls back to builtin UI
 try:
@@ -144,8 +142,8 @@ ROLE_UAA = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9"  # User Access Administrator
 
 # ── Source address values that mean "open to the internet" in NSG rules ───────
 # Used by nsg_bad_rules() to identify inbound rules that are publicly accessible.
-# Note: "0.0.0.0/0" is caught by the endswith("/0") check, not this set.
-INTERNET_SRCS = {"*", "0.0.0.0", "internet", "any", "0.0.0.0/0"}
+# Note: "0.0.0.0/0" is covered by the endswith("/0") check below, not this set.
+INTERNET_SRCS = {"*", "0.0.0.0", "internet", "any"}
 
 # ── Platform-managed subnets that Azure prohibits NSGs on ─────────────────────
 # check_7_11 skips these subnets to avoid false FAIL results.
@@ -4362,9 +4360,9 @@ def _audit_subscription_worker(
 
 def run_audit(
     subs: list[dict[str, Any]],
-    parallel: int = 3,
+    parallel: int = 2,
     resume: bool = True,
-    executor_mode: str = "thread",
+    executor_mode: str = "process",
     adaptive_concurrency: bool = True,
 ) -> list[R]:
     """
@@ -4376,7 +4374,7 @@ def run_audit(
       2. Run tenant-level identity checks ONCE (not per subscription).
          These produce results without a subscription_id / subscription_name.
       3. Prefetch all Resource Graph data across all remaining subscriptions.
-    4. Audit remaining subscriptions in parallel using thread or process workers.
+        4. Audit remaining subscriptions in parallel using thread or process workers.
       5. Merge all results and return.
 
     Thread-safe counter: A locked counter tracks how many subscriptions have
@@ -4386,9 +4384,9 @@ def run_audit(
     Parameters
     ──────────
     subs     : Full list of subscription dicts to audit (id, name)
-    parallel             : Max concurrent workers requested (default 3)
+    parallel             : Max concurrent workers requested (default 2)
     resume               : If True, skip subscriptions with existing checkpoints
-    executor_mode        : "thread" (default) or "process"
+    executor_mode        : "process" (default) or "thread"
     adaptive_concurrency : If True, reduce/increase workers based on throttling
 
     Returns
@@ -5072,14 +5070,14 @@ Examples:
         "--parallel",
         "-p",
         type=int,
-        default=3,
-        help="Number of concurrent subscription workers (default: 3, max recommended: 5)",
+        default=2,
+        help="Number of concurrent subscription workers (default: 2, max recommended: 5)",
     )
     parser.add_argument(
         "--executor",
         choices=["thread", "process"],
-        default="thread",
-        help="Worker backend for per-subscription audits (default: thread)",
+        default="process",
+        help="Worker backend for per-subscription audits (default: process)",
     )
     parser.add_argument(
         "--no-adaptive-concurrency",

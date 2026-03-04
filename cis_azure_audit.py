@@ -121,6 +121,15 @@ VERSION = "1.0.0"  # Tool version (written into checkpoints for change detection
 BENCHMARK_VER = "5.0.0"  # CIS Benchmark version this tool targets
 CHECKPOINT_DIR = Path("cis_checkpoints")  # Directory where per-subscription results are saved
 
+# ── Azure CLI call timeouts (seconds) ─────────────────────────────────────────
+TIMEOUTS: dict[str, int] = {
+    "default": 20,  # Most az CLI calls (diagnostics, security, keyvault, network)
+    "storage_list": 30,  # az storage account list — larger payload per subscription
+    "storage_svc": 15,  # Per-account blob/file/table service property queries
+    "activity_log": 25,  # Activity log queries with 90-day window
+    "graph": 120,  # Resource Graph bulk queries (az graph query)
+}
+
 # ── Audit result status values ────────────────────────────────────────────────
 # These are the only five valid statuses a Result can have.
 PASS = "PASS"  # Control requirement is met
@@ -795,7 +804,7 @@ def check_2_1_7(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     results = []
     for ws in workspaces:
         wname, wid = ws.get("name", "?"), ws.get("id")
-        rc, diag = az(["monitor", "diagnostic-settings", "list", "--resource", wid], sid, timeout=20)
+        rc, diag = az(["monitor", "diagnostic-settings", "list", "--resource", wid], sid, timeout=TIMEOUTS["default"])
         if rc != 0:
             results.append(
                 _err(
@@ -1227,7 +1236,7 @@ def check_5_23(sid: str, sname: str) -> R:
 
     Data source: az role definition list --custom-role-only true
     """
-    rc, data = az(["role", "definition", "list", "--custom-role-only", "true"], sid, timeout=20)
+    rc, data = az(["role", "definition", "list", "--custom-role-only", "true"], sid, timeout=TIMEOUTS["default"])
     if rc != 0:
         return _err(
             "5.23", "No custom subscription administrator roles", 1, "5 - Identity Services", str(data), sid, sname
@@ -1320,7 +1329,9 @@ def check_6_1_1_1(sid: str, sname: str) -> R:
     """
     # Note: --subscription must be passed as a positional arg here, not via
     # the sub parameter of az(), because this command has its own --subscription
-    rc, data = az(["monitor", "diagnostic-settings", "subscription", "list", "--subscription", sid], timeout=20)
+    rc, data = az(
+        ["monitor", "diagnostic-settings", "subscription", "list", "--subscription", sid], timeout=TIMEOUTS["default"]
+    )
     if rc != 0:
         return _err(
             "6.1.1.1",
@@ -1363,7 +1374,9 @@ def check_6_1_1_2(sid: str, sname: str) -> R:
 
     Data source: same endpoint as check_6_1_1_1.
     """
-    rc, data = az(["monitor", "diagnostic-settings", "subscription", "list", "--subscription", sid], timeout=20)
+    rc, data = az(
+        ["monitor", "diagnostic-settings", "subscription", "list", "--subscription", sid], timeout=TIMEOUTS["default"]
+    )
     if rc != 0:
         return _err(
             "6.1.1.2",
@@ -1432,7 +1445,7 @@ def check_6_1_1_4(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     results = []
     for v in vaults:
         vid, vname = v.get("id"), v.get("name", "?")
-        rc, diag = az(["monitor", "diagnostic-settings", "list", "--resource", vid], sid, timeout=20)
+        rc, diag = az(["monitor", "diagnostic-settings", "list", "--resource", vid], sid, timeout=TIMEOUTS["default"])
         if rc != 0:
             results.append(
                 _err(
@@ -1549,7 +1562,7 @@ def check_6_1_1_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         aid = app.get("id")
         kind = app.get("kind", "web")
 
-        rc, diag = az(["monitor", "diagnostic-settings", "list", "--resource", aid], sid, timeout=20)
+        rc, diag = az(["monitor", "diagnostic-settings", "list", "--resource", aid], sid, timeout=TIMEOUTS["default"])
         if rc != 0:
             results.append(
                 _err(
@@ -1686,7 +1699,7 @@ def check_6_1_2_alerts(sid: str, sname: str) -> list[R]:
 
     Data source: az monitor activity-log alert list
     """
-    rc, data = az(["monitor", "activity-log", "alert", "list"], sid, timeout=20)
+    rc, data = az(["monitor", "activity-log", "alert", "list"], sid, timeout=TIMEOUTS["default"])
     # If the call fails, continue with an empty list — all checks will FAIL
     alerts = data if (rc == 0 and isinstance(data, list)) else []
 
@@ -1780,7 +1793,7 @@ def check_6_1_3_1(sid: str, sname: str) -> R:
         f"https://management.azure.com/subscriptions/{sid}/"
         f"providers/microsoft.insights/components?api-version=2020-02-02"
     )
-    rc, data = az_rest(url, timeout=20)
+    rc, data = az_rest(url, timeout=TIMEOUTS["default"])
     if rc != 0:
         return _err(
             "6.1.3.1", "Application Insights configured", 2, "6 - Management & Governance", str(data), sid, sname
@@ -2027,7 +2040,7 @@ def check_7_5(sid: str, sname: str) -> list[R]:
     check requires flow logs to already exist — their absence may mean the
     subscription has no NSGs (covered by check_7_11).
     """
-    rc, watchers = az(["network", "watcher", "list"], sid, timeout=20)
+    rc, watchers = az(["network", "watcher", "list"], sid, timeout=TIMEOUTS["default"])
     if rc != 0:
         return [
             _err("7.5", "NSG flow log retention > 90 days", 2, "7 - Networking Services", str(watchers), sid, sname)
@@ -2037,7 +2050,9 @@ def check_7_5(sid: str, sname: str) -> list[R]:
     for watcher in watchers or []:
         # Flow logs are listed per Network Watcher, scoped by location only
         rc2, flows = az(
-            ["network", "watcher", "flow-log", "list", "--location", watcher.get("location", "")], sid, timeout=20
+            ["network", "watcher", "flow-log", "list", "--location", watcher.get("location", "")],
+            sid,
+            timeout=TIMEOUTS["default"],
         )
         if rc2 != 0:
             continue  # Skip this watcher if flow log list fails
@@ -2151,7 +2166,7 @@ def check_7_8(sid: str, sname: str) -> list[R]:
     Filters flow logs to only those targeting VNet resources (identified by
     "virtualnetworks" appearing in the targetResourceId path).
     """
-    rc, watchers = az(["network", "watcher", "list"], sid, timeout=20)
+    rc, watchers = az(["network", "watcher", "list"], sid, timeout=TIMEOUTS["default"])
     if rc != 0:
         return [
             _err("7.8", "VNet flow log retention > 90 days", 2, "7 - Networking Services", str(watchers), sid, sname)
@@ -2160,7 +2175,9 @@ def check_7_8(sid: str, sname: str) -> list[R]:
     results = []
     for watcher in watchers or []:
         rc2, flows = az(
-            ["network", "watcher", "flow-log", "list", "--location", watcher.get("location", "")], sid, timeout=20
+            ["network", "watcher", "flow-log", "list", "--location", watcher.get("location", "")],
+            sid,
+            timeout=TIMEOUTS["default"],
         )
         if rc2 != 0:
             continue
@@ -2585,7 +2602,7 @@ def check_8_1_defender(sid: str, sname: str) -> list[R]:
 
     results = []
     for ctrl, title, plan, level in plans:
-        rc, data = az(["security", "pricing", "show", "-n", plan], sid, timeout=20)
+        rc, data = az(["security", "pricing", "show", "-n", plan], sid, timeout=TIMEOUTS["default"])
         if rc != 0:
             results.append(_err(ctrl, title, level, "8 - Security Services", str(data), sid, sname))
             continue
@@ -2623,7 +2640,7 @@ def check_8_1_3_3(sid: str, sname: str) -> R:
         f"https://management.azure.com/subscriptions/{sid}/"
         f"providers/Microsoft.Security/settings?api-version=2022-05-01"
     )
-    rc, data = az_rest(url, timeout=20)
+    rc, data = az_rest(url, timeout=TIMEOUTS["default"])
     if rc != 0:
         return _err(
             "8.1.3.3",
@@ -2672,7 +2689,7 @@ def check_8_1_10(sid: str, sname: str) -> R:
         f"providers/Microsoft.Security/serverVulnerabilityAssessmentsSettings?"
         f"api-version=2023-05-01"
     )
-    rc, data = az_rest(url, timeout=20)
+    rc, data = az_rest(url, timeout=TIMEOUTS["default"])
     if rc != 0:
         return _err(
             "8.1.10", "Defender configured to check VM OS updates", 1, "8 - Security Services", str(data), sid, sname
@@ -2720,7 +2737,7 @@ def check_8_1_12_to_15(sid: str, sname: str) -> list[R]:
     results = []
 
     # Fetch contact list from stable GA API
-    rc, contacts = az(["security", "contact", "list"], sid, timeout=20)
+    rc, contacts = az(["security", "contact", "list"], sid, timeout=TIMEOUTS["default"])
     contact_list = contacts if (rc == 0 and isinstance(contacts, list)) else []
 
     # 8.1.12 — Owner role must be in the notificationsByRole.roles list
@@ -2774,7 +2791,7 @@ def check_8_1_12_to_15(sid: str, sname: str) -> list[R]:
         f"providers/Microsoft.Security/securityContacts"
         f"?api-version=2023-12-01-preview"
     )
-    rc2, cdata = az_rest(url, timeout=20)
+    rc2, cdata = az_rest(url, timeout=TIMEOUTS["default"])
     contact_items = cdata.get("value") or [] if rc2 == 0 and isinstance(cdata, dict) else []
 
     # 8.1.14 — Alert notification state must be "On"
@@ -2995,7 +3012,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "[?attributes.enabled==`true`].{name:name,expires:attributes.expires}",
                 ],
                 sid,
-                timeout=20,
+                timeout=TIMEOUTS["default"],
             )
             if rc != 0:
                 # Permission denied or other error; report as ERROR result
@@ -3051,7 +3068,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "[?attributes.enabled==`true`].{name:name,expires:attributes.expires}",
                 ],
                 sid,
-                timeout=20,
+                timeout=TIMEOUTS["default"],
             )
             if rc != 0:
                 # Permission denied or other error; report as ERROR result
@@ -3092,7 +3109,9 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         # A rotation policy with a "Rotate" lifetime action automates key
         # rotation, eliminating the risk of keys being left unrotated because
         # no one remembers to do it manually. One result per key.
-        rc, keys2 = az(["keyvault", "key", "list", "--vault-name", vname, "--query", "[].name"], sid, timeout=20)
+        rc, keys2 = az(
+            ["keyvault", "key", "list", "--vault-name", vname, "--query", "[].name"], sid, timeout=TIMEOUTS["default"]
+        )
         if rc != 0:
             # Permission denied or other error; report as ERROR result
             error_msg = str(keys2) if isinstance(keys2, str) else "Access denied or error listing keys"
@@ -3115,7 +3134,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 rc2, pol = az(
                     ["keyvault", "key", "rotation-policy", "show", "--vault-name", vname, "--name", kname],
                     sid,
-                    timeout=20,
+                    timeout=TIMEOUTS["default"],
                 )
                 if rc2 != 0:
                     # Permission denied or other error for this specific key
@@ -3164,7 +3183,11 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         # Short-lived certificates limit the window of exposure if a private key
         # is compromised. Certificates with >12 month validity require long-term
         # private key protection and delay detection of key compromise.
-        rc, certs = az(["keyvault", "certificate", "list", "--vault-name", vname, "--query", "[].id"], sid, timeout=20)
+        rc, certs = az(
+            ["keyvault", "certificate", "list", "--vault-name", vname, "--query", "[].id"],
+            sid,
+            timeout=TIMEOUTS["default"],
+        )
         if rc != 0:
             # Permission denied or other error; report as ERROR result
             error_msg = str(certs) if isinstance(certs, str) else "Access denied or error listing certificates"
@@ -3196,7 +3219,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         "policy.x509CertificateProperties.validityInMonths",
                     ],
                     sid,
-                    timeout=20,
+                    timeout=TIMEOUTS["default"],
                 )
                 if rc2 != 0:
                     # Permission denied or other error for this specific certificate
@@ -3393,7 +3416,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     # via az CLI and normalise the field names to match what Resource Graph
     # returns — so the complete set of per-control checks can still run.
     if not accounts:
-        rc_list, az_accounts = az(["storage", "account", "list"], sid, timeout=30)
+        rc_list, az_accounts = az(["storage", "account", "list"], sid, timeout=TIMEOUTS["storage_list"])
         if rc_list != 0 or not az_accounts:
             # Genuinely no storage accounts (or CLI also failed).
             # Instead of returning a single aggregated "9.x" control id, emit
@@ -3618,7 +3641,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         rc_blob, blob_props = az(
             ["storage", "account", "blob-service-properties", "show", "--account-name", aname, "--resource-group", rg],
             sid,
-            timeout=15,
+            timeout=TIMEOUTS["storage_svc"],
         )
 
         if rc_blob == 0 and isinstance(blob_props, dict):
@@ -3716,7 +3739,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         rc_file, file_props = az(
             ["storage", "account", "file-service-properties", "show", "--account-name", aname, "--resource-group", rg],
             sid,
-            timeout=15,
+            timeout=TIMEOUTS["storage_svc"],
         )
 
         if rc_file == 0 and isinstance(file_props, dict):
@@ -3825,7 +3848,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         rc_acct, acct_details = az(
             ["storage", "account", "show", "--name", aname, "--resource-group", rg, "--query", "keyPolicy"],
             sid,
-            timeout=15,
+            timeout=TIMEOUTS["storage_svc"],
         )
         if rc_acct == 0:
             key_policy = acct_details if isinstance(acct_details, dict) else {}
@@ -3878,7 +3901,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 acct.get("id", ""),
             ],
             sid,
-            timeout=25,
+            timeout=TIMEOUTS["activity_log"],
         )
 
         if rc_log == 0:
@@ -3925,7 +3948,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     # GROUP 5 — Resource locks (9.3.9, 9.3.10)
     # Single subscription-wide az lock list call; matched against every account.
     # ────────────────────────────────────────────────────────────────────────
-    rc_lk, all_locks = az(["lock", "list", "--subscription", sid], sid, timeout=20)
+    rc_lk, all_locks = az(["lock", "list", "--subscription", sid], sid, timeout=TIMEOUTS["default"])
     if rc_lk != 0:
         lk_msg = _friendly_error(str(all_locks))
         for acct in accounts:

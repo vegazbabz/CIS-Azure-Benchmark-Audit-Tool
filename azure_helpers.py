@@ -52,7 +52,6 @@ def _first_error_line(msg: str) -> str:
 
 _AUTHZ_TOKENS = frozenset(
     [
-        "forbidden",
         "forbiddenbyrbac",
         "not authorized",
         "authorizationfailed",
@@ -60,6 +59,23 @@ _AUTHZ_TOKENS = frozenset(
         "caller is not authorized",
     ]
 )
+
+# Firewall-block tokens must be checked BEFORE generic auth tokens because
+# "ForbiddenByFirewall" contains "forbidden" which would otherwise match _AUTHZ_TOKENS.
+_FIREWALL_TOKENS = frozenset(
+    [
+        "forbiddenbyFirewall",
+        "public network access is disabled",
+        "not allowed by its firewall rules",
+        "caller's ip address",
+    ]
+)
+
+
+def is_firewall_error(msg: str) -> bool:
+    """Return True if the error message indicates a network firewall block."""
+    lowered = str(msg).lower()
+    return any(t.lower() in lowered for t in _FIREWALL_TOKENS)
 
 
 def _friendly_error(msg: str) -> str:
@@ -71,6 +87,8 @@ def _friendly_error(msg: str) -> str:
     """
     if not msg:
         return "Unknown error"
+    if is_firewall_error(msg):
+        return "Firewall blocked — vault not reachable from this runner IP"
     lowered = str(msg).lower()
     if any(t in lowered for t in _AUTHZ_TOKENS):
         return "Insufficient permissions"

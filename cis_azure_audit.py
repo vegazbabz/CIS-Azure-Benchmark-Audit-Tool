@@ -41,10 +41,11 @@ during a write never produces a corrupt checkpoint file.
 
 PARALLEL EXECUTION
 ───────────────────
-Subscriptions are audited concurrently using a ThreadPoolExecutor. The
-default is 3 parallel workers (--parallel). Increasing this speeds up large
-tenants but risks hitting Azure API rate limits (HTTP 429). A warning is
-printed if you exceed 5 workers.
+Subscriptions are audited concurrently using either a ThreadPoolExecutor or
+ProcessPoolExecutor. The default is process mode with 2 workers
+(`--executor process --parallel 2`). You can override both values via CLI.
+Higher parallelism can speed up large tenants but may increase Azure API
+throttling (HTTP 429).
 
 REQUIREMENTS
 ─────────────
@@ -4362,9 +4363,9 @@ def _audit_subscription_worker(
 
 def run_audit(
     subs: list[dict[str, Any]],
-    parallel: int = 3,
+    parallel: int = 2,
     resume: bool = True,
-    executor_mode: str = "thread",
+    executor_mode: str = "process",
     adaptive_concurrency: bool = True,
 ) -> list[R]:
     """
@@ -4376,7 +4377,7 @@ def run_audit(
       2. Run tenant-level identity checks ONCE (not per subscription).
          These produce results without a subscription_id / subscription_name.
       3. Prefetch all Resource Graph data across all remaining subscriptions.
-    4. Audit remaining subscriptions in parallel using thread or process workers.
+        4. Audit remaining subscriptions in parallel using thread or process workers.
       5. Merge all results and return.
 
     Thread-safe counter: A locked counter tracks how many subscriptions have
@@ -4386,9 +4387,9 @@ def run_audit(
     Parameters
     ──────────
     subs     : Full list of subscription dicts to audit (id, name)
-    parallel             : Max concurrent workers requested (default 3)
+    parallel             : Max concurrent workers requested (default 2)
     resume               : If True, skip subscriptions with existing checkpoints
-    executor_mode        : "thread" (default) or "process"
+    executor_mode        : "process" (default) or "thread"
     adaptive_concurrency : If True, reduce/increase workers based on throttling
 
     Returns
@@ -5072,14 +5073,14 @@ Examples:
         "--parallel",
         "-p",
         type=int,
-        default=3,
-        help="Number of concurrent subscription workers (default: 3, max recommended: 5)",
+        default=2,
+        help="Number of concurrent subscription workers (default: 2, max recommended: 5)",
     )
     parser.add_argument(
         "--executor",
         choices=["thread", "process"],
-        default="thread",
-        help="Worker backend for per-subscription audits (default: thread)",
+        default="process",
+        help="Worker backend for per-subscription audits (default: process)",
     )
     parser.add_argument(
         "--no-adaptive-concurrency",

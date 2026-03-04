@@ -14,6 +14,8 @@ import subprocess
 
 
 class TestRunCmdWithRetries(unittest.TestCase):
+    """Validates retry/backoff outcomes for transient and fatal subprocess errors."""
+
     @patch("azure_helpers.logger")
     @patch("azure_helpers.time.sleep", lambda s: None)
     def test_retry_on_429_then_success(self, mock_logger: Any) -> None:

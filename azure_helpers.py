@@ -26,6 +26,8 @@ import threading
 # module-level logger; this will inherit the level set by the caller
 logger = logging.getLogger(__name__)
 
+# Tracks transient throttling retries across command calls so the orchestrator
+# can adapt worker concurrency between subscription batches.
 _rate_limit_retries = 0
 _rate_limit_lock = threading.Lock()
 

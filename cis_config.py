@@ -25,7 +25,19 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from pathlib import Path
+from typing import Any
+
+# TOML parsing: tomllib is stdlib on Python 3.11+; fall back to tomli on 3.10.
+# The sys.version_info guard lets mypy resolve the right branch per version.
+if sys.version_info >= (3, 11):
+    import tomllib as _tomllib
+else:
+    try:
+        import tomli as _tomllib  # type: ignore[import-not-found]
+    except ImportError:
+        _tomllib = None  # type: ignore[assignment]
 
 # ── Tool / benchmark identity ──────────────────────────────────────────────────
 VERSION = "1.0.0"  # Written into checkpoints for change detection
@@ -115,21 +127,16 @@ def load_config_file(path: Path | None = None) -> None:
         return  # No config file — use built-in defaults, that's fine
 
     # --- parse TOML ---
-    try:
-        import tomllib  # Python 3.11+
-    except ImportError:
-        try:
-            import tomli as tomllib  # type: ignore[no-redef]
-        except ImportError:
-            LOGGER.warning(
-                "cis_audit.toml found but tomllib/tomli is not available. "
-                "Install tomli (pip install tomli) on Python < 3.11 to use config files."
-            )
-            return
+    if _tomllib is None:
+        LOGGER.warning(
+            "cis_audit.toml found but tomllib/tomli is not available. "
+            "Install tomli (pip install tomli) on Python < 3.11 to use config files."
+        )
+        return
 
     try:
         with open(path, "rb") as fh:
-            data = tomllib.load(fh)
+            data: dict[str, Any] = _tomllib.load(fh)
     except Exception as exc:
         LOGGER.warning("Failed to parse config file %s: %s", path, exc)
         return

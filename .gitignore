@@ -1,0 +1,26 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# ── Audit outputs (contain tenant/subscription data) ──────────────────────────
+*.html
+*.log
+cis_checkpoints/
+
+# ── Local notes / AI session files ────────────────────────────────────────────
+.claude/
+*.txt
+
+# ── Editor / OS ───────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

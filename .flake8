@@ -1,0 +1,19 @@
+[flake8]
+# Match black's default line length so the two tools agree on wrapping.
+# Long strings inside HTML templates and Kusto queries are exempt via noqa.
+max-line-length = 120
+# E203  whitespace before ':'   — conflicts with black slice formatting
+# W503  line break before binary operator — conflicts with black
+extend-ignore = E203, W503
+# Exclude only virtual environments, caches, and build artifacts.
+# Project source files are fully linted.
+exclude =
+    .venv,
+    venv,
+    __pycache__,
+    .git,
+    .github,
+    cis_checkpoints,
+    *.egg-info,
+    build,
+    dist

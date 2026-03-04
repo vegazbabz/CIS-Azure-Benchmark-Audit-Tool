@@ -1,0 +1,4 @@
+[tool.black]
+# All project source files are formatted; no file-level exclusions.
+line-length = 120
+target-version = ["py38", "py39", "py310", "py311"]

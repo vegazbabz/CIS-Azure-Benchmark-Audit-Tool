@@ -43,7 +43,7 @@ PARALLEL EXECUTION
 ───────────────────
 Subscriptions are audited concurrently using either a ThreadPoolExecutor or
 ProcessPoolExecutor. The default is process mode with 2 workers
-(`--executor process --parallel 2`). You can override both values via CLI.
+(`--executor thread --parallel 3`). You can override both values via CLI.
 Higher parallelism can speed up large tenants but may increase Azure API
 throttling (HTTP 429).
 
@@ -4360,9 +4360,9 @@ def _audit_subscription_worker(
 
 def run_audit(
     subs: list[dict[str, Any]],
-    parallel: int = 2,
+    parallel: int = 3,
     resume: bool = True,
-    executor_mode: str = "process",
+    executor_mode: str = "thread",
     adaptive_concurrency: bool = True,
 ) -> list[R]:
     """
@@ -5070,14 +5070,14 @@ Examples:
         "--parallel",
         "-p",
         type=int,
-        default=2,
-        help="Number of concurrent subscription workers (default: 2, max recommended: 5)",
+        default=3,
+        help="Number of concurrent subscription workers (default: 3, max recommended: 5)",
     )
     parser.add_argument(
         "--executor",
         choices=["thread", "process"],
-        default="process",
-        help="Worker backend for per-subscription audits (default: process)",
+        default="thread",
+        help="Worker backend for per-subscription audits (default: thread)",
     )
     parser.add_argument(
         "--no-adaptive-concurrency",

@@ -117,21 +117,47 @@ from cis_report import _STATUS_STYLE, generate_html
 # Check helpers and modular check functions
 from checks_s2 import check_2_1_2, check_2_1_7, check_2_1_9, check_2_1_10, check_2_1_11
 from checks_s5 import (
-    check_5_1_1, check_5_1_2, check_5_3_3, check_5_4,
-    check_5_14, check_5_15, check_5_16, check_5_23, check_5_27,
+    check_5_1_1,
+    check_5_1_2,
+    check_5_3_3,
+    check_5_4,
+    check_5_14,
+    check_5_15,
+    check_5_16,
+    check_5_23,
+    check_5_27,
 )
 from checks_s6 import (
-    check_6_1_1_1, check_6_1_1_2, check_6_1_1_4, check_6_1_1_6,
-    check_6_1_2_alerts, check_6_1_3_1,
+    check_6_1_1_1,
+    check_6_1_1_2,
+    check_6_1_1_4,
+    check_6_1_1_6,
+    check_6_1_2_alerts,
+    check_6_1_3_1,
 )
 from checks_s7 import (
-    check_7_1, check_7_2, check_7_3, check_7_4, check_7_5,
-    check_7_6, check_7_8, check_7_10, check_7_11, check_7_12,
-    check_7_13, check_7_14, check_7_15,
+    check_7_1,
+    check_7_2,
+    check_7_3,
+    check_7_4,
+    check_7_5,
+    check_7_6,
+    check_7_8,
+    check_7_10,
+    check_7_11,
+    check_7_12,
+    check_7_13,
+    check_7_14,
+    check_7_15,
 )
 from checks_s8 import (
-    check_8_1_defender, check_8_1_3_3, check_8_1_10,
-    check_8_1_12_to_15, check_8_3_keyvaults, check_8_4_1, check_8_5,
+    check_8_1_defender,
+    check_8_1_3_3,
+    check_8_1_10,
+    check_8_1_12_to_15,
+    check_8_3_keyvaults,
+    check_8_4_1,
+    check_8_5,
 )
 from checks_s9 import check_9_storage
 

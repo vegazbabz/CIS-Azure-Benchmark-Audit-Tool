@@ -11,28 +11,27 @@ import unittest
 from typing import Any
 from unittest.mock import patch
 
-import azure_helpers
+import az_identity
 
 
 class TestPermissionHelpers(unittest.TestCase):
     """Covers low-level identity and role helper functions."""
 
-    @patch("azure_helpers.az")
+    @patch("az_identity.az")
     def test_get_signed_in_user_id_success(self, mock_az: Any) -> None:
         """Returns object ID when signed-in-user query succeeds immediately."""
         mock_az.return_value = (0, "abcd-1234\n")
-        uid = azure_helpers.get_signed_in_user_id()
+        uid = az_identity.get_signed_in_user_id()
         self.assertEqual(uid, "abcd-1234")
         mock_az.assert_called_with(["ad", "signed-in-user", "show", "--query", "objectId"])
 
-    @patch("azure_helpers.az")
+    @patch("az_identity.az")
     def test_get_signed_in_user_id_upn_fallback(self, mock_az: Any) -> None:
         """Falls back from object-id lookup to UPN resolution path."""
         # first call fails, second returns UPN, third resolves to objectId
         mock_az.side_effect = [(1, "error"), (0, "user@contoso.com\n"), (0, "abcd-5678\n")]
-        uid = azure_helpers.get_signed_in_user_id()
+        uid = az_identity.get_signed_in_user_id()
         self.assertEqual(uid, "abcd-5678")
-        # verify the sequence of CLI invocations
         expected = [
             ["ad", "signed-in-user", "show", "--query", "objectId"],
             ["account", "show", "--query", "user.name"],
@@ -40,19 +39,18 @@ class TestPermissionHelpers(unittest.TestCase):
         ]
         self.assertEqual(mock_az.call_args_list, [unittest.mock.call(x) for x in expected])
 
-    @patch("azure_helpers.az")
+    @patch("az_identity.az")
     def test_get_signed_in_user_id_failure(self, mock_az: Any) -> None:
         """Returns ``None`` when all identity lookup attempts fail."""
         mock_az.return_value = (1, "error")
-        self.assertIsNone(azure_helpers.get_signed_in_user_id())
+        self.assertIsNone(az_identity.get_signed_in_user_id())
 
-    @patch("azure_helpers.az")
+    @patch("az_identity.az")
     def test_list_roles_per_subscription(self, mock_az: Any) -> None:
         """Lists role assignments for a GUID assignee in subscription scope."""
         mock_az.return_value = (0, ["Reader", "Security Reader"])
-        # Test with GUID (should use --assignee)
         guid = "abcd1234-5678-1234-5678-abcdefabcdef"
-        rc, roles = azure_helpers.list_role_names_for_user(guid, "sub")
+        rc, roles = az_identity.list_role_names_for_user(guid, "sub")
         self.assertEqual(rc, 0)
         self.assertListEqual(roles, ["Reader", "Security Reader"])
         mock_az.assert_called_with(
@@ -71,12 +69,11 @@ class TestPermissionHelpers(unittest.TestCase):
             ]
         )
 
-    @patch("azure_helpers.az")
+    @patch("az_identity.az")
     def test_list_roles_no_subscription(self, mock_az: Any) -> None:
         """Lists role assignments for UPN assignee without subscription scope."""
         mock_az.return_value = (0, ["Reader"])
-        # Test with a UPN (non-GUID) — should use --assignee with --include-groups
-        rc, roles = azure_helpers.list_role_names_for_user("user@contoso.com")
+        rc, roles = az_identity.list_role_names_for_user("user@contoso.com")
         self.assertEqual(rc, 0)
         self.assertListEqual(roles, ["Reader"])
         mock_az.assert_called_with(
@@ -93,11 +90,11 @@ class TestPermissionHelpers(unittest.TestCase):
             ]
         )
 
-    @patch("azure_helpers.az")
+    @patch("az_identity.az")
     def test_list_roles_error_passthrough(self, mock_az: Any) -> None:
         """Propagates CLI error output unchanged to the caller."""
         mock_az.return_value = (2, "boom")
-        rc, out = azure_helpers.list_role_names_for_user("u", "sub")
+        rc, out = az_identity.list_role_names_for_user("u", "sub")
         self.assertEqual(rc, 2)
         self.assertEqual(out, "boom")
 
@@ -112,14 +109,12 @@ class TestPreflight(unittest.TestCase):
         """Preflight passes when Reader + Security Reader are present."""
         mock_user.return_value = "u"
 
-        # return both needed roles for sub1 (tenant roles are ignored)
         def list_side(user_id: str, sub: str | None = None) -> tuple[int, list[str]]:
             if sub:
                 return 0, ["Reader", "Security Reader"]
             return 0, []
 
         mock_list.side_effect = list_side
-        # should not raise
         import cis_azure_audit as mod
 
         subs = [{"name": "sub1", "id": "s1"}]
@@ -130,7 +125,6 @@ class TestPreflight(unittest.TestCase):
     @patch("cis_azure_audit.list_role_names_for_user")
     def test_preflight_missing(self, mock_list: Any, mock_user: Any, mock_print: Any) -> None:
         """Preflight exits with error when signed-in identity is unavailable."""
-        # return None to exercise the "unable to determine" message
         mock_user.return_value = None
         import cis_azure_audit as mod
 
@@ -146,7 +140,6 @@ class TestPreflight(unittest.TestCase):
         """Preflight exits with error when no security-prefixed role exists."""
         mock_user.return_value = "u"
 
-        # simulate missing any security-related role on sub
         def list_side(user_id: str, sub: str | None = None) -> tuple[int, list[str]]:
             if sub:
                 return 0, ["Reader"]
@@ -167,7 +160,6 @@ class TestPreflight(unittest.TestCase):
         """Preflight passes when Security Admin is present instead of Reader role variant."""
         mock_user.return_value = "u"
 
-        # Reader plus Security Admin should satisfy the check
         def list_side(user_id: str, sub: str | None = None) -> tuple[int, list[str]]:
             if sub:
                 return 0, ["Reader", "Security Admin"]
@@ -177,7 +169,6 @@ class TestPreflight(unittest.TestCase):
         import cis_azure_audit as mod
 
         subs = [{"name": "sub1", "id": "s1"}]
-        # should not raise
         mod.preflight_permissions(subs)
 
     @patch("cis_azure_audit.generate_html")

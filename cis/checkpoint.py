@@ -19,8 +19,8 @@ import json
 from dataclasses import asdict
 from typing import Any
 
-from cis_config import BENCHMARK_VER, CHECKPOINT_DIR, LOGGER, VERSION
-from cis_models import R
+from cis.config import BENCHMARK_VER, CHECKPOINT_DIR, LOGGER, VERSION
+from cis.models import R
 
 
 def save_checkpoint(sid: str, sname: str, results: list[R], status: str = "completed") -> None:

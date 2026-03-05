@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis_config import PASS, FAIL, INFO, TIMEOUTS
-from cis_models import R
-from cis_check_helpers import _err, _idx, _info
-from azure_helpers import az
+from cis.config import PASS, FAIL, INFO, TIMEOUTS
+from cis.models import R
+from cis.check_helpers import _err, _idx, _info
+from azure.helpers import az
 
 
 def check_2_1_2(sid: str, sname: str, td: dict[str, Any]) -> list[R]:

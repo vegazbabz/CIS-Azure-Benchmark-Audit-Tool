@@ -16,7 +16,7 @@ import sys
 import threading
 from typing import Any
 
-from cis_config import INTERNET_SRCS, TRACE_LEVEL
+from cis.config import INTERNET_SRCS, TRACE_LEVEL
 
 # ── Thread-safe console state ─────────────────────────────────────────────────
 # A single lock shared by all threads. Without it, parallel workers would

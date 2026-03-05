@@ -75,9 +75,11 @@ from typing import Any
 import sys  # sys.exit(), sys.platform (Windows vs Unix az path)
 import argparse  # CLI argument parsing
 import datetime  # Timestamps in checkpoints and reports
+import logging  # setLevel override for --quiet
 import os  # operating system interfaces (environment variables)
 import threading  # Lock for thread-safe console output in parallel runs
 import shutil  # shutil.rmtree() used by --fresh to clear checkpoints
+from pathlib import Path  # --output-dir path manipulation
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed  # Parallel workers
 
 # Configuration constants (version, timeouts, status codes, role GUIDs, etc.)
@@ -646,6 +648,7 @@ def run_audit(
     resume: bool = True,
     executor_mode: str = DEFAULT_EXECUTOR,
     adaptive_concurrency: bool = True,
+    quiet: bool = False,
 ) -> list[R]:
     """
     Orchestrate the full audit across all subscriptions.
@@ -700,7 +703,8 @@ def run_audit(
         LOGGER.warning("⚠️  --parallel must be >= 1; using %d", requested_parallel)
     if requested_parallel > 5:
         LOGGER.warning(
-            "⚠️  Requested --parallel=%d may trigger API throttling; adaptive mode will tune this if needed.",
+            "⚠️  --parallel=%d is high and may trigger Azure API rate limits (HTTP 429). "
+            "Monitor for 429 errors; adaptive mode will reduce workers if throttling is detected.",
             requested_parallel,
         )
 
@@ -762,7 +766,8 @@ def run_audit(
     else:
         progress = None
         task_id = 0
-        console_init(len(todo))
+        if not quiet:
+            console_init(len(todo))
 
     # ── Thread-safe subscription counter ─────────────────────────────────────
     # _started tracks how many subscriptions have begun processing.
@@ -794,7 +799,8 @@ def run_audit(
                 if progress is not None:
                     progress.update(task_id, description=sub.get("name", ""))
                 else:
-                    console_update(n, _total, sub.get("name", ""))
+                    if not quiet:
+                        console_update(n, _total, sub.get("name", ""))
 
                 LOGGER.debug("  ▶  [%d/%d] Starting:  %s", n, _total, sub["name"])
                 progress_label = f"{n}/{_total} "
@@ -858,7 +864,8 @@ def run_audit(
         except Exception:
             pass
     else:
-        console_finish()
+        if not quiet:
+            console_finish()
 
     # Tenant results are added ONCE after all subscription workers complete.
     # They must not be inside the parallel loop or they will be duplicated
@@ -955,6 +962,17 @@ Examples:
         help="Output HTML report filename (default: cis_azure_audit_report.html)",
     )
     parser.add_argument(
+        "--output-dir",
+        metavar="DIR",
+        help="Directory for the HTML report and checkpoint files (default: current working directory)",
+    )
+    parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress subscription names and resource-level detail from console output",
+    )
+    parser.add_argument(
         "--parallel",
         "-p",
         type=int,
@@ -999,6 +1017,23 @@ Examples:
     args = parser.parse_args()
 
     setup_logging(args.log_level, verbose=args.verbose, debug=args.debug, log_file=args.log_file)
+
+    # ── --quiet: suppress INFO-level console output ───────────────────────────
+    if args.quiet and not args.verbose and not args.debug:
+        logging.getLogger().setLevel(logging.WARNING)
+
+    # ── --output-dir: redirect report and checkpoints to a single directory ───
+    if args.output_dir:
+        import cis_config as _cfg
+        import cis_checkpoint as _ckpt
+
+        out_dir = Path(args.output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        new_ckpt_dir = out_dir / "cis_checkpoints"
+        _cfg.CHECKPOINT_DIR = new_ckpt_dir
+        setattr(_ckpt, "CHECKPOINT_DIR", new_ckpt_dir)
+        if not Path(args.output).is_absolute():
+            args.output = str(out_dir / args.output)
 
     # Start timer for elapsed time display in final summary
     start_time = datetime.datetime.now(datetime.timezone.utc)
@@ -1088,6 +1123,7 @@ Examples:
             resume=not args.fresh,
             executor_mode=args.executor,
             adaptive_concurrency=not args.no_adaptive_concurrency,
+            quiet=args.quiet,
         )
 
     # ── Level filter ──────────────────────────────────────────────────────────

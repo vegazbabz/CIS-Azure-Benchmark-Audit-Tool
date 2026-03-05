@@ -195,6 +195,7 @@ def generate_html(
     writer = csv.DictWriter(
         csv_buf,
         fieldnames=["control", "level", "title", "subscription", "resource", "status", "details"],
+        lineterminator="\n",
     )
     writer.writeheader()
     writer.writerows(json_data)

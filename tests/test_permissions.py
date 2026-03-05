@@ -11,13 +11,13 @@ import unittest
 from typing import Any
 from unittest.mock import patch
 
-import az_identity
+import azure.identity as az_identity
 
 
 class TestPermissionHelpers(unittest.TestCase):
     """Covers low-level identity and role helper functions."""
 
-    @patch("az_identity.az")
+    @patch("azure.identity.az")
     def test_get_signed_in_user_id_success(self, mock_az: Any) -> None:
         """Returns object ID when signed-in-user query succeeds immediately."""
         mock_az.return_value = (0, "abcd-1234\n")
@@ -25,7 +25,7 @@ class TestPermissionHelpers(unittest.TestCase):
         self.assertEqual(uid, "abcd-1234")
         mock_az.assert_called_with(["ad", "signed-in-user", "show", "--query", "objectId"])
 
-    @patch("az_identity.az")
+    @patch("azure.identity.az")
     def test_get_signed_in_user_id_upn_fallback(self, mock_az: Any) -> None:
         """Falls back from object-id lookup to UPN resolution path."""
         # first call fails, second returns UPN, third resolves to objectId
@@ -39,13 +39,13 @@ class TestPermissionHelpers(unittest.TestCase):
         ]
         self.assertEqual(mock_az.call_args_list, [unittest.mock.call(x) for x in expected])
 
-    @patch("az_identity.az")
+    @patch("azure.identity.az")
     def test_get_signed_in_user_id_failure(self, mock_az: Any) -> None:
         """Returns ``None`` when all identity lookup attempts fail."""
         mock_az.return_value = (1, "error")
         self.assertIsNone(az_identity.get_signed_in_user_id())
 
-    @patch("az_identity.az")
+    @patch("azure.identity.az")
     def test_list_roles_per_subscription(self, mock_az: Any) -> None:
         """Lists role assignments for a GUID assignee in subscription scope."""
         mock_az.return_value = (0, ["Reader", "Security Reader"])
@@ -69,7 +69,7 @@ class TestPermissionHelpers(unittest.TestCase):
             ]
         )
 
-    @patch("az_identity.az")
+    @patch("azure.identity.az")
     def test_list_roles_no_subscription(self, mock_az: Any) -> None:
         """Lists role assignments for UPN assignee without subscription scope."""
         mock_az.return_value = (0, ["Reader"])
@@ -90,7 +90,7 @@ class TestPermissionHelpers(unittest.TestCase):
             ]
         )
 
-    @patch("az_identity.az")
+    @patch("azure.identity.az")
     def test_list_roles_error_passthrough(self, mock_az: Any) -> None:
         """Propagates CLI error output unchanged to the caller."""
         mock_az.return_value = (2, "boom")

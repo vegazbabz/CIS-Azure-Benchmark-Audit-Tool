@@ -52,6 +52,12 @@ def setup_logging(log_level: str, verbose: bool = False, debug: bool = False, lo
     root_logger.handlers.clear()
     root_logger.setLevel(effective_level)
 
+    # Force UTF-8 on Windows where the console may default to cp1252
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(effective_level)
     console_handler.setFormatter(logging.Formatter("%(message)s"))

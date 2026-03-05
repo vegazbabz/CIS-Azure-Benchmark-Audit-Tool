@@ -339,8 +339,8 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     <option value="">All levels</option>
     <option value="L1">Level 1</option><option value="L2">Level 2</option>
   </select>
-  <button id="btn-json">Export JSON</button>
-  <button id="btn-csv">Export CSV</button>
+  <button id="btn-json">Copy JSON</button>
+  <button id="btn-csv">Copy CSV</button>
 </div>
 <div class="wrap"><table>
 <thead><tr>
@@ -425,27 +425,28 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     }});
   }});
 
-  /* Export button handlers */
-  btnJSON.addEventListener('click', exportJSON);
-  btnCSV.addEventListener('click', exportCSV);
-
-  /* draw the compliance pie chart once the DOM is ready */
-  drawPie();
-
-  /* Helper functions for export and chart */
-  function download(filename, text) {{
-    var blob = new Blob([text], {{type: 'text/plain;charset=utf-8'}});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  /* Export button handlers — copy to clipboard (file:// safe) */
+  function copyText(btn, text) {{
+    navigator.clipboard.writeText(text).then(function() {{
+      var orig = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      setTimeout(function() {{ btn.textContent = orig; }}, 2000);
+    }}).catch(function() {{
+      /* Fallback: select from a temporary textarea */
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      var orig = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      setTimeout(function() {{ btn.textContent = orig; }}, 2000);
+    }});
   }}
 
-  function exportJSON() {{
+  btnJSON.addEventListener('click', function() {{
     var rows = document.querySelectorAll('#tb tr:not(.sh)');
     var arr = [];
     rows.forEach(function(r) {{
@@ -459,10 +460,10 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
         details: r.cells[5].textContent.trim()
       }});
     }});
-    download('audit.json', JSON.stringify(arr, null, 2));
-  }}
+    copyText(btnJSON, JSON.stringify(arr, null, 2));
+  }});
 
-  function exportCSV() {{
+  btnCSV.addEventListener('click', function() {{
     var rows = document.querySelectorAll('#tb tr:not(.sh)');
     var lines = ['Control,Level,Title,Subscription/Resource,Status,Details'];
     rows.forEach(function(r) {{
@@ -474,8 +475,11 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
       }}
       lines.push(vals.join(','));
     }});
-    download('audit.csv', lines.join('\n'));
-  }}
+    copyText(btnCSV, lines.join('\n'));
+  }});
+
+  /* draw the compliance pie chart once the DOM is ready */
+  drawPie();
 
   function drawPie() {{
     var canvas = document.getElementById('pie');

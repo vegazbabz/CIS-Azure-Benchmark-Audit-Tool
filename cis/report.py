@@ -95,12 +95,15 @@ def generate_html(
     sec_data_json = json.dumps(sec_data, ensure_ascii=False)
 
     rows = ""
-    for sec in sorted(sections, key=lambda s: _ctrl_sort_key(s.split(" ")[0])):
+    for sec_idx, sec in enumerate(sorted(sections, key=lambda s: _ctrl_sort_key(s.split(" ")[0]))):
         grp = sections[sec]
+        sec_id = f"sec-{sec_idx}"
         # Count passing checks in this section (INFO and MANUAL excluded)
         sp = sum(1 for r in grp if r.status == PASS)
         rows += (
-            f'<tr class="sh"><td colspan="6">'
+            f'<tr class="sh" data-sec-id="{sec_id}" onclick="toggleSec(\'{sec_id}\', this)">'
+            f'<td colspan="6">'
+            f'<span class="sec-arrow">▼</span>'
             f"<b>{html.escape(sec)}</b>"
             f'<span class="ss">{sp} of {len(grp)} checks passed</span>'
             f"</td></tr>\n"
@@ -128,6 +131,7 @@ def generate_html(
             # data-* attributes are used by the JavaScript filter function
             rows += (
                 f'<tr style="background:{bg}" '
+                f'data-sec="{sec_id}" '
                 f'data-status="{r.status}" data-level="L{r.level}" '
                 f'data-sub="{html.escape(r.subscription_name or "")}">'
                 f"<td><code>{html.escape(r.control_id)}</code></td>"
@@ -406,6 +410,10 @@ th     {{ font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
 /* ── Section header rows ── */
 tr.sh td {{ background: #f1f5f9; font-size: .8rem; color: #475569;
              border-top: 2px solid #cbd5e1; padding: .5rem .8rem; }}
+tr.sh  {{ cursor: pointer; user-select: none; }}
+tr.sh:hover td {{ background: #e2e8f0; }}
+.sec-arrow {{ display: inline-block; margin-right: .45rem; font-size: .8rem;
+              transition: transform .15s; }}
 .ss    {{ float: right; color: #94a3b8; font-weight: normal; }}
 
 /* ── Status badge ── */
@@ -594,12 +602,23 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   /* Active subscription filter — empty string means "show all" */
   var subF = '';
 
+  /* Tracks which section IDs are collapsed (true = collapsed) */
+  var _collapsed = {{}};
+
+  /* Toggle a section open/closed and re-apply the filter */
+  function toggleSec(id, hdr) {{
+    _collapsed[id] = !_collapsed[id];
+    hdr.querySelector('.sec-arrow').textContent = _collapsed[id] ? '▶' : '▼';
+    filter();
+  }}
+
   function filter(){{
     var sv  = s.value.toLowerCase();    // Search value (lowercase for case-insensitive match)
     var stv = st.value;                 // Selected status ("PASS", "FAIL", etc. or "")
     var lvv = lv.value;                 // Selected level ("L1", "L2", or "")
+    var filtering = !!(sv || stv || lvv || subF); // Any filter active?
 
-    /* Show/hide data rows based on all four filters */
+    /* Show/hide data rows — collapse state is overridden when a filter is active */
     document.querySelectorAll('#tb tr:not(.sh)').forEach(function(r){{
       var badge = r.querySelector('.badge');  // Status badge element
       var lb    = r.querySelector('.lv');     // Level badge element
@@ -609,19 +628,23 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
               && (!lvv || (lb    && lb.textContent === lvv))          // Level filter
               && (!subF || r.dataset.sub === subF);                   // Subscription filter
 
-      r.style.display = ok ? '' : 'none';
+      /* Store filter match for section-header visibility logic below */
+      r.dataset.filterMatch = ok ? '1' : '0';
+
+      /* When filtering, show all matching rows regardless of collapse state */
+      r.style.display = (ok && (!_collapsed[r.dataset.sec] || filtering)) ? '' : 'none';
     }});
 
-    /* Hide section header rows when all their data rows are hidden */
+    /* Hide section header rows only when no children match the current filter */
     document.querySelectorAll('#tb tr.sh').forEach(function(h){{
       var sib = h.nextElementSibling;
-      var vis = false;
+      var anyMatch = false;
       /* Walk siblings until the next section header (or end of tbody) */
       while (sib && !sib.classList.contains('sh')) {{
-        if (sib.style.display !== 'none') vis = true;
+        if (sib.dataset.filterMatch === '1') anyMatch = true;
         sib = sib.nextElementSibling;
       }}
-      h.style.display = vis ? '' : 'none';
+      h.style.display = anyMatch ? '' : 'none';
     }});
   }}
 

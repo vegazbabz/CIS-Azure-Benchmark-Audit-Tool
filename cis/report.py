@@ -434,12 +434,15 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 
   /* Helper functions for export and chart */
   function download(filename, text) {{
+    var blob = new Blob([text], {{type: 'text/plain;charset=utf-8'}});
+    var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
+    a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }}
 
   function exportJSON() {{

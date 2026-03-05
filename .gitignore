@@ -11,7 +11,10 @@ build/
 # ── Audit outputs (contain tenant/subscription data) ──────────────────────────
 *.html
 *.log
+*.json
+*.csv
 cis_checkpoints/
+run
 
 # ── Local notes / AI session files ────────────────────────────────────────────
 .claude/

@@ -7,8 +7,11 @@ report with embedded CSS, JavaScript, live filters, and export buttons.
 
 from __future__ import annotations
 
+import csv
 import datetime
 import html
+import io
+import json
 from pathlib import Path
 from typing import Any
 
@@ -169,6 +172,34 @@ def generate_html(
         else ""
     )
 
+    # ── Generate JSON and CSV export files alongside the HTML ─────────────────
+    base = Path(output).with_suffix("")
+    json_name = Path(output).stem + ".json"
+    csv_name = Path(output).stem + ".csv"
+
+    json_data = [
+        {
+            "control": r.control_id,
+            "level": r.level,
+            "title": r.title,
+            "subscription": r.subscription_name or "",
+            "resource": r.resource or "",
+            "status": r.status,
+            "details": r.details,
+        }
+        for r in results
+    ]
+    base.with_suffix(".json").write_text(json.dumps(json_data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    csv_buf = io.StringIO()
+    writer = csv.DictWriter(
+        csv_buf,
+        fieldnames=["control", "level", "title", "subscription", "resource", "status", "details"],
+    )
+    writer.writeheader()
+    writer.writerows(json_data)
+    base.with_suffix(".csv").write_text(csv_buf.getvalue(), encoding="utf-8")
+
     # ── Report timestamp ──────────────────────────────────────────────────────
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -230,6 +261,9 @@ header p  {{ opacity: .8; font-size: .9rem; }}
     font-size: .85rem; outline: none; }}
 .filters input {{ min-width: 220px; }}
 .filters input:focus {{ border-color: #2563eb; }}
+.exp-btn {{ background: #1e3a5f; color: #fff; border-radius: 6px; padding: .4rem .8rem;
+    font-size: .85rem; text-decoration: none; white-space: nowrap; }}
+.exp-btn:hover {{ background: #2563eb; }}
 
 /* ── Table wrapper ── */
 .wrap  {{ overflow-x: auto; padding: 0 2rem 2rem; }}
@@ -339,8 +373,8 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     <option value="">All levels</option>
     <option value="L1">Level 1</option><option value="L2">Level 2</option>
   </select>
-  <button id="btn-json">Copy JSON</button>
-  <button id="btn-csv">Copy CSV</button>
+  <a href="{json_name}" download class="exp-btn">&#8681; Export JSON</a>
+  <a href="{csv_name}" download class="exp-btn">&#8681; Export CSV</a>
 </div>
 <div class="wrap"><table>
 <thead><tr>
@@ -365,8 +399,6 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   var s  = document.getElementById('s');    // Search text input
   var st = document.getElementById('st');   // Status dropdown
   var lv = document.getElementById('lv');   // Level dropdown
-  var btnJSON = document.getElementById('btn-json');
-  var btnCSV  = document.getElementById('btn-csv');
 
   /* Counts passed from Python for chart drawing */
   var JS_COUNTS = {{PASS: {counts[PASS]}, FAIL: {counts[FAIL]}, ERROR: {counts[ERROR]}}};
@@ -423,59 +455,6 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
       }}
       filter();
     }});
-  }});
-
-  /* Export button handlers — copy to clipboard (file:// safe) */
-  function copyText(btn, text) {{
-    navigator.clipboard.writeText(text).then(function() {{
-      var orig = btn.textContent;
-      btn.textContent = '✓ Copied!';
-      setTimeout(function() {{ btn.textContent = orig; }}, 2000);
-    }}).catch(function() {{
-      /* Fallback: select from a temporary textarea */
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
-      document.body.appendChild(ta);
-      ta.focus(); ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      var orig = btn.textContent;
-      btn.textContent = '✓ Copied!';
-      setTimeout(function() {{ btn.textContent = orig; }}, 2000);
-    }});
-  }}
-
-  btnJSON.addEventListener('click', function() {{
-    var rows = document.querySelectorAll('#tb tr:not(.sh)');
-    var arr = [];
-    rows.forEach(function(r) {{
-      if (r.style.display === 'none') return;
-      arr.push({{
-        control: r.cells[0].textContent.trim(),
-        level: r.cells[1].textContent.trim(),
-        title: r.cells[2].textContent.trim(),
-        subscription: r.cells[3].textContent.trim(),
-        status: r.cells[4].textContent.trim(),
-        details: r.cells[5].textContent.trim()
-      }});
-    }});
-    copyText(btnJSON, JSON.stringify(arr, null, 2));
-  }});
-
-  btnCSV.addEventListener('click', function() {{
-    var rows = document.querySelectorAll('#tb tr:not(.sh)');
-    var lines = ['Control,Level,Title,Subscription/Resource,Status,Details'];
-    rows.forEach(function(r) {{
-      if (r.style.display === 'none') return;
-      var vals = [];
-      for (var i = 0; i < 6; i++) {{
-        var txt = r.cells[i].innerText.replace(/"/g, '""');
-        vals.push('"' + txt + '"');
-      }}
-      lines.push(vals.join(','));
-    }});
-    copyText(btnCSV, lines.join('\n'));
   }});
 
   /* draw the compliance pie chart once the DOM is ready */

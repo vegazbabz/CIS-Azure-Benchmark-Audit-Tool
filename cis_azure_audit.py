@@ -1040,6 +1040,38 @@ Examples:
 
     LOGGER.info("\n🔒 CIS Azure Foundations Benchmark v%s — Audit Tool v%s\n", BENCHMARK_VER, VERSION)
 
+    # ── Report-only: skip all Azure calls, load checkpoints directly ──────────
+    if args.report_only:
+        LOGGER.info("\n📊 Report-only mode...")
+        checkpoints = load_checkpoints()
+        all_results = []
+        for sub_id, cp in checkpoints.items():
+            all_results.extend(results_from_checkpoint(cp))
+            LOGGER.info("   ✅ Loaded: %s", cp.get("subscription_name", sub_id))
+        if args.level:
+            all_results = [r for r in all_results if r.level == args.level]
+        counts = {s: sum(1 for r in all_results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL]}
+        total = len(all_results)
+        score = round(counts[PASS] / max(total - counts[INFO] - counts[MANUAL], 1) * 100, 1)
+        elapsed = (datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds()
+        mins, secs = divmod(int(elapsed), 60)
+        elapsed_str = f"{mins}m {secs}s" if mins else f"{secs}s"
+        LOGGER.info("\n%s", "━" * 60)
+        LOGGER.info("  COMPLETE — %d checks  |  %d subscription(s)  |  ⏱ %s", total, len(checkpoints), elapsed_str)
+        LOGGER.info("  Compliance Score : %s%%  (excludes INFO/MANUAL)", score)
+        LOGGER.info(
+            "  ✅ PASS %4d  ❌ FAIL %4d  ⚠️ ERROR %4d  ℹ️ INFO %4d  📋 MANUAL %4d",
+            counts[PASS],
+            counts[FAIL],
+            counts[ERROR],
+            counts[INFO],
+            counts[MANUAL],
+        )
+        LOGGER.info("%s", "━" * 60)
+        LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)
+        generate_html(all_results, args.output)
+        return
+
     # ── Prerequisite: az CLI available ────────────────────────────────────────
     rc, ver = az(["version"])
     if rc != 0:
@@ -1100,31 +1132,18 @@ Examples:
         else:
             LOGGER.info("   ✅ Preflight completed successfully.")
 
-    # ── Audit or report-only ──────────────────────────────────────────────────
-    if args.report_only:
-        # Load checkpoints and build report without running any new checks
-        LOGGER.info("\n📊 Report-only mode...")
-        checkpoints = load_checkpoints()
-        all_results = []
-        for sub in subs:
-            if sub["id"] in checkpoints:
-                all_results.extend(results_from_checkpoint(checkpoints[sub["id"]]))
-                LOGGER.info("   ✅ Loaded: %s", sub["name"])
-            else:
-                LOGGER.warning("   ⚠️  No checkpoint found: %s", sub["name"])
-    else:
-        # Clear checkpoints if --fresh was requested
-        if args.fresh and CHECKPOINT_DIR.exists():
-            shutil.rmtree(CHECKPOINT_DIR)
-            LOGGER.info("\n🗑️  Cleared checkpoints.")
-        all_results = run_audit(
-            subs,
-            parallel=args.parallel,
-            resume=not args.fresh,
-            executor_mode=args.executor,
-            adaptive_concurrency=not args.no_adaptive_concurrency,
-            quiet=args.quiet,
-        )
+    # ── Full audit ────────────────────────────────────────────────────────────
+    if args.fresh and CHECKPOINT_DIR.exists():
+        shutil.rmtree(CHECKPOINT_DIR)
+        LOGGER.info("\n🗑️  Cleared checkpoints.")
+    all_results = run_audit(
+        subs,
+        parallel=args.parallel,
+        resume=not args.fresh,
+        executor_mode=args.executor,
+        adaptive_concurrency=not args.no_adaptive_concurrency,
+        quiet=args.quiet,
+    )
 
     # ── Level filter ──────────────────────────────────────────────────────────
     # Applied after audit so checkpoints always store all levels

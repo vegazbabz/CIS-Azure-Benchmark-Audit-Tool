@@ -36,6 +36,7 @@ def generate_html(
     output: str,
     scope_info: dict[str, Any] | None = None,
     history: list[dict[str, Any]] | None = None,
+    sub_timestamps: dict[str, str] | None = None,
 ) -> None:
     """
     Generate a self-contained HTML audit report from a list of R instances.
@@ -151,6 +152,30 @@ def generate_html(
     def _sub_score(s: dict[str, int]) -> float:
         return s[PASS] / max(s[PASS] + s[FAIL] + s[ERROR], 1) * 100
 
+    today = datetime.datetime.now(datetime.timezone.utc).date()
+
+    def _audited_cell(sname: str) -> str:
+        """Return an HTML <td> showing the audit date and staleness for a subscription."""
+        ts_str = (sub_timestamps or {}).get(sname)
+        if not ts_str:
+            return "<td>—</td>"
+        try:
+            audited = datetime.datetime.fromisoformat(ts_str.replace("Z", "+00:00")).date()
+        except ValueError:
+            return "<td>—</td>"
+        age = (today - audited).days
+        if age == 0:
+            label = "today"
+            color = "#64748b"
+        elif age == 1:
+            label = "yesterday"
+            color = "#64748b"
+        else:
+            label = f"{age}d ago"
+            color = "#d97706" if age <= 30 else "#dc2626"
+        date_str = audited.strftime("%b %d")
+        return f'<td style="color:{color};white-space:nowrap">{date_str}<br><small>{label}</small></td>'
+
     sub_rows_html = ""
     for sn in sorted(sub_stats, key=lambda x: _sub_score(sub_stats[x])):
         st = sub_stats[sn]
@@ -178,6 +203,7 @@ def generate_html(
             f'<td style="color:#64748b">{st[INFO]}</td>'
             f'<td style="color:#7c3aed">{st[MANUAL]}</td>'
             f'<td style="color:#64748b">{st[SUPPRESSED]}</td>'
+            f"{_audited_cell(sn)}"
             f"</tr>\n"
         )
     sub_table = (
@@ -189,6 +215,7 @@ def generate_html(
         "<th>Subscription</th><th>Score</th><th>Breakdown</th>"
         "<th>&#10003; Pass</th><th>&#10007; Fail</th>"
         "<th>&#9888; Error</th><th>Info</th><th>Manual</th><th>&#128263; Suppressed</th>"
+        "<th>Audited</th>"
         f"</tr></thead><tbody>{sub_rows_html}</tbody></table></div>"
         if sub_rows_html
         else ""

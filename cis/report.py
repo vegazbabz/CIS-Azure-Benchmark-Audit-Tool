@@ -79,6 +79,10 @@ def generate_html(
     l2_score = round(l2_counts[PASS] / max(l2_counts[PASS] + l2_counts[FAIL] + l2_counts[ERROR], 1) * 100, 1)
     l1_col = "#16a34a" if l1_score >= 80 else "#d97706" if l1_score >= 60 else "#dc2626"
     l2_col = "#16a34a" if l2_score >= 80 else "#d97706" if l2_score >= 60 else "#dc2626"
+    overall_pass = counts[PASS]
+    overall_total = counts[PASS] + counts[FAIL] + counts[ERROR]
+    l1_total = l1_counts[PASS] + l1_counts[FAIL] + l1_counts[ERROR]
+    l2_total = l2_counts[PASS] + l2_counts[FAIL] + l2_counts[ERROR]
 
     # ── Build table rows grouped by section ───────────────────────────────────
     # Group results by their section field and sort alphabetically
@@ -527,6 +531,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 .lv-badge {{ font-size: .62rem; font-weight: 700; color: #fff; border-radius: 3px;
     padding: 0 4px; margin-left: 4px; vertical-align: middle; }}
 .donut-pct {{ font-size: 1.45rem; font-weight: 800; line-height: 1; margin-top: .2rem; }}
+.donut-cnt {{ font-size: .72rem; color: #94a3b8; margin-top: .1rem; }}
 .donut-legend {{ display: flex; gap: .9rem; margin-top: .7rem; flex-wrap: wrap; }}
 .donut-legend span {{ display: flex; align-items: center; gap: .35rem;
     font-size: .74rem; color: #475569; }}
@@ -570,16 +575,19 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
       <div class="donut-label">Overall</div>
       <canvas id="d-overall" width="110" height="110"></canvas>
       <div id="pct-overall" class="donut-pct" style="color:{score_col}">{score}%</div>
+      <div id="cnt-overall" class="donut-cnt">{overall_pass} / {overall_total} pass</div>
     </div>
     <div class="donut-group">
       <div class="donut-label">Level 1<span class="lv-badge" style="background:#dc2626">L1</span></div>
       <canvas id="d-l1" width="110" height="110"></canvas>
       <div id="pct-l1" class="donut-pct" style="color:{l1_col}">{l1_score}%</div>
+      <div id="cnt-l1" class="donut-cnt">{l1_counts[PASS]} / {l1_total} pass</div>
     </div>
     <div class="donut-group">
       <div class="donut-label">Level 2<span class="lv-badge" style="background:#7c3aed">L2</span></div>
       <canvas id="d-l2" width="110" height="110"></canvas>
       <div id="pct-l2" class="donut-pct" style="color:{l2_col}">{l2_score}%</div>
+      <div id="cnt-l2" class="donut-cnt">{l2_counts[PASS]} / {l2_total} pass</div>
     </div>
     <div class="donut-legend">
       <span><i style="background:#16a34a"></i>Pass</span>
@@ -756,6 +764,13 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     [['pct-overall', sc], ['pct-l1', l1s], ['pct-l2', l2s]].forEach(function(pair) {{
       var el = document.getElementById(pair[0]);
       if (el) {{ el.textContent = pair[1] + '%'; el.style.color = scoreColor(pair[1]); }}
+    }});
+    var ot = counts.PASS + counts.FAIL + counts.ERROR;
+    var l1t = l1.pass + l1.fail + l1.error;
+    var l2t = l2.pass + l2.fail + l2.error;
+    [['cnt-overall', counts.PASS, ot], ['cnt-l1', l1.pass, l1t], ['cnt-l2', l2.pass, l2t]].forEach(function(t) {{
+      var el = document.getElementById(t[0]);
+      if (el) el.textContent = t[1] + ' / ' + t[2] + ' pass';
     }});
   }}
 

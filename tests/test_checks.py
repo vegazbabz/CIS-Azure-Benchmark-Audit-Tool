@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import unittest
 from unittest.mock import patch
 
@@ -18,7 +20,7 @@ SID = "sub-test-1234"
 SNAME = "Test Sub"
 
 
-def _td(key, records):
+def _td(key: str, records: list) -> dict:
     """Build a minimal prefetch dict for _idx lookups."""
     return {key: {SID.lower(): records}}
 
@@ -31,14 +33,14 @@ def _td(key, records):
 class TestCheck212(unittest.TestCase):
     """2.1.2 — NSGs configured for Databricks subnets."""
 
-    def test_no_workspaces_returns_info(self):
+    def test_no_workspaces_returns_info(self) -> None:
         td = _td("databricks", [])
         results = checks_s2.check_2_1_2(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, INFO)
         self.assertEqual(results[0].control_id, "2.1.2")
 
-    def test_workspace_no_custom_vnet_returns_info(self):
+    def test_workspace_no_custom_vnet_returns_info(self) -> None:
         # Empty vnetId means managed VNet — should return INFO (not a failure)
         td = _td("databricks", [{"name": "ws1", "vnetId": ""}])
         td["subnets"] = {SID.lower(): []}
@@ -46,7 +48,7 @@ class TestCheck212(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, INFO)
 
-    def test_subnet_missing_nsg_returns_fail(self):
+    def test_subnet_missing_nsg_returns_fail(self) -> None:
         td = _td(
             "databricks",
             [
@@ -66,7 +68,7 @@ class TestCheck212(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, FAIL)
 
-    def test_all_nsgs_present_returns_pass(self):
+    def test_all_nsgs_present_returns_pass(self) -> None:
         td = _td(
             "databricks",
             [
@@ -90,27 +92,27 @@ class TestCheck212(unittest.TestCase):
 class TestCheck217(unittest.TestCase):
     """2.1.7 — Diagnostic logging configured for Azure Databricks."""
 
-    def test_no_workspaces_returns_info(self):
+    def test_no_workspaces_returns_info(self) -> None:
         td = _td("databricks", [])
         results = checks_s2.check_2_1_7(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, INFO)
 
-    def test_az_fails_returns_error(self):
+    def test_az_fails_returns_error(self) -> None:
         td = _td("databricks", [{"name": "ws1", "id": "/ws/ws1"}])
         with patch("checks_s2.az", return_value=(1, "auth error")):
             results = checks_s2.check_2_1_7(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, ERROR)
 
-    def test_diag_settings_found_returns_pass(self):
+    def test_diag_settings_found_returns_pass(self) -> None:
         td = _td("databricks", [{"name": "ws1", "id": "/ws/ws1"}])
         with patch("checks_s2.az", return_value=(0, [{"name": "diag1"}])):
             results = checks_s2.check_2_1_7(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, PASS)
 
-    def test_no_diag_settings_returns_fail(self):
+    def test_no_diag_settings_returns_fail(self) -> None:
         td = _td("databricks", [{"name": "ws1", "id": "/ws/ws1"}])
         with patch("checks_s2.az", return_value=(0, [])):
             results = checks_s2.check_2_1_7(SID, SNAME, td)
@@ -121,19 +123,19 @@ class TestCheck217(unittest.TestCase):
 class TestCheck219(unittest.TestCase):
     """2.1.9 — Databricks 'No Public IP' is Enabled."""
 
-    def test_no_workspaces_returns_info(self):
+    def test_no_workspaces_returns_info(self) -> None:
         td = _td("databricks", [])
         results = checks_s2.check_2_1_9(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, INFO)
 
-    def test_no_public_ip_true_returns_pass(self):
+    def test_no_public_ip_true_returns_pass(self) -> None:
         td = _td("databricks", [{"name": "ws1", "noPublicIp": True}])
         results = checks_s2.check_2_1_9(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, PASS)
 
-    def test_no_public_ip_false_returns_fail(self):
+    def test_no_public_ip_false_returns_fail(self) -> None:
         td = _td("databricks", [{"name": "ws1", "noPublicIp": False}])
         results = checks_s2.check_2_1_9(SID, SNAME, td)
         self.assertEqual(len(results), 1)
@@ -143,19 +145,19 @@ class TestCheck219(unittest.TestCase):
 class TestCheck2110(unittest.TestCase):
     """2.1.10 — Databricks 'Allow Public Network Access' is Disabled."""
 
-    def test_no_workspaces_returns_info(self):
+    def test_no_workspaces_returns_info(self) -> None:
         td = _td("databricks", [])
         results = checks_s2.check_2_1_10(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, INFO)
 
-    def test_public_access_disabled_returns_pass(self):
+    def test_public_access_disabled_returns_pass(self) -> None:
         td = _td("databricks", [{"name": "ws1", "publicAccess": "Disabled"}])
         results = checks_s2.check_2_1_10(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, PASS)
 
-    def test_public_access_enabled_returns_fail(self):
+    def test_public_access_enabled_returns_fail(self) -> None:
         td = _td("databricks", [{"name": "ws1", "publicAccess": "Enabled"}])
         results = checks_s2.check_2_1_10(SID, SNAME, td)
         self.assertEqual(len(results), 1)
@@ -165,19 +167,19 @@ class TestCheck2110(unittest.TestCase):
 class TestCheck2111(unittest.TestCase):
     """2.1.11 — Private endpoints configured for Azure Databricks workspaces."""
 
-    def test_no_workspaces_returns_info(self):
+    def test_no_workspaces_returns_info(self) -> None:
         td = _td("databricks", [])
         results = checks_s2.check_2_1_11(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, INFO)
 
-    def test_private_eps_present_returns_pass(self):
+    def test_private_eps_present_returns_pass(self) -> None:
         td = _td("databricks", [{"name": "ws1", "privateEps": 2}])
         results = checks_s2.check_2_1_11(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, PASS)
 
-    def test_no_private_eps_returns_fail(self):
+    def test_no_private_eps_returns_fail(self) -> None:
         td = _td("databricks", [{"name": "ws1", "privateEps": 0}])
         results = checks_s2.check_2_1_11(SID, SNAME, td)
         self.assertEqual(len(results), 1)
@@ -197,7 +199,7 @@ class TestCheck511(unittest.TestCase):
     returns a single R with the expected control_id.
     """
 
-    def test_returns_single_result(self):
+    def test_returns_single_result(self) -> None:
         result = checks_s5.check_5_1_1()
         self.assertEqual(result.control_id, "5.1.1")
         # The function documents that it returns INFO for CA-enabled tenants
@@ -211,7 +213,7 @@ class TestCheck512(unittest.TestCase):
     cannot be automated via az CLI.
     """
 
-    def test_returns_manual(self):
+    def test_returns_manual(self) -> None:
         result = checks_s5.check_5_1_2()
         self.assertEqual(result.control_id, "5.1.2")
         self.assertEqual(result.status, MANUAL)
@@ -220,14 +222,14 @@ class TestCheck512(unittest.TestCase):
 class TestCheck533(unittest.TestCase):
     """5.3.3 — User Access Administrator role is restricted."""
 
-    def test_no_uaa_assignments_returns_pass(self):
+    def test_no_uaa_assignments_returns_pass(self) -> None:
         td = _td("roles", [])
         results = checks_s5.check_5_3_3(SID, SNAME, td)
         self.assertIsInstance(results, list)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, PASS)
 
-    def test_uaa_assignment_at_subscription_scope_returns_fail(self):
+    def test_uaa_assignment_at_subscription_scope_returns_fail(self) -> None:
         from cis_config import ROLE_UAA
 
         td = _td(
@@ -255,23 +257,23 @@ class TestCheck533(unittest.TestCase):
 class TestCheck6111(unittest.TestCase):
     """6.1.1.1 — Diagnostic Setting for Subscription Activity Logs."""
 
-    def test_az_fails_returns_error(self):
+    def test_az_fails_returns_error(self) -> None:
         with patch("checks_s6.az", return_value=(1, "cli error")):
             result = checks_s6.check_6_1_1_1(SID, SNAME)
         self.assertEqual(result.status, ERROR)
         self.assertEqual(result.control_id, "6.1.1.1")
 
-    def test_settings_found_returns_pass(self):
+    def test_settings_found_returns_pass(self) -> None:
         with patch("checks_s6.az", return_value=(0, [{"name": "diag1"}])):
             result = checks_s6.check_6_1_1_1(SID, SNAME)
         self.assertEqual(result.status, PASS)
 
-    def test_no_settings_returns_fail(self):
+    def test_no_settings_returns_fail(self) -> None:
         with patch("checks_s6.az", return_value=(0, [])):
             result = checks_s6.check_6_1_1_1(SID, SNAME)
         self.assertEqual(result.status, FAIL)
 
-    def test_value_key_list_detected(self):
+    def test_value_key_list_detected(self) -> None:
         # az sometimes returns {"value": [...]} rather than a direct list
         with patch("checks_s6.az", return_value=(0, {"value": [{"name": "d1"}]})):
             result = checks_s6.check_6_1_1_1(SID, SNAME)
@@ -281,12 +283,12 @@ class TestCheck6111(unittest.TestCase):
 class TestCheck6112(unittest.TestCase):
     """6.1.1.2 — Diagnostic Setting captures required log categories."""
 
-    def test_az_fails_returns_error(self):
+    def test_az_fails_returns_error(self) -> None:
         with patch("checks_s6.az", return_value=(1, "err")):
             result = checks_s6.check_6_1_1_2(SID, SNAME)
         self.assertEqual(result.status, ERROR)
 
-    def test_all_required_categories_enabled_returns_pass(self):
+    def test_all_required_categories_enabled_returns_pass(self) -> None:
         settings = [
             {
                 "logs": [
@@ -301,7 +303,7 @@ class TestCheck6112(unittest.TestCase):
             result = checks_s6.check_6_1_1_2(SID, SNAME)
         self.assertEqual(result.status, PASS)
 
-    def test_missing_category_returns_fail(self):
+    def test_missing_category_returns_fail(self) -> None:
         # Only 3 of 4 required categories present
         settings = [
             {
@@ -317,7 +319,7 @@ class TestCheck6112(unittest.TestCase):
             result = checks_s6.check_6_1_1_2(SID, SNAME)
         self.assertEqual(result.status, FAIL)
 
-    def test_category_disabled_counts_as_missing(self):
+    def test_category_disabled_counts_as_missing(self) -> None:
         settings = [
             {
                 "logs": [
@@ -346,14 +348,14 @@ class TestCheck612Alerts(unittest.TestCase):
             }
         }
 
-    def test_no_alerts_all_fail(self):
+    def test_no_alerts_all_fail(self) -> None:
         with patch("checks_s6.az", return_value=(0, [])):
             results = checks_s6.check_6_1_2_alerts(SID, SNAME)
         self.assertTrue(all(r.status == FAIL for r in results))
         # 10 operation-name controls + 1 service health = 11
         self.assertEqual(len(results), 11)
 
-    def test_all_required_alerts_present_returns_all_pass(self):
+    def test_all_required_alerts_present_returns_all_pass(self) -> None:
         required_ops = [
             "microsoft.authorization/policyassignments/write",
             "microsoft.authorization/policyassignments/delete",
@@ -375,7 +377,7 @@ class TestCheck612Alerts(unittest.TestCase):
             results = checks_s6.check_6_1_2_alerts(SID, SNAME)
         self.assertTrue(all(r.status == PASS for r in results), [r for r in results if r.status != PASS])
 
-    def test_partial_alerts_mix_pass_fail(self):
+    def test_partial_alerts_mix_pass_fail(self) -> None:
         # Provide only the first required operation alert
         alerts = [self._make_alert("microsoft.authorization/policyassignments/write")]
         with patch("checks_s6.az", return_value=(0, alerts)):
@@ -393,7 +395,7 @@ class TestCheck612Alerts(unittest.TestCase):
 class TestCheck71(unittest.TestCase):
     """7.1 — RDP access from the internet is restricted."""
 
-    def test_no_nsgs_returns_info(self):
+    def test_no_nsgs_returns_info(self) -> None:
         td = _td("nsgs", [])
         results = checks_s7.check_7_1(SID, SNAME, td)
         self.assertEqual(len(results), 1)
@@ -417,13 +419,13 @@ class TestCheck71(unittest.TestCase):
             ],
         }
 
-    def test_nsg_with_rdp_rule_from_internet_returns_fail(self):
+    def test_nsg_with_rdp_rule_from_internet_returns_fail(self) -> None:
         td = _td("nsgs", [self._make_nsg_with_rule(3389, "*")])
         results = checks_s7.check_7_1(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, FAIL)
 
-    def test_nsg_with_no_bad_rdp_rules_returns_pass(self):
+    def test_nsg_with_no_bad_rdp_rules_returns_pass(self) -> None:
         # Port 3389 but restricted source (not internet)
         nsg = {
             "name": "safe-nsg",
@@ -450,13 +452,13 @@ class TestCheck71(unittest.TestCase):
 class TestCheck72(unittest.TestCase):
     """7.2 — SSH access from the internet is restricted."""
 
-    def test_no_nsgs_returns_info(self):
+    def test_no_nsgs_returns_info(self) -> None:
         td = _td("nsgs", [])
         results = checks_s7.check_7_2(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, INFO)
 
-    def test_nsg_with_ssh_rule_from_internet_returns_fail(self):
+    def test_nsg_with_ssh_rule_from_internet_returns_fail(self) -> None:
         nsg = {
             "name": "test-nsg",
             "rules": [
@@ -478,7 +480,7 @@ class TestCheck72(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, FAIL)
 
-    def test_nsg_with_no_bad_ssh_rules_returns_pass(self):
+    def test_nsg_with_no_bad_ssh_rules_returns_pass(self) -> None:
         nsg = {
             "name": "safe-nsg",
             "rules": [
@@ -504,26 +506,26 @@ class TestCheck72(unittest.TestCase):
 class TestCheck75(unittest.TestCase):
     """7.5 — NSG flow log retention >= 90 days."""
 
-    def test_az_watcher_list_fails_returns_error(self):
+    def test_az_watcher_list_fails_returns_error(self) -> None:
         with patch("checks_s7.az", return_value=(1, "err")):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, ERROR)
 
-    def test_no_watchers_returns_info(self):
+    def test_no_watchers_returns_info(self) -> None:
         with patch("checks_s7.az", return_value=(0, [])):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, INFO)
 
-    def test_flow_log_retention_90_days_enabled_returns_pass(self):
+    def test_flow_log_retention_90_days_enabled_returns_pass(self) -> None:
         watcher = {"location": "eastus", "name": "watcher1"}
         flow_log = {
             "name": "fl1",
             "retentionPolicy": {"days": 90, "enabled": True},
         }
 
-        def _az_side_effect(args, *a, **kw):
+        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
             # Check for flow-log first — its args also contain "watcher" and "list"
             if "flow-log" in args:
                 return (0, [flow_log])
@@ -536,14 +538,14 @@ class TestCheck75(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, PASS)
 
-    def test_flow_log_retention_below_90_returns_fail(self):
+    def test_flow_log_retention_below_90_returns_fail(self) -> None:
         watcher = {"location": "eastus", "name": "watcher1"}
         flow_log = {
             "name": "fl1",
             "retentionPolicy": {"days": 30, "enabled": True},
         }
 
-        def _az_side_effect(args, *a, **kw):
+        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
             if "flow-log" in args:
                 return (0, [flow_log])
             if "watcher" in args and "list" in args:
@@ -555,14 +557,14 @@ class TestCheck75(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, FAIL)
 
-    def test_flow_log_enabled_false_returns_fail(self):
+    def test_flow_log_enabled_false_returns_fail(self) -> None:
         watcher = {"location": "westus", "name": "watcher2"}
         flow_log = {
             "name": "fl2",
             "retentionPolicy": {"days": 90, "enabled": False},
         }
 
-        def _az_side_effect(args, *a, **kw):
+        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
             if "flow-log" in args:
                 return (0, [flow_log])
             if "watcher" in args and "list" in args:
@@ -583,29 +585,29 @@ class TestCheck75(unittest.TestCase):
 class TestCheck81Defender(unittest.TestCase):
     """8.1.x — Microsoft Defender for Cloud plan statuses."""
 
-    def test_az_fails_returns_error_results(self):
+    def test_az_fails_returns_error_results(self) -> None:
         with patch("checks_s8.az", return_value=(1, "access denied")):
             results = checks_s8.check_8_1_defender(SID, SNAME)
         # All 12 plans should produce ERROR results
         self.assertEqual(len(results), 12)
         self.assertTrue(all(r.status == ERROR for r in results))
 
-    def test_standard_tier_returns_pass(self):
+    def test_standard_tier_returns_pass(self) -> None:
         with patch("checks_s8.az", return_value=(0, {"pricingTier": "Standard"})):
             results = checks_s8.check_8_1_defender(SID, SNAME)
         self.assertEqual(len(results), 12)
         self.assertTrue(all(r.status == PASS for r in results))
 
-    def test_free_tier_returns_fail(self):
+    def test_free_tier_returns_fail(self) -> None:
         with patch("checks_s8.az", return_value=(0, {"pricingTier": "Free"})):
             results = checks_s8.check_8_1_defender(SID, SNAME)
         self.assertEqual(len(results), 12)
         self.assertTrue(all(r.status == FAIL for r in results))
 
-    def test_mixed_tiers_returns_mixed_statuses(self):
+    def test_mixed_tiers_returns_mixed_statuses(self) -> None:
         call_count = [0]
 
-        def _az_side_effect(args, *a, **kw):
+        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
             call_count[0] += 1
             # Alternate between Standard and Free
             tier = "Standard" if call_count[0] % 2 == 1 else "Free"
@@ -623,13 +625,13 @@ class TestCheck81Defender(unittest.TestCase):
 class TestCheck83Keyvaults(unittest.TestCase):
     """8.3.x — Key Vault security controls."""
 
-    def test_no_keyvaults_returns_info_for_each_control(self):
+    def test_no_keyvaults_returns_info_for_each_control(self) -> None:
         td = _td("keyvaults", [])
         results = checks_s8.check_8_3_keyvaults(SID, SNAME, td)
         self.assertTrue(len(results) > 0)
         self.assertTrue(all(r.status == INFO for r in results))
 
-    def test_purge_protection_disabled_returns_fail(self):
+    def test_purge_protection_disabled_returns_fail(self) -> None:
         # A minimal vault where purgeProtection=False
         vault = {
             "name": "kv1",
@@ -649,7 +651,7 @@ class TestCheck83Keyvaults(unittest.TestCase):
         self.assertTrue(len(purge_results) > 0)
         self.assertEqual(purge_results[0].status, FAIL)
 
-    def test_purge_protection_enabled_returns_pass(self):
+    def test_purge_protection_enabled_returns_pass(self) -> None:
         vault = {
             "name": "kv2",
             "id": "/subscriptions/x/resourceGroups/rg/providers/Microsoft.KeyVault/vaults/kv2",
@@ -667,7 +669,7 @@ class TestCheck83Keyvaults(unittest.TestCase):
         self.assertTrue(len(purge_results) > 0)
         self.assertEqual(purge_results[0].status, PASS)
 
-    def test_public_access_enabled_returns_fail_for_8_3_7(self):
+    def test_public_access_enabled_returns_fail_for_8_3_7(self) -> None:
         vault = {
             "name": "kv3",
             "rbac": True,
@@ -688,20 +690,20 @@ class TestCheck83Keyvaults(unittest.TestCase):
 class TestCheck841(unittest.TestCase):
     """8.4.1 — Azure Bastion Host exists in the subscription."""
 
-    def test_no_vms_returns_info(self):
+    def test_no_vms_returns_info(self) -> None:
         td = _td("bastion", [])
         td["vms"] = {SID.lower(): []}
         result = checks_s8.check_8_4_1(SID, SNAME, td)
         self.assertEqual(result.status, INFO)
         self.assertEqual(result.control_id, "8.4.1")
 
-    def test_bastion_host_exists_returns_pass(self):
+    def test_bastion_host_exists_returns_pass(self) -> None:
         td = _td("bastion", [{"name": "bastion1"}])
         td["vms"] = {SID.lower(): [{"name": "vm1"}]}
         result = checks_s8.check_8_4_1(SID, SNAME, td)
         self.assertEqual(result.status, PASS)
 
-    def test_vms_without_bastion_returns_fail(self):
+    def test_vms_without_bastion_returns_fail(self) -> None:
         td = _td("bastion", [])
         td["vms"] = {SID.lower(): [{"name": "vm1"}, {"name": "vm2"}]}
         result = checks_s8.check_8_4_1(SID, SNAME, td)
@@ -716,7 +718,7 @@ class TestCheck841(unittest.TestCase):
 class TestCheck9Storage(unittest.TestCase):
     """9.x — Storage account security checks."""
 
-    def test_no_storage_accounts_returns_info_list(self):
+    def test_no_storage_accounts_returns_info_list(self) -> None:
         """When both the prefetch dict and az CLI fallback have no accounts, INFO is returned."""
         td = _td("storage", [])
         with patch("checks_s9.az", return_value=(1, "no accounts")):
@@ -724,14 +726,14 @@ class TestCheck9Storage(unittest.TestCase):
         self.assertTrue(len(results) > 0)
         self.assertTrue(all(r.status == INFO for r in results))
 
-    def test_empty_az_list_returns_info(self):
+    def test_empty_az_list_returns_info(self) -> None:
         """az returns success but empty list — still no accounts."""
         td = _td("storage", [])
         with patch("checks_s9.az", return_value=(0, [])):
             results = checks_s9.check_9_storage(SID, SNAME, td)
         self.assertTrue(all(r.status == INFO for r in results))
 
-    def test_https_not_required_returns_fail(self):
+    def test_https_not_required_returns_fail(self) -> None:
         # 9.3.4 — supportsHttpsTrafficOnly = False
         account = {
             "name": "sa1",
@@ -756,7 +758,7 @@ class TestCheck9Storage(unittest.TestCase):
         self.assertTrue(len(https_results) > 0)
         self.assertEqual(https_results[0].status, FAIL)
 
-    def test_https_required_returns_pass(self):
+    def test_https_required_returns_pass(self) -> None:
         account = {
             "name": "sa2",
             "resourceGroup": "rg",
@@ -780,7 +782,7 @@ class TestCheck9Storage(unittest.TestCase):
         self.assertTrue(len(https_results) > 0)
         self.assertEqual(https_results[0].status, PASS)
 
-    def test_public_access_enabled_returns_fail_for_9_3_2_2(self):
+    def test_public_access_enabled_returns_fail_for_9_3_2_2(self) -> None:
         account = {
             "name": "sa3",
             "resourceGroup": "rg",
@@ -804,7 +806,7 @@ class TestCheck9Storage(unittest.TestCase):
         self.assertTrue(len(pub_results) > 0)
         self.assertEqual(pub_results[0].status, FAIL)
 
-    def test_fully_compliant_account_passes_all_static_checks(self):
+    def test_fully_compliant_account_passes_all_static_checks(self) -> None:
         account = {
             "name": "compliant",
             "resourceGroup": "rg",
@@ -839,7 +841,7 @@ class TestCheck9Storage(unittest.TestCase):
             },
         }
 
-        def _az_side_effect(args, *a, **kw):
+        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
             if "blob-service-properties" in args:
                 return (0, blob_svc)
             if "file-service-properties" in args:

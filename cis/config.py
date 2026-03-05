@@ -85,6 +85,7 @@ FAIL = "FAIL"  # Control requirement is NOT met — action required
 ERROR = "ERROR"  # Could not evaluate — az CLI call failed or timed out
 INFO = "INFO"  # Not applicable (e.g. no resources of this type in subscription)
 MANUAL = "MANUAL"  # Requires human review — cannot be automated via az CLI
+SUPPRESSED = "SUPPRESSED"  # Accepted risk — suppressed via suppressions.toml
 
 # ── Custom log level ──────────────────────────────────────────────────────────
 TRACE_LEVEL = 5  # Below DEBUG — very chatty execution traces

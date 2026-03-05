@@ -360,7 +360,23 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   <div class="card c-in"><div class="n">{counts[INFO]}</div><div class="l">ℹ️ Info/N/A</div></div>
   <div class="card c-ma"><div class="n">{counts[MANUAL]}</div><div class="l">📋 Manual</div></div>
 </div>
-<canvas id="pie" width="160" height="160" style="margin:1rem auto; display:block;"></canvas>
+<div style="display:flex;align-items:center;justify-content:center;gap:2rem;flex-wrap:wrap;padding:.5rem 0">
+  <canvas id="pie" width="140" height="140"></canvas>
+  <div style="display:flex;flex-direction:column;gap:.5rem;font-size:.85rem">
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#16a34a"></span>
+      <span>Passed ({counts[PASS]})</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#dc2626"></span>
+      <span>Failed ({counts[FAIL]})</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#ea580c"></span>
+      <span>Errors ({counts[ERROR]})</span>
+    </div>
+  </div>
+</div>
 {sub_table}
 <div class="filters">
   <label>Filter:</label>
@@ -374,8 +390,8 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     <option value="">All levels</option>
     <option value="L1">Level 1</option><option value="L2">Level 2</option>
   </select>
-  <a href="{json_name}" download class="exp-btn">&#8681; Export JSON</a>
-  <a href="{csv_name}" download class="exp-btn">&#8681; Export CSV</a>
+  <a href="{json_name}" target="_blank" class="exp-btn">&#8681; Export JSON</a>
+  <a href="{csv_name}" target="_blank" class="exp-btn">&#8681; Export CSV</a>
 </div>
 <div class="wrap"><table>
 <thead><tr>

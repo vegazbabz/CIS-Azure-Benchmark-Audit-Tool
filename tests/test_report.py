@@ -6,9 +6,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cis_config import BENCHMARK_VER, FAIL, INFO, MANUAL, PASS, VERSION
-from cis_models import R
-from cis_report import generate_html
+from cis.config import BENCHMARK_VER, FAIL, INFO, MANUAL, PASS, VERSION
+from cis.models import R
+from cis.report import generate_html
 
 
 def _results() -> list[R]:

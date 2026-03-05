@@ -12,7 +12,7 @@ import logging
 import re
 from typing import Any
 
-from az_client import az
+from azure.client import az
 
 logger = logging.getLogger(__name__)
 

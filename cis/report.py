@@ -12,9 +12,9 @@ import html
 from pathlib import Path
 from typing import Any
 
-from cis_config import BENCHMARK_VER, LOGGER, VERSION, FAIL, INFO, MANUAL, PASS, ERROR
-from cis_helpers import _ctrl_sort_key
-from cis_models import R
+from cis.config import BENCHMARK_VER, LOGGER, VERSION, FAIL, INFO, MANUAL, PASS, ERROR
+from cis.helpers import _ctrl_sort_key
+from cis.models import R
 
 # Visual style for each status type used in table rows and badges.
 # Format: (text_hex_colour, background_hex_colour, emoji)

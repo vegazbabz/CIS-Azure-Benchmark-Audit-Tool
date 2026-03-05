@@ -25,3 +25,6 @@ GitHub Copilot improvements.txt
 *.swo
 .DS_Store
 Thumbs.db
+
+# Local environment for VSCode test runner
+.env

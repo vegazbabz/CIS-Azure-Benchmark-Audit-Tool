@@ -229,9 +229,8 @@ def check_7_5(sid: str, sname: str) -> list[R]:
       2. For each watcher, list its flow logs
       3. For each flow log, check retention period >= 90 AND enabled == true
 
-    If no flow logs are found at all, returns INFO (not FAIL) because this
-    check requires flow logs to already exist — their absence may mean the
-    subscription has no NSGs (covered by check_7_11).
+    If no flow logs are found, returns FAIL with a message stating that flow
+    logging has not been enabled — absence of flow logs is non-compliant.
     """
     rc, watchers = az(["network", "watcher", "list"], sid, timeout=TIMEOUTS["default"])
     if rc != 0:
@@ -273,12 +272,14 @@ def check_7_5(sid: str, sname: str) -> list[R]:
 
     if not results:
         results.append(
-            _info(
+            R(
                 "7.5",
                 "NSG flow log retention > 90 days",
                 2,
                 "7 - Networking Services",
-                "No NSG flow logs found.",
+                FAIL,
+                "No NSG flow logs configured — flow logging has not been enabled for any NSG in this subscription. See also CIS 6.1.1.5 (NSG flow logs to Log Analytics).",
+                "Network Watcher > Flow logs > Create a flow log for each NSG with retention >= 90 days and Traffic Analytics enabled (CIS 6.1.1.5).",
                 sid,
                 sname,
             )
@@ -400,12 +401,14 @@ def check_7_8(sid: str, sname: str) -> list[R]:
 
     if not results:
         results.append(
-            _info(
+            R(
                 "7.8",
                 "VNet flow log retention > 90 days",
                 2,
                 "7 - Networking Services",
-                "No VNet flow logs found.",
+                FAIL,
+                "No VNet flow logs configured — flow logging has not been enabled for any VNet in this subscription. See also CIS 6.1.1.7 (VNet flow logs to Log Analytics).",
+                "Network Watcher > Flow logs > Create a flow log for each VNet with retention >= 90 days and Traffic Analytics enabled (CIS 6.1.1.7).",
                 sid,
                 sname,
             )

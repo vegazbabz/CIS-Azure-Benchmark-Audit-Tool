@@ -121,6 +121,9 @@ from cis.report import _STATUS_STYLE, generate_html
 # Finding suppression (accepted risks)
 from cis.suppressions import apply_suppressions, list_suppressions, load_suppressions
 
+# Run history for compliance trend tracking
+from cis.history import append_history, history_path_for, load_history
+
 # Check helpers and modular check functions
 from checks.s2 import check_2_1_2, check_2_1_7, check_2_1_9, check_2_1_10, check_2_1_11
 from checks.s5 import (
@@ -1103,7 +1106,8 @@ Examples:
         )
         LOGGER.info("%s", "━" * 60)
         LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)
-        generate_html(all_results, args.output)
+        run_history = load_history(history_path_for(args.output))
+        generate_html(all_results, args.output, history=run_history)
         return
 
     # ── Prerequisite: az CLI available ────────────────────────────────────────
@@ -1212,6 +1216,27 @@ Examples:
     LOGGER.info("%s", "━" * 60)
     LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)
 
+    # ── Append to run history (full audit only — not --report-only) ───────────
+    hist_path = history_path_for(args.output)
+    append_history(
+        hist_path,
+        {
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "version": VERSION,
+            "score": score,
+            "pass": counts[PASS],
+            "fail": counts[FAIL],
+            "error": counts[ERROR],
+            "info": counts[INFO],
+            "manual": counts[MANUAL],
+            "suppressed": counts[SUPPRESSED],
+            "total": total,
+            "subscriptions": [s["name"] for s in subs],
+            "level_filter": args.level,
+        },
+    )
+    run_history = load_history(hist_path)
+
     # ── Generate HTML report ──────────────────────────────────────────────────
     scope_info = {
         "tenant": acc.get("tenant", ""),
@@ -1224,7 +1249,7 @@ Examples:
         "subscriptions": [s["name"] for s in subs],
         "level_filter": args.level,
     }
-    generate_html(all_results, args.output, scope_info)
+    generate_html(all_results, args.output, scope_info, run_history)
 
 
 if __name__ == "__main__":

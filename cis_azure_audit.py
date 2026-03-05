@@ -307,6 +307,7 @@ _QUERIES = {
         | project subscriptionId = tostring(subscriptionId),
             principalId = tostring(properties.principalId),
             principalName = tostring(properties.principalName),
+            principalType = tostring(properties.principalType),
             roleDefinitionId = tostring(properties.roleDefinitionId),
             scope = tostring(properties.scope)
     """,

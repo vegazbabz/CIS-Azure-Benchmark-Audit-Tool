@@ -317,9 +317,12 @@ def check_5_27(sid: str, sname: str, td: dict[str, Any]) -> R:
     Data source: Resource Graph 'roles' query, filtered to ROLE_OWNER
     where scope exactly matches the subscription path.
 
-    Known limitation: group assignments count as 1 even if the group has
-    multiple members. This can cause a false PASS when a group with many
-    members is assigned Owner.
+    Group assignments are counted as a single owner (the group object itself).
+    When groups are detected, the details flag this so auditors can verify the
+    true member count manually. Automatic group expansion is not performed
+    because it requires additional Graph API permissions and nested groups
+    require recursive traversal — the benchmark audit procedure itself counts
+    role assignments, not individual members.
     """
     # Filter to Owner roles scoped exactly to this subscription
     owners = [
@@ -330,7 +333,34 @@ def check_5_27(sid: str, sname: str, td: dict[str, Any]) -> R:
     ]
 
     n = len(owners)
-    names = [o.get("principalName") or o.get("principalId", "?") for o in owners]
+
+    # Build a display label per assignment that includes the principal type
+    # so auditors can immediately see which assignments are groups vs. users.
+    def _label(o: dict[str, Any]) -> str:
+        ptype = o.get("principalType", "").lower()
+        name = o.get("principalName") or o.get("principalId", "?")
+        if ptype == "group":
+            return f"Group:{name}"
+        if ptype == "serviceprincipal":
+            return f"SP:{name}"
+        return name
+
+    labels = [_label(o) for o in owners]
+    has_groups = any(o.get("principalType", "").lower() == "group" for o in owners)
+
+    details = f"Owner count: {n} — {labels}"
+    if has_groups:
+        details += " — group assignments detected: verify member count manually"
+
+    if not 2 <= n <= 3:
+        remediation = "Adjust Owner role assignments to have 2-3 owners."
+    elif has_groups:
+        remediation = (
+            "Group assignments counted as 1 owner each — "
+            "expand group memberships to confirm true owner count is 2-3."
+        )
+    else:
+        remediation = ""
 
     return R(
         "5.27",
@@ -338,8 +368,8 @@ def check_5_27(sid: str, sname: str, td: dict[str, Any]) -> R:
         1,
         "5 - Identity Services",
         PASS if 2 <= n <= 3 else FAIL,
-        f"Owner count: {n} — {names}",
-        "Adjust Owner role assignments to have 2-3 owners." if not 2 <= n <= 3 else "",
+        details,
+        remediation,
         sid,
         sname,
     )

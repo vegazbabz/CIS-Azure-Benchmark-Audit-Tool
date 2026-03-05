@@ -1031,7 +1031,7 @@ Examples:
         out_dir.mkdir(parents=True, exist_ok=True)
         new_ckpt_dir = out_dir / "cis_checkpoints"
         _cfg.CHECKPOINT_DIR = new_ckpt_dir
-        _ckpt.CHECKPOINT_DIR = new_ckpt_dir  # type: ignore[attr-defined]
+        setattr(_ckpt, "CHECKPOINT_DIR", new_ckpt_dir)
         if not Path(args.output).is_absolute():
             args.output = str(out_dir / args.output)
 

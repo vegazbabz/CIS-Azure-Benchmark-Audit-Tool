@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis_config import PASS, FAIL, ERROR, INFO, TIMEOUTS
-from cis_models import R
-from cis_check_helpers import _err, _idx, _info
-from azure_helpers import az, az_rest, is_firewall_error, _friendly_error
+from cis.config import PASS, FAIL, ERROR, INFO, TIMEOUTS
+from cis.models import R
+from cis.check_helpers import _err, _idx, _info
+from azure.helpers import az, az_rest, is_firewall_error, _friendly_error
 
 
 def check_8_1_defender(sid: str, sname: str) -> list[R]:

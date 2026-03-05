@@ -7,7 +7,7 @@ All symbols have moved to focused sub-modules:
 Import from those modules directly in new code.
 """
 
-from az_client import (  # noqa: F401
+from azure.client import (  # noqa: F401
     AZ,
     _AUTHZ_TOKENS,
     _FIREWALL_TOKENS,
@@ -21,7 +21,7 @@ from az_client import (  # noqa: F401
     is_firewall_error,
     logger,
 )
-from az_identity import (  # noqa: F401
+from azure.identity import (  # noqa: F401
     _upn_to_objectid,
     check_user_permissions,
     get_signed_in_user_id,

@@ -291,9 +291,8 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 /* ── Back to top button ── */
 #back-top {{ position: fixed; bottom: 1.5rem; right: 1.5rem; width: 2.5rem; height: 2.5rem;
     background: #2563eb; color: #fff; border: none; border-radius: 50%; font-size: 1.1rem;
-    cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2); opacity: 0; transition: opacity .2s;
+    cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2);
     display: flex; align-items: center; justify-content: center; z-index: 999; }}
-#back-top.visible {{ opacity: 1; }}
 #back-top:hover {{ background: #1d4ed8; }}
 @media print {{ #back-top {{ display: none; }} }}
 
@@ -496,9 +495,6 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   }}
   /* ── Back to top ── */
   var btn = document.getElementById('back-top');
-  window.addEventListener('scroll', function() {{
-    btn.classList.toggle('visible', window.scrollY > 300);
-  }});
   btn.addEventListener('click', function() {{
     window.scrollTo({{top: 0, behavior: 'smooth'}});
   }});

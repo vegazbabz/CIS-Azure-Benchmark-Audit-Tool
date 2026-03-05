@@ -83,7 +83,7 @@ from pathlib import Path  # --output-dir path manipulation
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed  # Parallel workers
 
 # Configuration constants (version, timeouts, status codes, role GUIDs, etc.)
-from cis_config import (
+from cis.config import (
     VERSION,
     BENCHMARK_VER,
     CHECKPOINT_DIR,
@@ -100,10 +100,10 @@ from cis_config import (
 )
 
 # Audit result data model
-from cis_models import R
+from cis.models import R
 
 # Pure helpers: console UI, logging setup
-from cis_helpers import (
+from cis.helpers import (
     console_finish,
     console_init,
     console_update,
@@ -111,14 +111,14 @@ from cis_helpers import (
 )
 
 # Checkpoint save/load
-from cis_checkpoint import load_checkpoints, results_from_checkpoint, save_checkpoint
+from cis.checkpoint import load_checkpoints, results_from_checkpoint, save_checkpoint
 
 # HTML report generation
-from cis_report import _STATUS_STYLE, generate_html
+from cis.report import _STATUS_STYLE, generate_html
 
 # Check helpers and modular check functions
-from checks_s2 import check_2_1_2, check_2_1_7, check_2_1_9, check_2_1_10, check_2_1_11
-from checks_s5 import (
+from checks.s2 import check_2_1_2, check_2_1_7, check_2_1_9, check_2_1_10, check_2_1_11
+from checks.s5 import (
     check_5_1_1,
     check_5_1_2,
     check_5_3_3,
@@ -129,7 +129,7 @@ from checks_s5 import (
     check_5_23,
     check_5_27,
 )
-from checks_s6 import (
+from checks.s6 import (
     check_6_1_1_1,
     check_6_1_1_2,
     check_6_1_1_4,
@@ -137,7 +137,7 @@ from checks_s6 import (
     check_6_1_2_alerts,
     check_6_1_3_1,
 )
-from checks_s7 import (
+from checks.s7 import (
     check_7_1,
     check_7_2,
     check_7_3,
@@ -152,7 +152,7 @@ from checks_s7 import (
     check_7_14,
     check_7_15,
 )
-from checks_s8 import (
+from checks.s8 import (
     check_8_1_defender,
     check_8_1_3_3,
     check_8_1_10,
@@ -161,10 +161,10 @@ from checks_s8 import (
     check_8_4_1,
     check_8_5,
 )
-from checks_s9 import check_9_storage
+from checks.s9 import check_9_storage
 
 # Azure CLI helpers delegated to azure_helpers.py
-from azure_helpers import (
+from azure.helpers import (
     az,
     get_and_reset_rate_limit_retry_count,
     graph_query,
@@ -1024,8 +1024,8 @@ Examples:
 
     # ── --output-dir: redirect report and checkpoints to a single directory ───
     if args.output_dir:
-        import cis_config as _cfg
-        import cis_checkpoint as _ckpt
+        from cis import config as _cfg
+        from cis import checkpoint as _ckpt
 
         out_dir = Path(args.output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)

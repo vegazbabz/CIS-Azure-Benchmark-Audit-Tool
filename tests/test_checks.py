@@ -7,14 +7,14 @@ from typing import Any
 import unittest
 from unittest.mock import patch
 
-from cis_config import ERROR, FAIL, INFO, MANUAL, PASS
+from cis.config import ERROR, FAIL, INFO, MANUAL, PASS
 
-import checks_s2
-import checks_s5
-import checks_s6
-import checks_s7
-import checks_s8
-import checks_s9
+import checks.s2 as checks_s2
+import checks.s5 as checks_s5
+import checks.s6 as checks_s6
+import checks.s7 as checks_s7
+import checks.s8 as checks_s8
+import checks.s9 as checks_s9
 
 SID = "sub-test-1234"
 SNAME = "Test Sub"
@@ -100,21 +100,21 @@ class TestCheck217(unittest.TestCase):
 
     def test_az_fails_returns_error(self) -> None:
         td = _td("databricks", [{"name": "ws1", "id": "/ws/ws1"}])
-        with patch("checks_s2.az", return_value=(1, "auth error")):
+        with patch("checks.s2.az", return_value=(1, "auth error")):
             results = checks_s2.check_2_1_7(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, ERROR)
 
     def test_diag_settings_found_returns_pass(self) -> None:
         td = _td("databricks", [{"name": "ws1", "id": "/ws/ws1"}])
-        with patch("checks_s2.az", return_value=(0, [{"name": "diag1"}])):
+        with patch("checks.s2.az", return_value=(0, [{"name": "diag1"}])):
             results = checks_s2.check_2_1_7(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, PASS)
 
     def test_no_diag_settings_returns_fail(self) -> None:
         td = _td("databricks", [{"name": "ws1", "id": "/ws/ws1"}])
-        with patch("checks_s2.az", return_value=(0, [])):
+        with patch("checks.s2.az", return_value=(0, [])):
             results = checks_s2.check_2_1_7(SID, SNAME, td)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, FAIL)
@@ -230,7 +230,7 @@ class TestCheck533(unittest.TestCase):
         self.assertEqual(results[0].status, PASS)
 
     def test_uaa_assignment_at_subscription_scope_returns_fail(self) -> None:
-        from cis_config import ROLE_UAA
+        from cis.config import ROLE_UAA
 
         td = _td(
             "roles",
@@ -258,24 +258,24 @@ class TestCheck6111(unittest.TestCase):
     """6.1.1.1 — Diagnostic Setting for Subscription Activity Logs."""
 
     def test_az_fails_returns_error(self) -> None:
-        with patch("checks_s6.az", return_value=(1, "cli error")):
+        with patch("checks.s6.az", return_value=(1, "cli error")):
             result = checks_s6.check_6_1_1_1(SID, SNAME)
         self.assertEqual(result.status, ERROR)
         self.assertEqual(result.control_id, "6.1.1.1")
 
     def test_settings_found_returns_pass(self) -> None:
-        with patch("checks_s6.az", return_value=(0, [{"name": "diag1"}])):
+        with patch("checks.s6.az", return_value=(0, [{"name": "diag1"}])):
             result = checks_s6.check_6_1_1_1(SID, SNAME)
         self.assertEqual(result.status, PASS)
 
     def test_no_settings_returns_fail(self) -> None:
-        with patch("checks_s6.az", return_value=(0, [])):
+        with patch("checks.s6.az", return_value=(0, [])):
             result = checks_s6.check_6_1_1_1(SID, SNAME)
         self.assertEqual(result.status, FAIL)
 
     def test_value_key_list_detected(self) -> None:
         # az sometimes returns {"value": [...]} rather than a direct list
-        with patch("checks_s6.az", return_value=(0, {"value": [{"name": "d1"}]})):
+        with patch("checks.s6.az", return_value=(0, {"value": [{"name": "d1"}]})):
             result = checks_s6.check_6_1_1_1(SID, SNAME)
         self.assertEqual(result.status, PASS)
 
@@ -284,7 +284,7 @@ class TestCheck6112(unittest.TestCase):
     """6.1.1.2 — Diagnostic Setting captures required log categories."""
 
     def test_az_fails_returns_error(self) -> None:
-        with patch("checks_s6.az", return_value=(1, "err")):
+        with patch("checks.s6.az", return_value=(1, "err")):
             result = checks_s6.check_6_1_1_2(SID, SNAME)
         self.assertEqual(result.status, ERROR)
 
@@ -299,7 +299,7 @@ class TestCheck6112(unittest.TestCase):
                 ]
             }
         ]
-        with patch("checks_s6.az", return_value=(0, settings)):
+        with patch("checks.s6.az", return_value=(0, settings)):
             result = checks_s6.check_6_1_1_2(SID, SNAME)
         self.assertEqual(result.status, PASS)
 
@@ -315,7 +315,7 @@ class TestCheck6112(unittest.TestCase):
                 ]
             }
         ]
-        with patch("checks_s6.az", return_value=(0, settings)):
+        with patch("checks.s6.az", return_value=(0, settings)):
             result = checks_s6.check_6_1_1_2(SID, SNAME)
         self.assertEqual(result.status, FAIL)
 
@@ -330,7 +330,7 @@ class TestCheck6112(unittest.TestCase):
                 ]
             }
         ]
-        with patch("checks_s6.az", return_value=(0, settings)):
+        with patch("checks.s6.az", return_value=(0, settings)):
             result = checks_s6.check_6_1_1_2(SID, SNAME)
         self.assertEqual(result.status, FAIL)
 
@@ -349,7 +349,7 @@ class TestCheck612Alerts(unittest.TestCase):
         }
 
     def test_no_alerts_all_fail(self) -> None:
-        with patch("checks_s6.az", return_value=(0, [])):
+        with patch("checks.s6.az", return_value=(0, [])):
             results = checks_s6.check_6_1_2_alerts(SID, SNAME)
         self.assertTrue(all(r.status == FAIL for r in results))
         # 10 operation-name controls + 1 service health = 11
@@ -373,14 +373,14 @@ class TestCheck612Alerts(unittest.TestCase):
         # Add ServiceHealth alert (6.1.2.11)
         alerts.append({"condition": {"allOf": [{"field": "category", "equals": "ServiceHealth"}]}})
 
-        with patch("checks_s6.az", return_value=(0, alerts)):
+        with patch("checks.s6.az", return_value=(0, alerts)):
             results = checks_s6.check_6_1_2_alerts(SID, SNAME)
         self.assertTrue(all(r.status == PASS for r in results), [r for r in results if r.status != PASS])
 
     def test_partial_alerts_mix_pass_fail(self) -> None:
         # Provide only the first required operation alert
         alerts = [self._make_alert("microsoft.authorization/policyassignments/write")]
-        with patch("checks_s6.az", return_value=(0, alerts)):
+        with patch("checks.s6.az", return_value=(0, alerts)):
             results = checks_s6.check_6_1_2_alerts(SID, SNAME)
         statuses = {r.control_id: r.status for r in results}
         self.assertEqual(statuses["6.1.2.1"], PASS)
@@ -507,13 +507,13 @@ class TestCheck75(unittest.TestCase):
     """7.5 — NSG flow log retention >= 90 days."""
 
     def test_az_watcher_list_fails_returns_error(self) -> None:
-        with patch("checks_s7.az", return_value=(1, "err")):
+        with patch("checks.s7.az", return_value=(1, "err")):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, ERROR)
 
     def test_no_watchers_returns_info(self) -> None:
-        with patch("checks_s7.az", return_value=(0, [])):
+        with patch("checks.s7.az", return_value=(0, [])):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, INFO)
@@ -533,7 +533,7 @@ class TestCheck75(unittest.TestCase):
                 return (0, [watcher])
             return (1, "unexpected")
 
-        with patch("checks_s7.az", side_effect=_az_side_effect):
+        with patch("checks.s7.az", side_effect=_az_side_effect):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, PASS)
@@ -552,7 +552,7 @@ class TestCheck75(unittest.TestCase):
                 return (0, [watcher])
             return (1, "unexpected")
 
-        with patch("checks_s7.az", side_effect=_az_side_effect):
+        with patch("checks.s7.az", side_effect=_az_side_effect):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, FAIL)
@@ -571,7 +571,7 @@ class TestCheck75(unittest.TestCase):
                 return (0, [watcher])
             return (1, "unexpected")
 
-        with patch("checks_s7.az", side_effect=_az_side_effect):
+        with patch("checks.s7.az", side_effect=_az_side_effect):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, FAIL)
@@ -586,20 +586,20 @@ class TestCheck81Defender(unittest.TestCase):
     """8.1.x — Microsoft Defender for Cloud plan statuses."""
 
     def test_az_fails_returns_error_results(self) -> None:
-        with patch("checks_s8.az", return_value=(1, "access denied")):
+        with patch("checks.s8.az", return_value=(1, "access denied")):
             results = checks_s8.check_8_1_defender(SID, SNAME)
         # All 12 plans should produce ERROR results
         self.assertEqual(len(results), 12)
         self.assertTrue(all(r.status == ERROR for r in results))
 
     def test_standard_tier_returns_pass(self) -> None:
-        with patch("checks_s8.az", return_value=(0, {"pricingTier": "Standard"})):
+        with patch("checks.s8.az", return_value=(0, {"pricingTier": "Standard"})):
             results = checks_s8.check_8_1_defender(SID, SNAME)
         self.assertEqual(len(results), 12)
         self.assertTrue(all(r.status == PASS for r in results))
 
     def test_free_tier_returns_fail(self) -> None:
-        with patch("checks_s8.az", return_value=(0, {"pricingTier": "Free"})):
+        with patch("checks.s8.az", return_value=(0, {"pricingTier": "Free"})):
             results = checks_s8.check_8_1_defender(SID, SNAME)
         self.assertEqual(len(results), 12)
         self.assertTrue(all(r.status == FAIL for r in results))
@@ -613,7 +613,7 @@ class TestCheck81Defender(unittest.TestCase):
             tier = "Standard" if call_count[0] % 2 == 1 else "Free"
             return (0, {"pricingTier": tier})
 
-        with patch("checks_s8.az", side_effect=_az_side_effect):
+        with patch("checks.s8.az", side_effect=_az_side_effect):
             results = checks_s8.check_8_1_defender(SID, SNAME)
         self.assertEqual(len(results), 12)
         pass_count = sum(1 for r in results if r.status == PASS)
@@ -644,7 +644,7 @@ class TestCheck83Keyvaults(unittest.TestCase):
         td = _td("keyvaults", [vault])
 
         # az calls for keys/secrets/certs will return empty lists to avoid unrelated failures
-        with patch("checks_s8.az", return_value=(0, [])):
+        with patch("checks.s8.az", return_value=(0, [])):
             results = checks_s8.check_8_3_keyvaults(SID, SNAME, td)
 
         purge_results = [r for r in results if r.control_id == "8.3.5"]
@@ -662,7 +662,7 @@ class TestCheck83Keyvaults(unittest.TestCase):
         }
         td = _td("keyvaults", [vault])
 
-        with patch("checks_s8.az", return_value=(0, [])):
+        with patch("checks.s8.az", return_value=(0, [])):
             results = checks_s8.check_8_3_keyvaults(SID, SNAME, td)
 
         purge_results = [r for r in results if r.control_id == "8.3.5"]
@@ -679,7 +679,7 @@ class TestCheck83Keyvaults(unittest.TestCase):
         }
         td = _td("keyvaults", [vault])
 
-        with patch("checks_s8.az", return_value=(0, [])):
+        with patch("checks.s8.az", return_value=(0, [])):
             results = checks_s8.check_8_3_keyvaults(SID, SNAME, td)
 
         pub_results = [r for r in results if r.control_id == "8.3.7"]
@@ -721,7 +721,7 @@ class TestCheck9Storage(unittest.TestCase):
     def test_no_storage_accounts_returns_info_list(self) -> None:
         """When both the prefetch dict and az CLI fallback have no accounts, INFO is returned."""
         td = _td("storage", [])
-        with patch("checks_s9.az", return_value=(1, "no accounts")):
+        with patch("checks.s9.az", return_value=(1, "no accounts")):
             results = checks_s9.check_9_storage(SID, SNAME, td)
         self.assertTrue(len(results) > 0)
         self.assertTrue(all(r.status == INFO for r in results))
@@ -729,7 +729,7 @@ class TestCheck9Storage(unittest.TestCase):
     def test_empty_az_list_returns_info(self) -> None:
         """az returns success but empty list — still no accounts."""
         td = _td("storage", [])
-        with patch("checks_s9.az", return_value=(0, [])):
+        with patch("checks.s9.az", return_value=(0, [])):
             results = checks_s9.check_9_storage(SID, SNAME, td)
         self.assertTrue(all(r.status == INFO for r in results))
 
@@ -752,7 +752,7 @@ class TestCheck9Storage(unittest.TestCase):
             "privateEps": 1,
         }
         td = _td("storage", [account])
-        with patch("checks_s9.az", return_value=(0, [])):
+        with patch("checks.s9.az", return_value=(0, [])):
             results = checks_s9.check_9_storage(SID, SNAME, td)
         https_results = [r for r in results if r.control_id == "9.3.4"]
         self.assertTrue(len(https_results) > 0)
@@ -776,7 +776,7 @@ class TestCheck9Storage(unittest.TestCase):
             "privateEps": 1,
         }
         td = _td("storage", [account])
-        with patch("checks_s9.az", return_value=(0, [])):
+        with patch("checks.s9.az", return_value=(0, [])):
             results = checks_s9.check_9_storage(SID, SNAME, td)
         https_results = [r for r in results if r.control_id == "9.3.4"]
         self.assertTrue(len(https_results) > 0)
@@ -800,7 +800,7 @@ class TestCheck9Storage(unittest.TestCase):
             "privateEps": 0,
         }
         td = _td("storage", [account])
-        with patch("checks_s9.az", return_value=(0, [])):
+        with patch("checks.s9.az", return_value=(0, [])):
             results = checks_s9.check_9_storage(SID, SNAME, td)
         pub_results = [r for r in results if r.control_id == "9.3.2.2"]
         self.assertTrue(len(pub_results) > 0)
@@ -848,7 +848,7 @@ class TestCheck9Storage(unittest.TestCase):
                 return (0, file_svc)
             return (0, [])
 
-        with patch("checks_s9.az", side_effect=_az_side_effect):
+        with patch("checks.s9.az", side_effect=_az_side_effect):
             results = checks_s9.check_9_storage(SID, SNAME, td)
 
         # Static checks that have deterministic outcomes given the account data

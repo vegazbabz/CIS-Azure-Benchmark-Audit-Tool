@@ -1,6 +1,6 @@
 # CIS Microsoft Azure Foundations Benchmark v5.0.0 — Audit Tool
 
-**Version:** 1.0.0
+**Version:** 1.0.0-beta3
 **Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
 **Coverage:** 93 of 95 automated controls · 2 manual controls noted in output
 
@@ -9,11 +9,12 @@
 ## Overview
 
 A Python tool that audits an Azure tenant against the CIS Microsoft Azure Foundations Benchmark v5.0.0.
-It requires no pip installs — only Python 3.10+ and the Azure CLI.
+It requires no pip installs beyond the standard library — only Python 3.10+ and the Azure CLI.
 
 Results are saved as checkpoints after each subscription completes, so a failed or interrupted run
 can be resumed without re-running completed work. Output is a self-contained HTML report with
-filtering, compliance scoring, and per-finding remediation guidance.
+filtering, compliance scoring, charts, and per-finding remediation guidance. JSON and CSV exports
+are generated alongside the HTML automatically.
 
 ---
 
@@ -30,33 +31,28 @@ filtering, compliance scoring, and per-finding remediation guidance.
 
 ### Azure permissions
 
-| Scope | Role |
-| --- | --- |
-| Each subscription | Reader |
-| Each subscription | Security Reader |
-| Microsoft Entra ID (tenant) | Global Reader (for identity checks 5.x; not programmatically verified) |
+| Scope | Role | Purpose |
+| --- | --- | --- |
+| Each subscription | Reader | Enumerate all resources |
+| Each subscription | Security Reader | Defender plans, security contacts |
+| Microsoft Entra ID (tenant) | Global Reader | Identity checks (5.x) |
+| Key Vaults (optional) | Key Vault Reader | List keys, secrets, certificates for 8.3.x checks |
+
+> **Key Vault data plane:** Controls 8.3.1–8.3.4, 8.3.9, and 8.3.11 enumerate individual keys,
+> secrets, and certificates. This requires data plane access in addition to Reader.
+> For RBAC-enabled vaults assign **Key Vault Reader**; for access-policy vaults, add the
+> runner account to the vault's access policy. Without this, affected checks return ERROR with a
+> note in the report.
 
 ### Development prerequisites
 
-If you're planning to modify or lint the code, install the development dependencies:
+Install the development dependencies for linting, formatting, and type checking:
 
 ```bash
 pip install -r requirements-dev.txt
 ```
 
-This brings in `flake8`, `mypy`, and optionally `rich` for richer console output.
-
----
-
-## Permission Preflight
-
-Before auditing subscriptions the tool verifies the signed-in account has the required roles:
-
-- **Reader** and **Security Reader** on each target subscription
-- **Global Reader** at the tenant level (for identity-related checks; not validated by the tool)
-
-If any roles are missing the script will abort early with a concise list of shortfalls.
-This prevents long runs that then fail due to insufficient permissions.
+This installs `black`, `flake8`, `mypy`, and optionally `rich` for local progress bars.
 
 ---
 
@@ -66,13 +62,69 @@ This prevents long runs that then fail due to insufficient permissions.
 # 1. Login to Azure
 az login
 
-# 2. Run the audit
+# 2. Run the audit (audits all enabled subscriptions)
 python cis_azure_audit.py
+
+# 3. Open the report
+start cis_azure_audit_report.html
 ```
 
 The script will automatically install the `resource-graph` extension if missing, enumerate all
-enabled subscriptions, run all checks, and save `cis_azure_audit_report.html` in the current
-directory.
+enabled subscriptions, run all checks, and save the report files in the current directory.
+
+---
+
+## Project Structure
+
+```text
+cis_azure_audit.py          Main entry point and CLI
+cis_audit.toml              Optional configuration file (parallel, timeouts, etc.)
+azure/
+  client.py                 az CLI wrappers, retry logic, error helpers
+  helpers.py                Shared Azure utilities
+  identity.py               Permission preflight and role helpers
+checks/
+  s2.py                     Section 2 — Databricks
+  s5.py                     Section 5 — Identity
+  s6.py                     Section 6 — Governance
+  s7.py                     Section 7 — Networking
+  s8.py                     Section 8 — Security Services
+  s9.py                     Section 9 — Storage
+cis/
+  checkpoint.py             Checkpoint read/write
+  check_helpers.py          Shared check utilities (port ranges, NSG rules, etc.)
+  config.py                 Config file loader (cis_audit.toml)
+  helpers.py                Logging setup, console output
+  models.py                 Result dataclass (R)
+  report.py                 HTML report generation, JSON/CSV export
+scripts/
+  preflight_check.py        Standalone permission check script
+tests/                      Unit test suite (no Azure connection required)
+```
+
+---
+
+## Configuration File
+
+`cis_audit.toml` is loaded automatically from the same directory as `cis_azure_audit.py`.
+All settings are optional — omit any line to keep the built-in default.
+The path can be overridden with the `CIS_AUDIT_CONFIG` environment variable.
+
+```toml
+[audit]
+parallel       = 3          # Concurrent subscription workers (1–20)
+executor       = "thread"   # "thread" (recommended on Windows) or "process"
+checkpoint_dir = "cis_checkpoints"
+
+[timeouts]
+default      = 20    # Most az CLI calls (seconds)
+storage_list = 30    # az storage account list
+storage_svc  = 15    # Per-account blob/file/table service queries
+activity_log = 25    # Activity log queries
+graph        = 120   # Resource Graph bulk queries
+```
+
+CLI flags override `cis_audit.toml` values when both are set.
 
 ---
 
@@ -82,73 +134,25 @@ directory.
 python cis_azure_audit.py [options]
 ```
 
+### All options
+
 | Option | Description |
 | --- | --- |
-| `-s`, `--subscription` | Audit a single subscription by name or ID |
+| `-s`, `--subscription` | Audit one or more subscriptions by name or GUID (repeatable) |
 | `-o`, `--output` | Output HTML filename (default: `cis_azure_audit_report.html`) |
-| `-p`, `--parallel` | Concurrent subscription workers (default: 2) |
-| `--executor` | Worker backend: `process` (default) or `thread` |
+| `--output-dir` | Directory for all output files (HTML, JSON, CSV, checkpoints) |
+| `-p`, `--parallel` | Concurrent subscription workers (default: from config or 2) |
+| `--executor` | Worker backend: `thread` (default on Windows) or `process` |
 | `--no-adaptive-concurrency` | Disable dynamic worker tuning when throttling is detected |
-| `-l`, `--level` | Filter output to Level 1 or Level 2 controls only |
-| `--fresh` | Clear all checkpoints and start from scratch |
-| `--report-only` | Regenerate HTML from existing checkpoints, no API calls |
-| `--log-level` | Base log level: `TRACE`, `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
-| `-v`, `--verbose` | Enable verbose logging (sets `DEBUG`) |
-| `--debug` | Enable trace logging (sets `TRACE`) |
-| `--log-file` | Write structured logs to a file (in addition to console) |
+| `-l`, `--level` | Filter output to Level `1` or `2` controls only |
+| `--fresh` | Clear all checkpoints and start a full re-audit |
+| `--report-only` | Regenerate the HTML/JSON/CSV from existing checkpoints — no API calls |
 | `--skip-preflight` | Skip permission preflight checks |
-
-### Logging flags
-
-Logging level precedence is:
-
-1. `--debug` (most verbose, `TRACE`)
-2. `--verbose` (`DEBUG`)
-3. `--log-level` (default `INFO`)
-
-Use `--log-file` to keep a persistent log while still printing concise output to the console.
-
-### Concurrency tuning
-
-The audit adapts worker count automatically when Azure API throttling (HTTP 429 / rate limit
-retries) is detected:
-
-- Starts at `--parallel` workers (minimum 1).
-- Reduces workers when transient throttling retries spike.
-- Gradually increases workers again after stable batches without throttling.
-
-Default execution uses `--executor process --parallel 2`, based on benchmark results in this
-environment. Users can still override both defaults at runtime.
-
-Use `--no-adaptive-concurrency` to keep worker count fixed.
-
-#### Benchmark your own defaults
-
-Use a representative subscription and compare elapsed time across candidate settings, then pick
-the fastest *stable* option (few/no throttling retries).
-
-```powershell
-$py = "python"
-$sub = "<YOUR-LARGEST-SUBSCRIPTION-NAME>"
-$runs = @(
-  @{executor="process"; parallel=2},
-  @{executor="process"; parallel=4},
-  @{executor="thread";  parallel=2}
-)
-
-foreach ($r in $runs) {
-  $label = "$($r.executor)-p$($r.parallel)"
-  $log = "bench_$label.log"
-  $elapsed = Measure-Command {
-    & $py cis_azure_audit.py --subscription "$sub" --executor $r.executor --parallel $r.parallel `
-      --level 1 --fresh --skip-preflight --output "bench_$label.html" --log-file $log *> $null
-  }
-  $transient = (Select-String -Path $log -Pattern "transient error detected" -SimpleMatch | Measure-Object).Count
-  Write-Output "$label : $([Math]::Round($elapsed.TotalSeconds,2))s ; transient_retries=$transient"
-}
-```
-
-Tip: run each candidate 2–3 times and compare median runtime, not a single run.
+| `-q`, `--quiet` | Suppress per-check progress lines; only show summary |
+| `--log-level` | Base log level: `TRACE`, `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `-v`, `--verbose` | Verbose logging (sets `DEBUG`) |
+| `--debug` | Trace logging (sets `TRACE`) |
+| `--log-file` | Write full logs to a file in addition to the console |
 
 ### Examples
 
@@ -156,19 +160,22 @@ Tip: run each candidate 2–3 times and compare median runtime, not a single run
 # Audit all subscriptions
 python cis_azure_audit.py
 
-# Audit one subscription
+# Audit a single subscription by name
 python cis_azure_audit.py -s "Production"
+
+# Audit multiple subscriptions
+python cis_azure_audit.py -s "Production" -s "Staging"
 
 # Run faster with more parallel workers
 python cis_azure_audit.py --parallel 5
 
-# Use thread workers instead of the process default
+# Use thread workers (recommended on Windows)
 python cis_azure_audit.py --executor thread --parallel 4
 
-# Keep a fixed worker count (disable adaptive throttling response)
-python cis_azure_audit.py --parallel 6 --no-adaptive-concurrency
+# Save everything to a specific folder
+python cis_azure_audit.py --output-dir C:\AuditResults
 
-# Script was interrupted? Just re-run — it resumes automatically
+# Interrupted run? Just re-run — it resumes automatically
 python cis_azure_audit.py
 
 # Start completely fresh, ignoring previous checkpoints
@@ -180,12 +187,47 @@ python cis_azure_audit.py --report-only
 # Level 1 controls only
 python cis_azure_audit.py --level 1
 
-# Verbose per-check diagnostics
-python cis_azure_audit.py --verbose
+# Quiet mode — suppress per-check lines, show only summary
+python cis_azure_audit.py --quiet
 
-# Trace-level diagnostics and write logs to file
+# Trace-level diagnostics written to a log file
 python cis_azure_audit.py --debug --log-file cis_audit.log
 ```
+
+### Concurrency tuning
+
+The audit adapts worker count automatically when Azure API throttling (HTTP 429) is detected:
+
+- Starts at `--parallel` workers (minimum 1).
+- Reduces workers when transient throttling retries spike.
+- Gradually restores workers after stable batches.
+
+Use `--no-adaptive-concurrency` to keep the worker count fixed.
+
+#### Benchmark your own defaults
+
+```powershell
+$py  = "python"
+$sub = "<YOUR-LARGEST-SUBSCRIPTION-NAME>"
+$runs = @(
+  @{executor="thread";  parallel=2},
+  @{executor="thread";  parallel=4},
+  @{executor="process"; parallel=2}
+)
+
+foreach ($r in $runs) {
+  $label = "$($r.executor)-p$($r.parallel)"
+  $log   = "bench_$label.log"
+  $elapsed = Measure-Command {
+    & $py cis_azure_audit.py --subscription "$sub" --executor $r.executor --parallel $r.parallel `
+      --level 1 --fresh --skip-preflight --output "bench_$label.html" --log-file $log *> $null
+  }
+  $retries = (Select-String -Path $log -Pattern "transient error" -SimpleMatch | Measure-Object).Count
+  Write-Output "$label : $([Math]::Round($elapsed.TotalSeconds,2))s  retries=$retries"
+}
+```
+
+Run each candidate 2–3 times and compare median runtime, not a single run.
 
 ---
 
@@ -193,13 +235,13 @@ python cis_azure_audit.py --debug --log-file cis_audit.log
 
 ### Data collection — three methods
 
-#### 1. Azure Resource Graph (bulk prefetch — runs once per audit)
+#### 1. Azure Resource Graph (bulk prefetch — once per audit)
 
-Before any per-subscription work begins, a set of Kusto queries fetches all relevant resources
-across the entire tenant in one round trip. Resources fetched via Resource Graph:
+Before any per-subscription work begins, Kusto queries fetch all relevant resources across the
+entire tenant in a single round trip:
 
-- Network Security Groups and all security rules
-- Storage accounts and their security properties
+- Network Security Groups and security rules
+- Storage accounts and security properties
 - Key Vaults — access configuration and network settings
 - Virtual Networks, subnets, and NSG associations
 - Application Gateways and WAF settings
@@ -211,10 +253,9 @@ across the entire tenant in one round trip. Resources fetched via Resource Graph
 
 #### 2. Azure CLI calls per subscription
 
-For data Resource Graph cannot return — live service configurations, diagnostic settings, activity
-log alerts, and storage service properties:
+For live service configurations and data Resource Graph cannot expose:
 
-- `az security pricing show` — all Defender plan statuses (8.1.x)
+- `az security pricing show` — Defender plan statuses (8.1.x)
 - `az security contact list` — notification settings (8.1.12–8.1.15)
 - `az monitor diagnostic-settings list` — Key Vault and App Service logging
 - `az monitor activity-log alert list` — all 11 alert checks (6.1.2.x)
@@ -228,7 +269,7 @@ log alerts, and storage service properties:
 
 #### 3. Azure REST API via `az rest`
 
-For tenant-level identity checks where only the Graph or ARM REST API applies:
+For tenant-level identity checks not available via the az CLI:
 
 - `graph.microsoft.com/v1.0/policies/authorizationPolicy` — covers 5.4, 5.14, 5.15, 5.16
 - ARM REST for WDATP integration settings (8.1.3.3) and attack path notifications (8.1.15)
@@ -236,13 +277,13 @@ For tenant-level identity checks where only the Graph or ARM REST API applies:
 ### Checkpoints and resume
 
 After each subscription completes, results are written to `cis_checkpoints/<subscription-id>.json`.
-If the script is stopped or crashes mid-run, re-running it will automatically skip completed
-subscriptions and continue from where it left off. Use `--fresh` to discard all checkpoints.
+If the script is stopped or crashes mid-run, re-running it will skip completed subscriptions and
+continue from where it left off. Use `--fresh` to discard all checkpoints and start over.
 
 ### Parallel execution
 
-Subscriptions run concurrently via Python's `concurrent.futures` executor. The default is 2
-parallel workers. Increase with `--parallel` for large tenants. The Resource Graph prefetch always
+Subscriptions run concurrently via Python's `concurrent.futures` executor. The default is 2 parallel
+workers (configurable in `cis_audit.toml` or via `--parallel`). The Resource Graph prefetch always
 runs once before the parallel loop begins.
 
 ---
@@ -251,12 +292,14 @@ runs once before the parallel loop begins.
 
 The generated report is a self-contained HTML file with no external dependencies.
 
-- **Summary cards** — compliance score (PASS / total, excluding INFO and MANUAL), plus individual counts for each status.
-- **Compliance chart** — a pie chart shows PASS/FAIL/ERROR proportions at a glance.
-- **Filterable table** — filter simultaneously by free-text search, status, and level (L1/L2). Section headers collapse automatically when all their results are filtered out.
+- **Summary cards** — compliance score (PASS / total, excluding INFO and MANUAL), plus counts for each status.
+- **Compliance donuts** — three ring charts showing PASS/FAIL/ERROR proportions overall, for Level 1, and for Level 2.
+- **Section breakdown** — horizontal stacked bars per CIS section, sorted worst to best.
+- **Per-subscription summary** — stacked-bar table showing pass/fail/error counts per subscription; click a row to filter the results table to that subscription.
+- **Filterable table** — filter simultaneously by free-text search, subscription, status, and level (L1/L2). Section headers collapse when all their results are filtered out.
 - **Per-resource results** — each NSG, storage account, Key Vault, subnet, and Databricks workspace is reported individually, not aggregated to a single pass/fail per control.
 - **Remediation hints** — every FAIL result includes the Azure portal navigation path to fix the issue.
-- **Export JSON/CSV** — download the currently filtered results for automation or sharing.
+- **Export** — JSON and CSV files are generated alongside the HTML at report time. Click **Export JSON** or **Export CSV** in the report to download them.
 - **Back to top** — fixed button in the bottom-right corner for long reports.
 
 ### Status types
@@ -268,6 +311,18 @@ The generated report is a self-contained HTML file with no external dependencies
 | ERROR | Check could not complete (permissions issue, timeout, or API error) |
 | INFO | Not applicable — no resources of this type exist, or control does not apply |
 | MANUAL | Cannot be automated — requires manual verification per the CIS PDF |
+
+### Output files
+
+Each run produces three files (same base name, same directory):
+
+| File | Contents |
+| --- | --- |
+| `cis_azure_audit_report.html` | Self-contained interactive report |
+| `cis_azure_audit_report.json` | All results as a JSON array |
+| `cis_azure_audit_report.csv` | All results as a flat CSV |
+
+Use `--output` to change the base name, or `--output-dir` to change the directory.
 
 ---
 
@@ -299,8 +354,11 @@ The generated report is a self-contained HTML file with no external dependencies
 | 5.23 | No custom subscription administrator roles | L1 |
 | 5.27 | Between 2 and 3 subscription owners | L1 |
 
-> **5.1.1** — returns INFO for E3/E5 tenants using Conditional Access (security defaults are mutually exclusive with CA).
-> **5.1.2** — returns MANUAL. The only audit method in the CIS PDF is `Get-MgUser` via Graph PowerShell; there is no `az` CLI equivalent.
+> **5.1.1** — returns INFO for E3/E5 tenants using Conditional Access (security defaults are
+> mutually exclusive with CA policies).
+>
+> **5.1.2** — returns MANUAL. The CIS PDF audit method requires `Get-MgUser` via Graph PowerShell;
+> there is no `az` CLI equivalent.
 
 ### Section 6 — Management and Governance (16 automated)
 
@@ -376,7 +434,7 @@ The generated report is a self-contained HTML file with no external dependencies
 | 8.4.1 | Azure Bastion Host exists | L2 |
 | 8.5 | DDoS Network Protection enabled on VNets | L2 |
 
-### Section 9 — Storage Services (19 automated)
+### Section 9 — Storage Services (21 automated)
 
 | Control | Title | Level |
 | --- | --- | --- |
@@ -418,14 +476,13 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ### Run one test file
 
 ```powershell
-python -m unittest tests.test_permissions -v
-python -m unittest tests.test_retry -v
+python -m unittest tests.test_checks -v
+python -m unittest tests.test_report -v
 ```
 
 ### Run one test class
 
 ```powershell
-python -m unittest tests.test_permissions.TestPermissionHelpers -v
 python -m unittest tests.test_permissions.TestPreflight -v
 ```
 
@@ -453,6 +510,7 @@ cis_checkpoints/
 
 Each file contains the full result set for that subscription, a UTC timestamp, and a completion
 status. Delete the `cis_checkpoints/` folder or use `--fresh` to discard all checkpoints.
+Use `--report-only` to regenerate the HTML report from existing checkpoints without running any checks.
 
 ---
 
@@ -462,23 +520,24 @@ status. Delete the `cis_checkpoints/` folder or use `--fresh` to discard all che
 
 **Point-in-time** — results reflect the state at the moment the script ran.
 
-**Key Vault data plane access** — listing keys and secrets requires data plane permissions in
-addition to subscription Reader. Assign Key Vault Reader (RBAC vaults) or add the runner to the
-vault's access policy (non-RBAC vaults).
+**Key Vault data plane access** — listing keys, secrets, and certificates requires data plane
+permissions in addition to subscription Reader. Assign **Key Vault Reader** (RBAC vaults) or add
+the runner account to the vault's access policy (non-RBAC vaults). Without this, affected checks
+return ERROR with a note in the report.
 
-**Graph API for identity checks** — controls 5.4, 5.14, 5.15, and 5.16 use `az rest` to call
-the Graph API. If your tenant has not consented to the required Graph permissions for the Azure
-CLI app, these will return ERROR. Test with:
+**Graph API for identity checks** — controls 5.4, 5.14, 5.15, and 5.16 call the Graph API via
+`az rest`. If the required Graph permissions have not been consented for the Azure CLI app, these
+will return ERROR. Test with:
 
 ```powershell
 az rest --method get --url "https://graph.microsoft.com/v1.0/policies/authorizationPolicy"
 ```
 
-**Conditional Access policies (5.2.x)** — these controls are marked Manual in the benchmark and
-are not checked by this script. They require review in the Entra ID portal.
+**Conditional Access policies (5.2.x)** — marked Manual in the benchmark and not checked by this
+tool. They require review in the Entra ID portal.
 
 **Large tenants** — Resource Graph handles bulk data efficiently. The main bottleneck at scale is
-per-subscription CLI calls. Use `--parallel 5` or higher for tenants with many subscriptions.
+per-subscription CLI calls. Use `--parallel 5` or higher, or tune via `cis_audit.toml`.
 
 ---
 
@@ -495,12 +554,26 @@ Your account needs Global Reader in Entra ID. Test the Graph call directly:
 az rest --method get --url "https://graph.microsoft.com/v1.0/policies/authorizationPolicy"
 ```
 
-If this fails, ask your Entra ID admin to grant Global Reader or consent to the required Graph
-API permissions for the Azure CLI app (app ID: 04b07795-8ddb-461a-bbee-02f9e1bf7b46).
+If this fails, ask your Entra ID admin to grant Global Reader or consent to the required Graph API
+permissions for the Azure CLI app (app ID: `04b07795-8ddb-461a-bbee-02f9e1bf7b46`).
+
+**Key Vault checks return ERROR (Insufficient permissions)**
+The runner account needs Key Vault data plane access. For RBAC-enabled vaults assign the
+**Key Vault Reader** role; for access-policy vaults, add the account to the vault's access policy.
 
 **A check consistently times out**
-All `az` CLI calls have a 25-second timeout (15 seconds for storage service property calls).
-Timed-out checks are recorded as ERROR and the script continues.
+All `az` CLI calls have configurable timeouts (default 20 seconds). Increase them in `cis_audit.toml`:
+
+```toml
+[timeouts]
+default = 40
+```
+
+Timed-out checks are recorded as ERROR and the audit continues.
+
+**Subscription not found**
+Subscription names are matched exactly (case-sensitive). Run `az account list --output table` to
+see the exact names available to your account.
 
 ---
 

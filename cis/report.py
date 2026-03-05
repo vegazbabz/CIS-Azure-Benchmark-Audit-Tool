@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from cis.config import BENCHMARK_VER, LOGGER, VERSION, FAIL, INFO, MANUAL, PASS, ERROR
+from cis.config import BENCHMARK_VER, LOGGER, VERSION, FAIL, INFO, MANUAL, PASS, ERROR, SUPPRESSED
 from cis.helpers import _ctrl_sort_key
 from cis.models import R
 
@@ -27,6 +27,7 @@ _STATUS_STYLE = {
     ERROR: ("#ea580c", "#fff7ed", "⚠️"),  # Orange
     INFO: ("#2563eb", "#eff6ff", "ℹ️"),  # Blue
     MANUAL: ("#7c3aed", "#f5f3ff", "📋"),  # Purple
+    SUPPRESSED: ("#64748b", "#f1f5f9", "🔇"),  # Muted grey
 }
 
 
@@ -58,12 +59,12 @@ def generate_html(
                  subscriptions (list of name strings), level_filter
     """
     # ── Counts and score ──────────────────────────────────────────────────────
-    counts = {s: sum(1 for r in results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL]}
+    counts = {s: sum(1 for r in results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL, SUPPRESSED]}
     total = len(results)
 
-    # Compliance score excludes INFO (not applicable) and MANUAL (human review).
-    # Score = PASS / (PASS + FAIL + ERROR) expressed as a percentage.
-    denom = max(total - counts[INFO] - counts[MANUAL], 1)  # Avoid division by zero
+    # Compliance score excludes INFO (not applicable), MANUAL (human review),
+    # and SUPPRESSED (accepted risk — counted separately, not as a pass or fail).
+    denom = max(total - counts[INFO] - counts[MANUAL] - counts[SUPPRESSED], 1)  # Avoid division by zero
     score = round(counts[PASS] / denom * 100, 1)
     score_col = "#16a34a" if score >= 80 else "#d97706" if score >= 60 else "#dc2626"
 
@@ -142,7 +143,7 @@ def generate_html(
         if not sn:
             continue
         if sn not in sub_stats:
-            sub_stats[sn] = {PASS: 0, FAIL: 0, ERROR: 0, INFO: 0, MANUAL: 0}
+            sub_stats[sn] = {PASS: 0, FAIL: 0, ERROR: 0, INFO: 0, MANUAL: 0, SUPPRESSED: 0}
         sub_stats[sn][r.status] = sub_stats[sn].get(r.status, 0) + 1
 
     def _sub_score(s: dict[str, int]) -> float:
@@ -174,6 +175,7 @@ def generate_html(
             f'<td style="color:#ea580c">{st[ERROR]}</td>'
             f'<td style="color:#64748b">{st[INFO]}</td>'
             f'<td style="color:#7c3aed">{st[MANUAL]}</td>'
+            f'<td style="color:#64748b">{st[SUPPRESSED]}</td>'
             f"</tr>\n"
         )
     sub_table = (
@@ -184,7 +186,7 @@ def generate_html(
         "<thead><tr>"
         "<th>Subscription</th><th>Score</th><th>Breakdown</th>"
         "<th>&#10003; Pass</th><th>&#10007; Fail</th>"
-        "<th>&#9888; Error</th><th>Info</th><th>Manual</th>"
+        "<th>&#9888; Error</th><th>Info</th><th>Manual</th><th>&#128263; Suppressed</th>"
         f"</tr></thead><tbody>{sub_rows_html}</tbody></table></div>"
         if sub_rows_html
         else ""
@@ -272,6 +274,7 @@ header p  {{ opacity: .8; font-size: .9rem; }}
 .c-er .n {{ color: #ea580c; }}
 .c-in .n {{ color: #2563eb; }}
 .c-ma .n {{ color: #7c3aed; }}
+.c-su .n {{ color: #64748b; }}
 
 /* ── Filter bar ── */
 .filters {{ display: flex; align-items: center; gap: .75rem; padding: .8rem 2rem;
@@ -408,6 +411,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   <div class="card c-er"><div class="n">{counts[ERROR]}</div><div class="l">⚠️ Errors</div></div>
   <div class="card c-in"><div class="n">{counts[INFO]}</div><div class="l">ℹ️ Info/N/A</div></div>
   <div class="card c-ma"><div class="n">{counts[MANUAL]}</div><div class="l">📋 Manual</div></div>
+  <div class="card c-su"><div class="n">{counts[SUPPRESSED]}</div><div class="l">🔇 Suppressed</div></div>
 </div>
 <div class="dashboard">
   <div class="dash-donuts">
@@ -441,7 +445,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   <select id="st">
     <option value="">All statuses</option>
     <option>PASS</option><option>FAIL</option><option>ERROR</option>
-    <option>INFO</option><option>MANUAL</option>
+    <option>INFO</option><option>MANUAL</option><option>SUPPRESSED</option>
   </select>
   <select id="lv">
     <option value="">All levels</option>
@@ -460,7 +464,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 <footer>
   CIS Microsoft Azure Foundations Benchmark v{BENCHMARK_VER} (Sep 2025) &nbsp;·&nbsp;
   Tool v{VERSION} &nbsp;·&nbsp;
-  Compliance score excludes INFO and MANUAL checks.
+  Compliance score excludes INFO, MANUAL, and SUPPRESSED checks.
   Manual controls require separate review per the CIS PDF.
 </footer>
 <script>

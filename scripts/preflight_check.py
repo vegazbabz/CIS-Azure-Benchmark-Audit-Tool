@@ -6,7 +6,7 @@ This script is intentionally lightweight and prints the key fields from
 outside the full audit flow.
 """
 
-from azure_helpers import check_user_permissions
+from azure.helpers import check_user_permissions
 
 
 def main() -> None:

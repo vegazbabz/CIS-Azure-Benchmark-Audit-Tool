@@ -6,12 +6,19 @@ SECTION 9 — STORAGE SERVICES
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from cis.config import PASS, FAIL, ERROR, TIMEOUTS
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az, _friendly_error
+
+# Maximum number of storage accounts audited concurrently within one subscription.
+# Each account makes 4 az CLI calls (blob props, file props, key policy, activity log).
+# At 10 workers this yields ~40 concurrent subprocesses per subscription — well within
+# typical system limits. Adjust down if you see resource exhaustion on your runner.
+_ACCOUNT_WORKERS = 10
 
 
 def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
@@ -40,8 +47,13 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
       Requires: az storage account show (key policy) + az monitor activity-log list
       Checks: 9.3.1.1 (rotation reminders), 9.3.1.2 (keys rotated within 90 days)
 
+    Group 5 — Resource locks (subscription-wide)
+      Single az lock list call fetched once before per-account processing.
+      Checks: 9.3.9 (CanNotDelete lock), 9.3.10 (ReadOnly lock)
+
     Data source (Group 1): Resource Graph 'storage' query
-    Data sources (Groups 2-4): az CLI per-account calls
+    Data sources (Groups 2-4): az CLI per-account calls, parallelised across accounts
+    Data source (Group 5): az lock list (one call per subscription)
     """
     accounts = _idx(td, "storage", sid)
 
@@ -122,10 +134,15 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             )
         accounts = normalised
 
-    results = []
-    for acct in accounts:
+    # ── Group 5 — fetch subscription-wide lock list once before the per-account loop ──
+    # Fetched here so it can complete while per-account work is parallelised below.
+    rc_lk, all_locks = az(["lock", "list", "--subscription", sid], sid, timeout=TIMEOUTS["default"])
+
+    def _check_one_account(acct: dict[str, Any]) -> list[R]:
+        """Audit one storage account (Groups 1–4). Called in parallel by the outer pool."""
         aname = acct.get("name", "?")
         rg = acct.get("resourceGroup", "?")
+        acc_results: list[R] = []
 
         # ────────────────────────────────────────────────────────────────────
         # GROUP 1 — Static checks using Resource Graph data only
@@ -255,7 +272,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
         # Emit one R per static check — show actual value in details for easy verification
         for ctrl, title, lvl, compliant, display_val, remediation in static:
-            results.append(
+            acc_results.append(
                 R(
                     ctrl,
                     title,
@@ -271,15 +288,27 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             )
 
         # ────────────────────────────────────────────────────────────────────
-        # GROUP 2 — Blob service properties
+        # GROUPS 2 + 3 — Blob and file service properties (fetched concurrently)
+        # The two calls are independent so we run them in parallel to halve
+        # the per-account latency for this pair.
         # ────────────────────────────────────────────────────────────────────
+        with ThreadPoolExecutor(max_workers=2) as svc_pool:
+            f_blob = svc_pool.submit(
+                az,
+                ["storage", "account", "blob-service-properties", "show", "--account-name", aname, "--resource-group", rg],
+                sid,
+                timeout=TIMEOUTS["storage_svc"],
+            )
+            f_file = svc_pool.submit(
+                az,
+                ["storage", "account", "file-service-properties", "show", "--account-name", aname, "--resource-group", rg],
+                sid,
+                timeout=TIMEOUTS["storage_svc"],
+            )
+            rc_blob, blob_props = f_blob.result()
+            rc_file, file_props = f_file.result()
 
-        rc_blob, blob_props = az(
-            ["storage", "account", "blob-service-properties", "show", "--account-name", aname, "--resource-group", rg],
-            sid,
-            timeout=TIMEOUTS["storage_svc"],
-        )
-
+        # GROUP 2 — process blob results
         if rc_blob == 0 and isinstance(blob_props, dict):
             # deleteRetentionPolicy — applies to individual blob versions
             drp = blob_props.get("deleteRetentionPolicy", {}) or {}
@@ -289,7 +318,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
             # 9.2.1 — Blob soft delete allows recovery of deleted blobs within
             # the retention period. Essential for ransomware recovery.
-            results.append(
+            acc_results.append(
                 R(
                     "9.2.1",
                     "Blob soft delete enabled",
@@ -310,7 +339,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
             # 9.2.2 — Container soft delete allows recovery of deleted containers
             # (and all blobs within) within the retention period.
-            results.append(
+            acc_results.append(
                 R(
                     "9.2.2",
                     "Container soft delete enabled",
@@ -331,7 +360,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
             # 9.2.3 — Versioning automatically saves a copy of a blob before every
             # write/delete, allowing point-in-time recovery. (L2)
-            results.append(
+            acc_results.append(
                 R(
                     "9.2.3",
                     "Blob versioning enabled",
@@ -353,7 +382,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 ("9.2.2", "Container soft delete enabled", 1),
                 ("9.2.3", "Blob versioning enabled", 2),
             ]:
-                results.append(
+                acc_results.append(
                     R(
                         ctrl,
                         title,
@@ -368,22 +397,13 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     )
                 )
 
-        # ────────────────────────────────────────────────────────────────────
-        # GROUP 3 — File service properties
-        # ────────────────────────────────────────────────────────────────────
-
-        rc_file, file_props = az(
-            ["storage", "account", "file-service-properties", "show", "--account-name", aname, "--resource-group", rg],
-            sid,
-            timeout=TIMEOUTS["storage_svc"],
-        )
-
+        # GROUP 3 — process file results
         if rc_file == 0 and isinstance(file_props, dict):
             # shareDeleteRetentionPolicy — applies to Azure File Share soft delete
             srp = file_props.get("shareDeleteRetentionPolicy", {}) or {}
 
             # 9.1.1 — File share soft delete allows recovery of deleted shares
-            results.append(
+            acc_results.append(
                 R(
                     "9.1.1",
                     "Azure Files soft delete enabled",
@@ -414,7 +434,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
             # 9.1.2 — SMB 3.1.1 adds pre-authentication integrity protection.
             # If the account has no SMB settings (e.g. BlobStorage tier), treat as PASS.
-            results.append(
+            acc_results.append(
                 R(
                     "9.1.2",
                     "SMB protocol version >= 3.1.1",
@@ -435,7 +455,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
             # 9.1.3 — AES-256-GCM provides authenticated encryption of the SMB channel,
             # preventing eavesdropping and tampering on the network.
-            results.append(
+            acc_results.append(
                 R(
                     "9.1.3",
                     "SMB channel encryption AES-256-GCM or higher",
@@ -459,7 +479,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 ("9.1.2", "SMB protocol version >= 3.1.1", 1),
                 ("9.1.3", "SMB channel encryption AES-256-GCM", 1),
             ]:
-                results.append(
+                acc_results.append(
                     R(
                         ctrl,
                         title,
@@ -475,21 +495,42 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 )
 
         # ────────────────────────────────────────────────────────────────────
-        # GROUP 4 — Key management checks
+        # GROUP 4 — Key management (key policy + activity log fetched concurrently)
+        # The two calls target different Azure services and are independent.
         # ────────────────────────────────────────────────────────────────────
+        with ThreadPoolExecutor(max_workers=2) as key_pool:
+            f_key = key_pool.submit(
+                az,
+                ["storage", "account", "show", "--name", aname, "--resource-group", rg, "--query", "keyPolicy"],
+                sid,
+                timeout=TIMEOUTS["storage_svc"],
+            )
+            f_log = key_pool.submit(
+                az,
+                [
+                    "monitor",
+                    "activity-log",
+                    "list",
+                    "--namespace",
+                    "Microsoft.Storage",
+                    "--offset",
+                    "90d",
+                    "--resource-id",
+                    acct.get("id", ""),
+                ],
+                sid,
+                timeout=TIMEOUTS["activity_log"],
+            )
+            rc_acct, acct_details = f_key.result()
+            rc_log, log_data = f_log.result()
 
         # 9.3.1.1 — Key rotation reminder
         # keyExpirationPeriodInDays triggers an Azure Portal warning when keys
         # approach the expiry threshold, prompting manual rotation.
-        rc_acct, acct_details = az(
-            ["storage", "account", "show", "--name", aname, "--resource-group", rg, "--query", "keyPolicy"],
-            sid,
-            timeout=TIMEOUTS["storage_svc"],
-        )
         if rc_acct == 0:
             key_policy = acct_details if isinstance(acct_details, dict) else {}
             reminder_days = key_policy.get("keyExpirationPeriodInDays")
-            results.append(
+            acc_results.append(
                 R(
                     "9.3.1.1",
                     "Storage account key rotation reminders enabled",
@@ -504,7 +545,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 )
             )
         else:
-            results.append(
+            acc_results.append(
                 _err(
                     "9.3.1.1",
                     "Storage account key rotation reminders enabled",
@@ -524,22 +565,6 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         # 9.3.1.2 — fetch without --query to avoid JMESPath null crash
         # Some activity log entries have null authorization.action, which causes
         # contains() to fail in JMESPath. Fetch all events and filter in Python.
-        rc_log, log_data = az(
-            [
-                "monitor",
-                "activity-log",
-                "list",
-                "--namespace",
-                "Microsoft.Storage",
-                "--offset",
-                "90d",
-                "--resource-id",
-                acct.get("id", ""),
-            ],
-            sid,
-            timeout=TIMEOUTS["activity_log"],
-        )
-
         if rc_log == 0:
             all_events = log_data if isinstance(log_data, list) else []
             # Filter in Python — safe against null authorization.action values
@@ -549,7 +574,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 if "regeneratekey" in str((e.get("authorization") or {}).get("action", "")).lower()
             ]
             last = regen_events[-1][:10] if regen_events else None
-            results.append(
+            acc_results.append(
                 R(
                     "9.3.1.2",
                     "Storage access keys regenerated within 90 days",
@@ -568,7 +593,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 )
             )
         else:
-            results.append(
+            acc_results.append(
                 _err(
                     "9.3.1.2",
                     "Storage access keys regenerated within 90 days",
@@ -580,11 +605,19 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 )
             )
 
+        return acc_results
+
+    # ── Process all accounts in parallel ─────────────────────────────────────
+    results: list[R] = []
+    with ThreadPoolExecutor(max_workers=_ACCOUNT_WORKERS) as pool:
+        futures = [pool.submit(_check_one_account, acct) for acct in accounts]
+        for fut in as_completed(futures):
+            results.extend(fut.result())
+
     # ────────────────────────────────────────────────────────────────────────
     # GROUP 5 — Resource locks (9.3.9, 9.3.10)
     # Single subscription-wide az lock list call; matched against every account.
     # ────────────────────────────────────────────────────────────────────────
-    rc_lk, all_locks = az(["lock", "list", "--subscription", sid], sid, timeout=TIMEOUTS["default"])
     if rc_lk != 0:
         lk_msg = _friendly_error(str(all_locks))
         for acct in accounts:

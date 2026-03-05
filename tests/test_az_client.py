@@ -18,10 +18,10 @@ from unittest.mock import call, patch
 
 import az_client
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _ok(stdout: str = "", stderr: str = "") -> tuple[int, str, str]:
     """Simulate a successful _run_cmd_with_retries return."""
@@ -36,6 +36,7 @@ def _fail(stderr: str = "some error", rc: int = 1) -> tuple[int, str, str]:
 # ---------------------------------------------------------------------------
 # _first_error_line
 # ---------------------------------------------------------------------------
+
 
 class TestFirstErrorLine(unittest.TestCase):
 
@@ -62,6 +63,7 @@ class TestFirstErrorLine(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # is_firewall_error
 # ---------------------------------------------------------------------------
+
 
 class TestIsFirewallError(unittest.TestCase):
 
@@ -90,6 +92,7 @@ class TestIsFirewallError(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # _friendly_error
 # ---------------------------------------------------------------------------
+
 
 class TestFriendlyError(unittest.TestCase):
 
@@ -125,6 +128,7 @@ class TestFriendlyError(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # az()
 # ---------------------------------------------------------------------------
+
 
 class TestAz(unittest.TestCase):
 
@@ -184,6 +188,7 @@ class TestAz(unittest.TestCase):
 # az_rest()
 # ---------------------------------------------------------------------------
 
+
 class TestAzRest(unittest.TestCase):
 
     def _patch(self, return_value: tuple[int, str, str]) -> Any:
@@ -222,6 +227,7 @@ class TestAzRest(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # graph_query()
 # ---------------------------------------------------------------------------
+
 
 class TestGraphQuery(unittest.TestCase):
 
@@ -285,6 +291,7 @@ class TestGraphQuery(unittest.TestCase):
 # get_and_reset_rate_limit_retry_count()
 # ---------------------------------------------------------------------------
 
+
 class TestRateLimitCounter(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -308,15 +315,17 @@ class TestRateLimitCounter(unittest.TestCase):
             (1, "", "429 Too Many Requests"),
             (0, json.dumps({}), ""),
         ]
-        with patch("az_client.subprocess.run") as mock_run, \
-             patch("az_client.time.sleep", lambda s: None):
+        with patch("az_client.subprocess.run") as mock_run, patch("az_client.time.sleep", lambda s: None):
+
             def _side(cmd: list[str], **kw: Any) -> Any:
                 import subprocess as sp
+
                 rc_val, out_val, err_val = responses[mock_run.call_count - 1]
                 r: sp.CompletedProcess[str] = sp.CompletedProcess(cmd, rc_val)
                 r.stdout = out_val
                 r.stderr = err_val
                 return r
+
             mock_run.side_effect = _side
             az_client.az(["account", "show"])
         count = az_client.get_and_reset_rate_limit_retry_count()

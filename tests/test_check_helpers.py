@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import unittest
 
-from cis_azure_audit import _ctrl_sort_key, nsg_bad_rules, port_in_range
+from cis.helpers import _ctrl_sort_key, nsg_bad_rules, port_in_range
 
 # ---------------------------------------------------------------------------
 # port_in_range
@@ -136,6 +136,16 @@ class TestNsgBadRules(unittest.TestCase):
         r3 = _rule(name="r3")
         result = nsg_bad_rules([r1, r2, r3], 22)
         self.assertEqual(result, ["r1", "r3"])
+
+    def test_source_address_prefixes_plural_wildcard(self) -> None:
+        """Rules using sourceAddressPrefixes list with '*' must be flagged."""
+        r = _rule(sourceAddressPrefix="", sourceAddressPrefixes=["10.0.0.0/8", "*"])
+        self.assertEqual(nsg_bad_rules([r], 22), ["bad-rule"])
+
+    def test_source_address_prefixes_plural_private_only(self) -> None:
+        """Rules using sourceAddressPrefixes with only private ranges must pass."""
+        r = _rule(sourceAddressPrefix="", sourceAddressPrefixes=["10.0.0.0/8", "192.168.1.0/24"])
+        self.assertEqual(nsg_bad_rules([r], 22), [])
 
 
 # ---------------------------------------------------------------------------

@@ -65,12 +65,31 @@ def generate_html(
     # Score = PASS / (PASS + FAIL + ERROR) expressed as a percentage.
     denom = max(total - counts[INFO] - counts[MANUAL], 1)  # Avoid division by zero
     score = round(counts[PASS] / denom * 100, 1)
+    score_col = "#16a34a" if score >= 80 else "#d97706" if score >= 60 else "#dc2626"
+
+    # ── L1 / L2 breakdown ─────────────────────────────────────────────────────
+    l1_counts = {s: sum(1 for r in results if r.level == 1 and r.status == s) for s in [PASS, FAIL, ERROR]}
+    l2_counts = {s: sum(1 for r in results if r.level == 2 and r.status == s) for s in [PASS, FAIL, ERROR]}
+    l1_score = round(l1_counts[PASS] / max(l1_counts[PASS] + l1_counts[FAIL] + l1_counts[ERROR], 1) * 100, 1)
+    l2_score = round(l2_counts[PASS] / max(l2_counts[PASS] + l2_counts[FAIL] + l2_counts[ERROR], 1) * 100, 1)
+    l1_col = "#16a34a" if l1_score >= 80 else "#d97706" if l1_score >= 60 else "#dc2626"
+    l2_col = "#16a34a" if l2_score >= 80 else "#d97706" if l2_score >= 60 else "#dc2626"
 
     # ── Build table rows grouped by section ───────────────────────────────────
     # Group results by their section field and sort alphabetically
     sections: dict = {}
     for r in results:
         sections.setdefault(r.section, []).append(r)
+
+    # ── Per-section scores (passed to JS for section breakdown chart) ─────────
+    sec_data: dict = {}
+    for sec, grp in sections.items():
+        sp = sum(1 for r in grp if r.status == PASS)
+        sf = sum(1 for r in grp if r.status == FAIL)
+        se = sum(1 for r in grp if r.status == ERROR)
+        sec_data[sec] = {"pass": sp, "fail": sf, "error": se,
+                         "score": round(sp / max(sp + sf + se, 1) * 100, 1)}
+    sec_data_json = json.dumps(sec_data, ensure_ascii=False)
 
     rows = ""
     for sec in sorted(sections, key=lambda s: _ctrl_sort_key(s.split(" ")[0])):
@@ -340,6 +359,34 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     table {{ box-shadow: none; }}
     tr {{ page-break-inside: avoid; }}
 }}
+
+/* ── Compliance dashboard ── */
+.dashboard {{ display: flex; gap: 2rem; padding: 1rem 2rem 1.5rem;
+    flex-wrap: wrap; align-items: flex-start; background: #fff;
+    border-bottom: 1px solid #e2e8f0; }}
+.dash-donuts {{ display: flex; gap: 2rem; flex-wrap: wrap; align-items: flex-start; }}
+.donut-group {{ display: flex; flex-direction: column; align-items: center; gap: .25rem; }}
+.donut-label {{ font-size: .7rem; font-weight: 700; color: #475569;
+    text-transform: uppercase; letter-spacing: .05em; text-align: center; margin-bottom: .15rem; }}
+.lv-badge {{ font-size: .62rem; font-weight: 700; color: #fff; border-radius: 3px;
+    padding: 0 4px; margin-left: 4px; vertical-align: middle; }}
+.donut-pct {{ font-size: 1.45rem; font-weight: 800; line-height: 1; margin-top: .2rem; }}
+.donut-legend {{ display: flex; gap: .9rem; margin-top: .7rem; flex-wrap: wrap; }}
+.donut-legend span {{ display: flex; align-items: center; gap: .35rem;
+    font-size: .74rem; color: #475569; }}
+.donut-legend i {{ display: inline-block; width: 10px; height: 10px; border-radius: 2px; }}
+.sec-breakdown {{ flex: 1; min-width: 260px; }}
+.sb-title {{ font-size: .72rem; font-weight: 700; color: #475569;
+    text-transform: uppercase; letter-spacing: .05em; margin-bottom: .75rem; }}
+.sb-subtitle {{ font-size: .67rem; font-weight: 400; color: #94a3b8;
+    text-transform: none; letter-spacing: 0; margin-left: .4rem; }}
+.sb-row {{ display: flex; align-items: center; gap: .6rem; margin-bottom: .42rem; }}
+.sb-name {{ font-size: .77rem; color: #1e293b; font-weight: 500; width: 200px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }}
+.sb-bar {{ flex: 1; height: 9px; border-radius: 5px; background: #e2e8f0;
+    overflow: hidden; display: flex; min-width: 80px; }}
+.sb-bar span {{ display: block; height: 100%; }}
+.sb-pct {{ font-size: .77rem; font-weight: 700; width: 40px; text-align: right; flex-shrink: 0; }}
 </style>
 </head>
 <body>
@@ -360,22 +407,30 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   <div class="card c-in"><div class="n">{counts[INFO]}</div><div class="l">ℹ️ Info/N/A</div></div>
   <div class="card c-ma"><div class="n">{counts[MANUAL]}</div><div class="l">📋 Manual</div></div>
 </div>
-<div style="display:flex;align-items:center;justify-content:center;gap:2rem;flex-wrap:wrap;padding:.5rem 0">
-  <canvas id="pie" width="140" height="140"></canvas>
-  <div style="display:flex;flex-direction:column;gap:.5rem;font-size:.85rem">
-    <div style="display:flex;align-items:center;gap:.5rem">
-      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#16a34a"></span>
-      <span>Passed ({counts[PASS]})</span>
+<div class="dashboard">
+  <div class="dash-donuts">
+    <div class="donut-group">
+      <div class="donut-label">Overall</div>
+      <canvas id="d-overall" width="110" height="110"></canvas>
+      <div class="donut-pct" style="color:{score_col}">{score}%</div>
     </div>
-    <div style="display:flex;align-items:center;gap:.5rem">
-      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#dc2626"></span>
-      <span>Failed ({counts[FAIL]})</span>
+    <div class="donut-group">
+      <div class="donut-label">Level 1<span class="lv-badge" style="background:#dc2626">L1</span></div>
+      <canvas id="d-l1" width="110" height="110"></canvas>
+      <div class="donut-pct" style="color:{l1_col}">{l1_score}%</div>
     </div>
-    <div style="display:flex;align-items:center;gap:.5rem">
-      <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#ea580c"></span>
-      <span>Errors ({counts[ERROR]})</span>
+    <div class="donut-group">
+      <div class="donut-label">Level 2<span class="lv-badge" style="background:#7c3aed">L2</span></div>
+      <canvas id="d-l2" width="110" height="110"></canvas>
+      <div class="donut-pct" style="color:{l2_col}">{l2_score}%</div>
+    </div>
+    <div class="donut-legend">
+      <span><i style="background:#16a34a"></i>Pass</span>
+      <span><i style="background:#dc2626"></i>Fail</span>
+      <span><i style="background:#cbd5e1"></i>Error / N/A</span>
     </div>
   </div>
+  <div class="sec-breakdown" id="sec-breakdown"></div>
 </div>
 {sub_table}
 <div class="filters">
@@ -390,8 +445,8 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     <option value="">All levels</option>
     <option value="L1">Level 1</option><option value="L2">Level 2</option>
   </select>
-  <a href="{json_name}" target="_blank" class="exp-btn">&#8681; Export JSON</a>
-  <a href="{csv_name}" target="_blank" class="exp-btn">&#8681; Export CSV</a>
+  <a href="{json_name}" class="exp-btn">&#8681; Export JSON</a>
+  <a href="{csv_name}" class="exp-btn">&#8681; Export CSV</a>
 </div>
 <div class="wrap"><table>
 <thead><tr>
@@ -417,8 +472,11 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   var st = document.getElementById('st');   // Status dropdown
   var lv = document.getElementById('lv');   // Level dropdown
 
-  /* Counts passed from Python for chart drawing */
-  var JS_COUNTS = {{PASS: {counts[PASS]}, FAIL: {counts[FAIL]}, ERROR: {counts[ERROR]}}};
+  /* Data for charts — passed from Python */
+  var JS_COUNTS   = {{PASS: {counts[PASS]}, FAIL: {counts[FAIL]}, ERROR: {counts[ERROR]}}};
+  var JS_L1       = {{pass: {l1_counts[PASS]}, fail: {l1_counts[FAIL]}, error: {l1_counts[ERROR]}}};
+  var JS_L2       = {{pass: {l2_counts[PASS]}, fail: {l2_counts[FAIL]}, error: {l2_counts[ERROR]}}};
+  var JS_SECTIONS = {sec_data_json};
 
   /* Active subscription filter — empty string means "show all" */
   var subF = '';
@@ -474,28 +532,70 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     }});
   }});
 
-  /* draw the compliance pie chart once the DOM is ready */
-  drawPie();
+  /* Draw three compliance donut charts and section breakdown */
+  drawDonut('d-overall', JS_COUNTS.PASS, JS_COUNTS.FAIL, JS_COUNTS.ERROR);
+  drawDonut('d-l1',      JS_L1.pass,     JS_L1.fail,     JS_L1.error);
+  drawDonut('d-l2',      JS_L2.pass,     JS_L2.fail,     JS_L2.error);
+  renderSectionBreakdown();
 
-  function drawPie() {{
-    var canvas = document.getElementById('pie');
-    if (!canvas) return;
-    var ctx = canvas.getContext('2d');
-    var data = JS_COUNTS;
-    var total = data.PASS + data.FAIL + data.ERROR;
+  /* Donut ring chart: pass (green) / fail (red) / error (neutral gray — not a compliance failure) */
+  function drawDonut(id, pass, fail, error) {{
+    var cv = document.getElementById(id);
+    if (!cv) return;
+    var ctx = cv.getContext('2d');
+    var cx = 55, cy = 55, r = 44, ri = 28;
+    var total = pass + fail + error;
     if (total === 0) return;
-    var start = 0;
-    var colors = {{PASS: '#16a34a', FAIL: '#dc2626', ERROR: '#ea580c'}};
-    Object.keys(data).forEach(function(k) {{
-      var slice = (data[k] / total) * 2 * Math.PI;
-      ctx.fillStyle = colors[k];
+    var segs = [[pass,'#16a34a'],[fail,'#dc2626'],[error,'#cbd5e1']];
+    var start = -Math.PI / 2;
+    segs.forEach(function(seg) {{
+      if (!seg[0]) return;
+      var arc = (seg[0] / total) * 2 * Math.PI;
       ctx.beginPath();
-      ctx.moveTo(80, 80);
-      ctx.arc(80, 80, 60, start, start + slice);
+      ctx.moveTo(cx + r * Math.cos(start), cy + r * Math.sin(start));
+      ctx.arc(cx, cy, r, start, start + arc);
+      ctx.arc(cx, cy, ri, start + arc, start, true);
       ctx.closePath();
+      ctx.fillStyle = seg[1];
       ctx.fill();
-      start += slice;
+      start += arc;
     }});
+    /* punch center hole white */
+    ctx.beginPath();
+    ctx.arc(cx, cy, ri - 1, 0, 2 * Math.PI);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  }}
+
+  /* Section breakdown: horizontal stacked bars sorted worst → best */
+  function renderSectionBreakdown() {{
+    var el = document.getElementById('sec-breakdown');
+    if (!el) return;
+    var secs = Object.keys(JS_SECTIONS)
+      .filter(function(a) {{ return JS_SECTIONS[a].pass + JS_SECTIONS[a].fail > 0; }})
+      .sort(function(a,b) {{
+      return JS_SECTIONS[a].score - JS_SECTIONS[b].score;
+    }});
+    var h = '<div class="sb-title">Section Breakdown'
+          + '<span class="sb-subtitle">worst \u2192 best</span></div>';
+    secs.forEach(function(sec) {{
+      var d = JS_SECTIONS[sec];
+      var scored = d.pass + d.fail + d.error;
+      var col = d.score >= 80 ? '#16a34a' : d.score >= 60 ? '#d97706' : '#dc2626';
+      var pw = scored ? Math.round(d.pass  / scored * 100) : 0;
+      var fw = scored ? Math.round(d.fail  / scored * 100) : 0;
+      var ew = Math.max(0, 100 - pw - fw);
+      h += '<div class="sb-row">'
+         + '<div class="sb-name" title="' + sec + '">' + sec + '</div>'
+         + '<div class="sb-bar">'
+         + '<span style="width:' + pw + '%;background:#16a34a"></span>'
+         + '<span style="width:' + fw + '%;background:#dc2626"></span>'
+         + '<span style="width:' + ew + '%;background:#cbd5e1"></span>'
+         + '</div>'
+         + '<span class="sb-pct" style="color:' + col + '">' + d.score + '%</span>'
+         + '</div>';
+    }});
+    el.innerHTML = h;
   }}
 }})();
 </script>

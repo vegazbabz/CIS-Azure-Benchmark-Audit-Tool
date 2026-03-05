@@ -496,7 +496,8 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   /* ── Back to top ── */
   var btn = document.getElementById('back-top');
   btn.addEventListener('click', function() {{
-    window.scrollTo({{top: 0, behavior: 'smooth'}});
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }});
 }})();
 </script>

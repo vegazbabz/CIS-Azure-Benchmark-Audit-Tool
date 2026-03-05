@@ -484,7 +484,10 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         1,
                         "8 - Security Services",
                         INFO if is_firewall_error(error_msg) else ERROR,
-                        f"Vault '{vname}': Failed to enumerate keys - {_friendly_error(error_msg)}",
+                        (
+                            f"Vault '{vname}': Failed to enumerate keys"
+                            f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
+                        ),
                         "",
                         sid,
                         sname,
@@ -543,7 +546,10 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         1,
                         "8 - Security Services",
                         INFO if is_firewall_error(error_msg) else ERROR,
-                        f"Vault '{vname}': Failed to enumerate secrets - {_friendly_error(error_msg)}",
+                        (
+                            f"Vault '{vname}': Failed to enumerate secrets"
+                            f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
+                        ),
                         "",
                         sid,
                         sname,
@@ -588,7 +594,10 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     2,
                     "8 - Security Services",
                     INFO if is_firewall_error(error_msg) else ERROR,
-                    f"Vault '{vname}': Failed to enumerate keys - {_friendly_error(error_msg)}",
+                    (
+                        f"Vault '{vname}': Failed to enumerate keys"
+                        f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
+                    ),
                     "",
                     sid,
                     sname,
@@ -616,8 +625,8 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             "8 - Security Services",
                             INFO if is_firewall_error(error_msg) else ERROR,
                             (
-                                f"Vault '{vname}' key '{kname}': "
-                                f"Failed to fetch rotation policy - {_friendly_error(error_msg)}"
+                                f"Vault '{vname}' key '{kname}': Failed to fetch rotation policy"
+                                f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
                             ),
                             "",
                             sid,
@@ -670,7 +679,10 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     1,
                     "8 - Security Services",
                     INFO if is_firewall_error(error_msg) else ERROR,
-                    f"Vault '{vname}': Failed to enumerate certificates - {_friendly_error(error_msg)}",
+                    (
+                        f"Vault '{vname}': Failed to enumerate certificates"
+                        f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
+                    ),
                     "",
                     sid,
                     sname,
@@ -708,8 +720,8 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             "8 - Security Services",
                             INFO if is_firewall_error(error_msg) else ERROR,
                             (
-                                f"Vault '{vname}' cert '{cname}': "
-                                f"Failed to fetch certificate - {_friendly_error(error_msg)}"
+                                f"Vault '{vname}' cert '{cname}': Failed to fetch certificate"
+                                f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
                             ),
                             "",
                             sid,

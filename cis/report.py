@@ -87,8 +87,7 @@ def generate_html(
         sp = sum(1 for r in grp if r.status == PASS)
         sf = sum(1 for r in grp if r.status == FAIL)
         se = sum(1 for r in grp if r.status == ERROR)
-        sec_data[sec] = {"pass": sp, "fail": sf, "error": se,
-                         "score": round(sp / max(sp + sf + se, 1) * 100, 1)}
+        sec_data[sec] = {"pass": sp, "fail": sf, "error": se, "score": round(sp / max(sp + sf + se, 1) * 100, 1)}
     sec_data_json = json.dumps(sec_data, ensure_ascii=False)
 
     rows = ""
@@ -218,7 +217,9 @@ def generate_html(
     )
     writer.writeheader()
     writer.writerows(json_data)
-    base.with_suffix(".csv").write_text(csv_buf.getvalue(), encoding="utf-8")
+    csv_text = csv_buf.getvalue()
+    base.with_suffix(".csv").write_text(csv_text, encoding="utf-8")
+    csv_js = json.dumps(csv_text)  # safely escaped for embedding in JS
 
     # ── Report timestamp ──────────────────────────────────────────────────────
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -282,7 +283,8 @@ header p  {{ opacity: .8; font-size: .9rem; }}
 .filters input {{ min-width: 220px; }}
 .filters input:focus {{ border-color: #2563eb; }}
 .exp-btn {{ background: #1e3a5f; color: #fff; border-radius: 6px; padding: .4rem .8rem;
-    font-size: .85rem; text-decoration: none; white-space: nowrap; }}
+    font-size: .85rem; text-decoration: none; white-space: nowrap;
+    border: none; cursor: pointer; font-family: inherit; }}
 .exp-btn:hover {{ background: #2563eb; }}
 
 /* ── Table wrapper ── */
@@ -446,7 +448,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     <option value="L1">Level 1</option><option value="L2">Level 2</option>
   </select>
   <a href="{json_name}" class="exp-btn">&#8681; Export JSON</a>
-  <a href="{csv_name}" class="exp-btn">&#8681; Export CSV</a>
+  <button onclick="downloadCSV()" class="exp-btn">&#8681; Export CSV</button>
 </div>
 <div class="wrap"><table>
 <thead><tr>
@@ -473,6 +475,8 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   var lv = document.getElementById('lv');   // Level dropdown
 
   /* Data for charts — passed from Python */
+  var CSV_DATA    = {csv_js};
+  var CSV_NAME    = '{csv_name}';
   var JS_COUNTS   = {{PASS: {counts[PASS]}, FAIL: {counts[FAIL]}, ERROR: {counts[ERROR]}}};
   var JS_L1       = {{pass: {l1_counts[PASS]}, fail: {l1_counts[FAIL]}, error: {l1_counts[ERROR]}}};
   var JS_L2       = {{pass: {l2_counts[PASS]}, fail: {l2_counts[FAIL]}, error: {l2_counts[ERROR]}}};
@@ -596,6 +600,19 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
          + '</div>';
     }});
     el.innerHTML = h;
+  }}
+
+  /* CSV download — embed data as Blob to bypass file:// link restrictions */
+  function downloadCSV() {{
+    var blob = new Blob([CSV_DATA], {{type: 'text/csv;charset=utf-8;'}});
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href     = url;
+    a.download = CSV_NAME;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }}
 }})();
 </script>

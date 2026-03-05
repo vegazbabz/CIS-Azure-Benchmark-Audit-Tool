@@ -254,7 +254,6 @@ def generate_html(
     writer.writerows(json_data)
     csv_text = csv_buf.getvalue()
     base.with_suffix(".csv").write_text(csv_text, encoding="utf-8")
-    csv_js = json.dumps(csv_text)  # safely escaped for embedding in JS
 
     # ── Report timestamp ──────────────────────────────────────────────────────
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -541,17 +540,17 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     <div class="donut-group">
       <div class="donut-label">Overall</div>
       <canvas id="d-overall" width="110" height="110"></canvas>
-      <div class="donut-pct" style="color:{score_col}">{score}%</div>
+      <div id="pct-overall" class="donut-pct" style="color:{score_col}">{score}%</div>
     </div>
     <div class="donut-group">
       <div class="donut-label">Level 1<span class="lv-badge" style="background:#dc2626">L1</span></div>
       <canvas id="d-l1" width="110" height="110"></canvas>
-      <div class="donut-pct" style="color:{l1_col}">{l1_score}%</div>
+      <div id="pct-l1" class="donut-pct" style="color:{l1_col}">{l1_score}%</div>
     </div>
     <div class="donut-group">
       <div class="donut-label">Level 2<span class="lv-badge" style="background:#7c3aed">L2</span></div>
       <canvas id="d-l2" width="110" height="110"></canvas>
-      <div class="donut-pct" style="color:{l2_col}">{l2_score}%</div>
+      <div id="pct-l2" class="donut-pct" style="color:{l2_col}">{l2_score}%</div>
     </div>
     <div class="donut-legend">
       <span><i style="background:#16a34a"></i>Pass</span>
@@ -576,7 +575,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     <option value="L1">Level 1</option><option value="L2">Level 2</option>
   </select>
   <a href="{json_name}" class="exp-btn">&#8681; Export JSON</a>
-  <button onclick="downloadCSV()" class="exp-btn">&#8681; Export CSV</button>
+  <a href="{csv_name}" class="exp-btn">&#8681; Export CSV</a>
 </div>
 <div class="wrap"><table>
 <thead><tr>
@@ -603,8 +602,6 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   var lv = document.getElementById('lv');   // Level dropdown
 
   /* Data for charts — passed from Python */
-  var CSV_DATA    = {csv_js};
-  var CSV_NAME    = '{csv_name}';
   var JS_COUNTS   = {{PASS: {counts[PASS]}, FAIL: {counts[FAIL]}, ERROR: {counts[ERROR]}}};
   var JS_L1       = {{pass: {l1_counts[PASS]}, fail: {l1_counts[FAIL]}, error: {l1_counts[ERROR]}}};
   var JS_L2       = {{pass: {l2_counts[PASS]}, fail: {l2_counts[FAIL]}, error: {l2_counts[ERROR]}}};
@@ -720,6 +717,17 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     drawDonut('d-l1',      l1.pass,     l1.fail,     l1.error);
     drawDonut('d-l2',      l2.pass,     l2.fail,     l2.error);
     renderSectionBreakdown(secs);
+
+    /* Update percentage text below each donut */
+    function scoreColor(s) {{ return s >= 80 ? '#16a34a' : s >= 60 ? '#d97706' : '#dc2626'; }}
+    function pct(p, f, e) {{ return Math.round(p / Math.max(p + f + e, 1) * 1000) / 10; }}
+    var sc  = pct(counts.PASS, counts.FAIL, counts.ERROR);
+    var l1s = pct(l1.pass, l1.fail, l1.error);
+    var l2s = pct(l2.pass, l2.fail, l2.error);
+    [['pct-overall', sc], ['pct-l1', l1s], ['pct-l2', l2s]].forEach(function(pair) {{
+      var el = document.getElementById(pair[0]);
+      if (el) {{ el.textContent = pair[1] + '%'; el.style.color = scoreColor(pair[1]); }}
+    }});
   }}
 
   /* Draw three compliance donut charts and section breakdown */
@@ -786,18 +794,6 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     el.innerHTML = h;
   }}
 
-  /* CSV download — embed data as Blob to bypass file:// link restrictions */
-  function downloadCSV() {{
-    var blob = new Blob([CSV_DATA], {{type: 'text/csv;charset=utf-8;'}});
-    var url  = URL.createObjectURL(blob);
-    var a    = document.createElement('a');
-    a.href     = url;
-    a.download = CSV_NAME;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }}
 }})();
 </script>
 </body>

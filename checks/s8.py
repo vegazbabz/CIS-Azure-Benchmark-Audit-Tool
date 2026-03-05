@@ -815,14 +815,14 @@ def check_8_4_1(sid: str, sname: str, td: dict[str, Any]) -> R:
     """
     hosts = _idx(td, "bastion", sid)
     if hosts:
-        names = [h.get("name") for h in hosts]
+        labels = [f"{h.get('name')} (SKU: {(h.get('sku') or {}).get('name', '?')})" for h in hosts]
         return R(
             "8.4.1",
             "Azure Bastion Host exists",
             2,
             "8 - Security Services",
             PASS,
-            f"Bastion host(s) found: {names}",
+            f"Bastion host(s) found: {labels}",
             "",
             sid,
             sname,

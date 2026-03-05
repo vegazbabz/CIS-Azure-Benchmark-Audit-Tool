@@ -475,16 +475,43 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     box-shadow: 0 2px 8px rgba(0,0,0,.2); text-decoration: none;
     display: flex; align-items: center; justify-content: center; z-index: 999; }}
 #back-top:hover {{ background: #1d4ed8; }}
-@media print {{ #back-top {{ display: none; }} }}
 
-/* ── Print stylesheet ── */
+/* ── Print / PDF stylesheet ── */
 @media print {{
-    .filters {{ display: none; }}
-    header {{ background: #1e3a5f !important; -webkit-print-color-adjust: exact; }}
-    body {{ background: white; }}
+    /* Hide interactive-only elements */
+    #back-top, .filters, .trend-box {{ display: none !important; }}
+    .sub-summary-wrap h2 small {{ display: none; }}
+    .sec-arrow {{ display: none; }}
+    tr.sh {{ cursor: default; }}
+
+    /* Clean page background */
+    body {{ background: #fff; font-size: .78rem; }}
+    .wrap {{ overflow: visible; padding: 0 1rem 1rem; }}
+
+    /* Keep dark header and coloured row backgrounds in print */
+    header, tr[style], tr.sh td, thead,
+    .cards .card {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+
+    /* Remove screen-only shadows and borders */
     .cards .card {{ box-shadow: none; border: 1px solid #e2e8f0; }}
-    table {{ box-shadow: none; }}
-    tr {{ page-break-inside: avoid; }}
+    table, .sub-summary {{ box-shadow: none; }}
+
+    /* Repeat table header on each printed page */
+    thead {{ display: table-header-group; }}
+
+    /* Page-break rules: keep a row together, keep section header with its rows */
+    tr            {{ page-break-inside: avoid; }}
+    tr.sh         {{ page-break-after: avoid; }}
+    .dashboard    {{ page-break-inside: avoid; }}
+    .sub-summary-wrap {{ page-break-inside: avoid; }}
+
+    /* Remove hover / active highlights that mean nothing on paper */
+    .sub-row:hover {{ background: inherit !important; }}
+    .sub-row.active {{ outline: none; background: inherit !important; }}
+
+    /* Slightly tighter column for print */
+    .sub-col {{ min-width: 100px; max-width: 160px; }}
+    table {{ font-size: .78rem; }}
 }}
 
 /* ── Compliance dashboard ── */

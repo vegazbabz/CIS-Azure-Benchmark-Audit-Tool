@@ -97,6 +97,7 @@ cis/
   helpers.py                Logging setup, console output
   models.py                 Result dataclass (R)
   report.py                 HTML report generation, JSON/CSV export
+  suppressions.py           Finding suppression (accepted risks)
 scripts/
   preflight_check.py        Standalone permission check script
 tests/                      Unit test suite (no Azure connection required)
@@ -147,6 +148,8 @@ python cis_azure_audit.py [options]
 | `-l`, `--level` | Filter output to Level `1` or `2` controls only |
 | `--fresh` | Clear all checkpoints and start a full re-audit |
 | `--report-only` | Regenerate the HTML/JSON/CSV from existing checkpoints — no API calls |
+| `--suppressions` | Path to suppressions TOML file (default: `suppressions.toml` next to the script) |
+| `--list-suppressions` | Print all active suppressions and exit |
 | `--skip-preflight` | Skip permission preflight checks |
 | `-q`, `--quiet` | Suppress per-check progress lines; only show summary |
 | `--log-level` | Base log level: `TRACE`, `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
@@ -192,6 +195,12 @@ python cis_azure_audit.py --quiet
 
 # Trace-level diagnostics written to a log file
 python cis_azure_audit.py --debug --log-file cis_audit.log
+
+# See what findings are currently suppressed
+python cis_azure_audit.py --list-suppressions
+
+# Regenerate the report after editing suppressions.toml (no re-audit needed)
+python cis_azure_audit.py --report-only
 ```
 
 ### Concurrency tuning
@@ -311,6 +320,7 @@ The generated report is a self-contained HTML file with no external dependencies
 | ERROR | Check could not complete (permissions issue, timeout, or API error) |
 | INFO | Not applicable — no resources of this type exist, or control does not apply |
 | MANUAL | Cannot be automated — requires manual verification per the CIS PDF |
+| SUPPRESSED | Accepted risk — defined in `suppressions.toml` with a justification and expiry |
 
 ### Output files
 
@@ -323,6 +333,64 @@ Each run produces three files (same base name, same directory):
 | `cis_azure_audit_report.csv` | All results as a flat CSV |
 
 Use `--output` to change the base name, or `--output-dir` to change the directory.
+
+---
+
+## Suppressing Findings (Accepted Risks)
+
+Some findings are intentional — for example, a jump host that deliberately has RDP open, or a
+DDoS plan that is not required for a given environment. Without a way to acknowledge these,
+every report contains the same known findings and reviewers stop trusting the output.
+
+A `suppressions.toml` file next to `cis_azure_audit.py` lets you mark specific findings as
+accepted risks. Suppressed findings still appear in the report in grey with your justification
+visible — they are never hidden. The compliance score excludes them (like INFO and MANUAL).
+
+Suppressions are applied at **report generation time only**. Checkpoints always store the raw
+FAIL, so removing a suppression and running `--report-only` immediately reinstates the finding.
+
+### suppressions.toml format
+
+```toml
+[[suppressions]]
+control_id    = "7.1"
+resource      = "jumphost-nsg"   # optional — exact match; omit to match all resources
+subscription  = "Production"     # optional — exact match; omit to match all subscriptions
+justification = "Intentional RDP jump host — restricted by Azure Firewall IP allowlist"
+expires       = "2026-12-31"     # required — ISO date, maximum 1 year from today
+
+[[suppressions]]
+control_id    = "8.5"
+justification = "DDoS protection not required — no public-facing workloads in this tenant"
+expires       = "2026-06-01"
+```
+
+### Suppression rules
+
+| Field | Required | Behaviour |
+| --- | --- | --- |
+| `control_id` | Yes | Exact match against the CIS control number |
+| `resource` | No | Exact case-insensitive match against the resource name; omit to match all |
+| `subscription` | No | Exact case-insensitive match against the subscription name; omit to match all |
+| `justification` | Yes | Free text — shown in the report next to the finding |
+| `expires` | Yes | ISO date (`YYYY-MM-DD`); maximum 1 year from today |
+
+- Only `FAIL` and `ERROR` findings can be suppressed
+- Expired entries are skipped and the finding reverts to `FAIL`/`ERROR` with a warning logged
+- Entries with expiry beyond 1 year are capped at 1 year with a warning
+
+### Suppression workflow
+
+```powershell
+# 1. Check what is currently suppressed
+python cis_azure_audit.py --list-suppressions
+
+# 2. Edit suppressions.toml, then regenerate the report without re-auditing
+python cis_azure_audit.py --report-only
+
+# 3. Use a custom suppressions file (e.g. per-environment)
+python cis_azure_audit.py --suppressions prod-suppressions.toml
+```
 
 ---
 

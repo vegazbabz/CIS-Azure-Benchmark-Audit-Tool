@@ -270,7 +270,7 @@ _QUERIES = {
     # ── Azure Bastion ─────────────────────────────────────────────────────────
     "bastion": """
         resources | where type =~ 'microsoft.network/bastionhosts'
-        | project id, name, resourceGroup, subscriptionId
+        | project id, name, resourceGroup, subscriptionId, sku
     """,
     # ── Virtual Machines ──────────────────────────────────────────────────────
     # Used by check_8_4_1 to determine whether Bastion is relevant.

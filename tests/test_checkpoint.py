@@ -8,10 +8,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import cis_checkpoint
-from cis_checkpoint import load_checkpoints, results_from_checkpoint, save_checkpoint
-from cis_config import BENCHMARK_VER, VERSION
-from cis_models import R
+import cis.checkpoint as cis_checkpoint
+from cis.checkpoint import load_checkpoints, results_from_checkpoint, save_checkpoint
+from cis.config import BENCHMARK_VER, VERSION
+from cis.models import R
 
 
 def _sample_results() -> list[R]:

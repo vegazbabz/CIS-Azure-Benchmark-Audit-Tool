@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import unittest
 
-from cis_check_helpers import _err, _idx, _info
-from cis_config import ERROR, INFO
+from cis.check_helpers import _err, _idx, _info
+from cis.config import ERROR, INFO
 
 
 class TestIdx(unittest.TestCase):

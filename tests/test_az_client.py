@@ -11,10 +11,9 @@ Covers:
 """
 
 import json
-import sys
 import unittest
 from typing import Any
-from unittest.mock import call, patch
+from unittest.mock import patch
 
 import az_client
 
@@ -307,9 +306,6 @@ class TestRateLimitCounter(unittest.TestCase):
 
     def test_counter_incremented_by_retry(self) -> None:
         """A 429 response from _run_cmd_with_retries increments the counter."""
-        throttle_then_ok = [
-            (0, "", "429 Too Many Requests"),  # triggers retry
-        ]
         # Simulate a transient throttle followed by success
         responses = [
             (1, "", "429 Too Many Requests"),

@@ -95,6 +95,7 @@ from cis.config import (
     ERROR,
     INFO,
     MANUAL,
+    SUPPRESSED,
     TRACE_LEVEL,
     LOGGER,
     load_config_file,
@@ -116,6 +117,9 @@ from cis.checkpoint import load_checkpoints, results_from_checkpoint, save_check
 
 # HTML report generation
 from cis.report import _STATUS_STYLE, generate_html
+
+# Finding suppression (accepted risks)
+from cis.suppressions import apply_suppressions, list_suppressions, load_suppressions
 
 # Check helpers and modular check functions
 from checks.s2 import check_2_1_2, check_2_1_7, check_2_1_9, check_2_1_10, check_2_1_11
@@ -1020,6 +1024,17 @@ Examples:
         action="store_true",
         help="Skip permission preflight checks (useful for testing or when roles are unavailable)",
     )
+    parser.add_argument(
+        "--suppressions",
+        metavar="FILE",
+        default="suppressions.toml",
+        help="Path to suppressions TOML file (default: suppressions.toml next to this script)",
+    )
+    parser.add_argument(
+        "--list-suppressions",
+        action="store_true",
+        help="Print all active suppressions and exit",
+    )
 
     args = parser.parse_args()
 
@@ -1042,6 +1057,14 @@ Examples:
         if not Path(args.output).is_absolute():
             args.output = str(out_dir / args.output)
 
+    # ── Load suppressions (applied at report time, not during audit) ──────────
+    suppressions_path = Path(args.suppressions)
+    suppressions = load_suppressions(suppressions_path)
+
+    if args.list_suppressions:
+        list_suppressions(suppressions, suppressions_path)
+        return
+
     # Start timer for elapsed time display in final summary
     start_time = datetime.datetime.now(datetime.timezone.utc)
 
@@ -1057,22 +1080,26 @@ Examples:
             LOGGER.info("   ✅ Loaded: %s", cp.get("subscription_name", sub_id))
         if args.level:
             all_results = [r for r in all_results if r.level == args.level]
-        counts = {s: sum(1 for r in all_results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL]}
+        all_results = apply_suppressions(all_results, suppressions)
+        counts = {
+            s: sum(1 for r in all_results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL, SUPPRESSED]
+        }
         total = len(all_results)
-        score = round(counts[PASS] / max(total - counts[INFO] - counts[MANUAL], 1) * 100, 1)
+        score = round(counts[PASS] / max(total - counts[INFO] - counts[MANUAL] - counts[SUPPRESSED], 1) * 100, 1)
         elapsed = (datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds()
         mins, secs = divmod(int(elapsed), 60)
         elapsed_str = f"{mins}m {secs}s" if mins else f"{secs}s"
         LOGGER.info("\n%s", "━" * 60)
         LOGGER.info("  COMPLETE — %d checks  |  %d subscription(s)  |  ⏱ %s", total, len(checkpoints), elapsed_str)
-        LOGGER.info("  Compliance Score : %s%%  (excludes INFO/MANUAL)", score)
+        LOGGER.info("  Compliance Score : %s%%  (excludes INFO/MANUAL/SUPPRESSED)", score)
         LOGGER.info(
-            "  ✅ PASS %4d  ❌ FAIL %4d  ⚠️ ERROR %4d  ℹ️ INFO %4d  📋 MANUAL %4d",
+            "  ✅ PASS %4d  ❌ FAIL %4d  ⚠️ ERROR %4d  ℹ️ INFO %4d  📋 MANUAL %4d  🔇 SUPPRESSED %4d",
             counts[PASS],
             counts[FAIL],
             counts[ERROR],
             counts[INFO],
             counts[MANUAL],
+            counts[SUPPRESSED],
         )
         LOGGER.info("%s", "━" * 60)
         LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)
@@ -1157,10 +1184,13 @@ Examples:
     if args.level:
         all_results = [r for r in all_results if r.level == args.level]
 
+    # ── Apply suppressions (at report time — checkpoints always store raw FAIL) ─
+    all_results = apply_suppressions(all_results, suppressions)
+
     # ── Final summary ─────────────────────────────────────────────────────────
-    counts = {s: sum(1 for r in all_results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL]}
+    counts = {s: sum(1 for r in all_results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL, SUPPRESSED]}
     total = len(all_results)
-    score = round(counts[PASS] / max(total - counts[INFO] - counts[MANUAL], 1) * 100, 1)
+    score = round(counts[PASS] / max(total - counts[INFO] - counts[MANUAL] - counts[SUPPRESSED], 1) * 100, 1)
 
     # Calculate elapsed time
     elapsed = (datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds()
@@ -1169,14 +1199,15 @@ Examples:
 
     LOGGER.info("\n%s", "━" * 60)
     LOGGER.info("  COMPLETE — %d checks  |  %d subscription(s)  |  ⏱ %s", total, len(subs), elapsed_str)
-    LOGGER.info("  Compliance Score : %s%%  (excludes INFO/MANUAL)", score)
+    LOGGER.info("  Compliance Score : %s%%  (excludes INFO/MANUAL/SUPPRESSED)", score)
     LOGGER.info(
-        "  ✅ PASS %4d  ❌ FAIL %4d  ⚠️ ERROR %4d  ℹ️ INFO %4d  📋 MANUAL %4d",
+        "  ✅ PASS %4d  ❌ FAIL %4d  ⚠️ ERROR %4d  ℹ️ INFO %4d  📋 MANUAL %4d  🔇 SUPPRESSED %4d",
         counts[PASS],
         counts[FAIL],
         counts[ERROR],
         counts[INFO],
         counts[MANUAL],
+        counts[SUPPRESSED],
     )
     LOGGER.info("%s", "━" * 60)
     LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)

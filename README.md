@@ -95,6 +95,7 @@ cis/
   check_helpers.py          Shared check utilities (port ranges, NSG rules, etc.)
   config.py                 Config file loader (cis_audit.toml)
   helpers.py                Logging setup, console output
+  history.py                Run history for compliance trend tracking
   models.py                 Result dataclass (R)
   report.py                 HTML report generation, JSON/CSV export
   suppressions.py           Finding suppression (accepted risks)
@@ -309,6 +310,7 @@ The generated report is a self-contained HTML file with no external dependencies
 - **Per-resource results** — each NSG, storage account, Key Vault, subnet, and Databricks workspace is reported individually, not aggregated to a single pass/fail per control.
 - **Remediation hints** — every FAIL result includes the Azure portal navigation path to fix the issue.
 - **Export** — JSON and CSV files are generated alongside the HTML at report time. Click **Export JSON** or **Export CSV** in the report to download them.
+- **Compliance trend** — after two or more full audit runs, a collapsible chart appears above the results table showing the compliance score over time. Collapsed by default so it does not distract from current findings.
 - **Back to top** — fixed button in the bottom-right corner for long reports.
 
 ### Status types
@@ -324,15 +326,20 @@ The generated report is a self-contained HTML file with no external dependencies
 
 ### Output files
 
-Each run produces three files (same base name, same directory):
+Each run produces three report files and updates the run history:
 
 | File | Contents |
 | --- | --- |
 | `cis_azure_audit_report.html` | Self-contained interactive report |
 | `cis_azure_audit_report.json` | All results as a JSON array |
 | `cis_azure_audit_report.csv` | All results as a flat CSV |
+| `cis_run_history.json` | Compliance score history for the trend chart (last 30 runs) |
 
 Use `--output` to change the base name, or `--output-dir` to change the directory.
+The history file is always written to the same directory as the HTML report.
+
+> **Note:** `--report-only` does **not** update the history file — it regenerates the report from
+> existing checkpoints but is not a new measurement.
 
 ---
 

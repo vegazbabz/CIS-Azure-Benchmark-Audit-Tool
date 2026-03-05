@@ -1,5 +1,10 @@
 # CIS Microsoft Azure Foundations Benchmark v5.0.0 — Audit Tool
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![CIS Benchmark](https://img.shields.io/badge/CIS%20Benchmark-v5.0.0-orange.svg)](https://www.cisecurity.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![CI](https://github.com/vegazbabz/CIS-Azure-Benchmark-Audit-Tool/actions/workflows/ci.yml/badge.svg)](https://github.com/vegazbabz/CIS-Azure-Benchmark-Audit-Tool/actions/workflows/ci.yml)
+
 **Version:** 1.0.0-beta3
 **Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
 **Coverage:** 93 automated controls · 1 manual control noted in output · 1 control pending (2.1.1)

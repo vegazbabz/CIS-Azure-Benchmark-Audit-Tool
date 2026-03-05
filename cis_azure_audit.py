@@ -1106,8 +1106,9 @@ Examples:
         )
         LOGGER.info("%s", "━" * 60)
         LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)
+        sub_timestamps = {cp["subscription_name"]: cp["timestamp"] for cp in checkpoints.values()}
         run_history = load_history(history_path_for(args.output))
-        generate_html(all_results, args.output, history=run_history)
+        generate_html(all_results, args.output, history=run_history, sub_timestamps=sub_timestamps)
         return
 
     # ── Prerequisite: az CLI available ────────────────────────────────────────
@@ -1249,7 +1250,8 @@ Examples:
         "subscriptions": [s["name"] for s in subs],
         "level_filter": args.level,
     }
-    generate_html(all_results, args.output, scope_info, run_history)
+    sub_timestamps = {cp["subscription_name"]: cp["timestamp"] for cp in load_checkpoints().values()}
+    generate_html(all_results, args.output, scope_info, run_history, sub_timestamps)
 
 
 if __name__ == "__main__":

@@ -472,7 +472,11 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 timeout=TIMEOUTS["default"],
             )
             if rc != 0:
-                error_msg = str(keys) if isinstance(keys, str) else "Access denied or error listing keys"
+                error_msg = (
+                    str(keys)
+                    if isinstance(keys, str)
+                    else "Access denied or error listing keys (requires Key Vault data plane permissions)"
+                )
                 results.append(
                     R(
                         ctrl,
@@ -527,7 +531,11 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 timeout=TIMEOUTS["default"],
             )
             if rc != 0:
-                error_msg = str(secrets) if isinstance(secrets, str) else "Access denied or error listing secrets"
+                error_msg = (
+                    str(secrets)
+                    if isinstance(secrets, str)
+                    else "Access denied or error listing secrets (requires Key Vault data plane permissions)"
+                )
                 results.append(
                     R(
                         ctrl,
@@ -568,7 +576,11 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             ["keyvault", "key", "list", "--vault-name", vname, "--query", "[].name"], sid, timeout=TIMEOUTS["default"]
         )
         if rc != 0:
-            error_msg = str(keys2) if isinstance(keys2, str) else "Access denied or error listing keys"
+            error_msg = (
+                str(keys2)
+                if isinstance(keys2, str)
+                else "Access denied or error listing keys (requires Key Vault data plane permissions)"
+            )
             results.append(
                 R(
                     "8.3.9",
@@ -591,7 +603,11 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     timeout=TIMEOUTS["default"],
                 )
                 if rc2 != 0:
-                    error_msg = str(pol) if isinstance(pol, str) else "Access denied"
+                    error_msg = (
+                        str(pol)
+                        if isinstance(pol, str)
+                        else "Access denied (requires Key Vault data plane permissions)"
+                    )
                     results.append(
                         R(
                             "8.3.9",
@@ -642,7 +658,11 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             timeout=TIMEOUTS["default"],
         )
         if rc != 0:
-            error_msg = str(certs) if isinstance(certs, str) else "Access denied or error listing certificates"
+            error_msg = (
+                str(certs)
+                if isinstance(certs, str)
+                else "Access denied or error listing certificates (requires Key Vault data plane permissions)"
+            )
             results.append(
                 R(
                     "8.3.11",
@@ -674,7 +694,11 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     timeout=TIMEOUTS["default"],
                 )
                 if rc2 != 0:
-                    error_msg = str(cert) if isinstance(cert, str) else "Access denied"
+                    error_msg = (
+                        str(cert)
+                        if isinstance(cert, str)
+                        else "Access denied (requires Key Vault data plane permissions)"
+                    )
                     cname = cert_id.split("/")[-1]
                     results.append(
                         R(

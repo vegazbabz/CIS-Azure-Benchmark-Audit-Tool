@@ -103,7 +103,8 @@ def generate_html(
             # data-* attributes are used by the JavaScript filter function
             rows += (
                 f'<tr style="background:{bg}" '
-                f'data-status="{r.status}" data-level="L{r.level}">'
+                f'data-status="{r.status}" data-level="L{r.level}" '
+                f'data-sub="{html.escape(r.subscription_name or "")}">'
                 f"<td><code>{html.escape(r.control_id)}</code></td>"
                 f'<td><span class="lv">L{r.level}</span></td>'
                 f"<td>{html.escape(r.title)}</td>"
@@ -112,6 +113,61 @@ def generate_html(
                 f"<td>{html.escape(r.details)}{fix}</td>"
                 f"</tr>\n"
             )
+
+    # ── Per-subscription summary table ───────────────────────────────────────
+    sub_stats: dict[str, dict[str, int]] = {}
+    for r in results:
+        sn = r.subscription_name or ""
+        if not sn:
+            continue
+        if sn not in sub_stats:
+            sub_stats[sn] = {PASS: 0, FAIL: 0, ERROR: 0, INFO: 0, MANUAL: 0}
+        sub_stats[sn][r.status] = sub_stats[sn].get(r.status, 0) + 1
+
+    def _sub_score(s: dict[str, int]) -> float:
+        return s[PASS] / max(s[PASS] + s[FAIL] + s[ERROR], 1) * 100
+
+    sub_rows_html = ""
+    for sn in sorted(sub_stats, key=lambda x: _sub_score(sub_stats[x])):
+        st = sub_stats[sn]
+        pct = round(_sub_score(st), 1)
+        col = "#16a34a" if pct >= 80 else "#d97706" if pct >= 60 else "#dc2626"
+        scored = max(st[PASS] + st[FAIL] + st[ERROR], 1)
+        pass_w = round(st[PASS] / scored * 100)
+        fail_w = round(st[FAIL] / scored * 100)
+        err_w = max(0, 100 - pass_w - fail_w)
+        bar = (
+            f'<div class="sbar">'
+            f'<span style="width:{pass_w}%;background:#16a34a"></span>'
+            f'<span style="width:{fail_w}%;background:#dc2626"></span>'
+            f'<span style="width:{err_w}%;background:#ea580c"></span>'
+            f"</div>"
+        )
+        sub_rows_html += (
+            f'<tr class="sub-row" data-sub="{html.escape(sn)}">'
+            f'<td style="font-weight:600">{html.escape(sn)}</td>'
+            f'<td><span style="color:{col};font-weight:700">{pct}%</span></td>'
+            f"<td>{bar}</td>"
+            f'<td style="color:#16a34a;font-weight:600">{st[PASS]}</td>'
+            f'<td style="color:#dc2626;font-weight:600">{st[FAIL]}</td>'
+            f'<td style="color:#ea580c">{st[ERROR]}</td>'
+            f'<td style="color:#64748b">{st[INFO]}</td>'
+            f'<td style="color:#7c3aed">{st[MANUAL]}</td>'
+            f"</tr>\n"
+        )
+    sub_table = (
+        '<div class="sub-summary-wrap">'
+        "<h2>Subscription Summary "
+        "<small>(click a row to filter the table below)</small></h2>"
+        '<table class="sub-summary">'
+        "<thead><tr>"
+        "<th>Subscription</th><th>Score</th><th>Breakdown</th>"
+        "<th>&#10003; Pass</th><th>&#10007; Fail</th>"
+        "<th>&#9888; Error</th><th>Info</th><th>Manual</th>"
+        f"</tr></thead><tbody>{sub_rows_html}</tbody></table></div>"
+        if sub_rows_html
+        else ""
+    )
 
     # ── Report timestamp ──────────────────────────────────────────────────────
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -215,6 +271,23 @@ tr.sh td {{ background: #f1f5f9; font-size: .8rem; color: #475569;
 /* ── Footer ── */
 footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem; }}
 
+/* ── Subscription summary ── */
+.sub-summary-wrap {{ padding: 0 2rem 1.5rem; }}
+.sub-summary-wrap h2 {{ font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: .6rem; }}
+.sub-summary-wrap h2 small {{ font-size: .75rem; color: #94a3b8; font-weight: normal; }}
+.sub-summary {{ width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }}
+.sub-summary thead {{ background: #1e3a5f; color: #fff; }}
+.sub-summary th, .sub-summary td {{ padding: .45rem .8rem; text-align: left;
+    border-bottom: 1px solid #e2e8f0; font-size: .83rem; }}
+.sub-summary th {{ font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }}
+.sub-row {{ cursor: pointer; }}
+.sub-row:hover {{ background: #f1f5f9 !important; }}
+.sub-row.active {{ background: #dbeafe !important; outline: 2px solid #2563eb; }}
+.sbar {{ display: flex; height: 8px; border-radius: 4px; overflow: hidden;
+    min-width: 120px; background: #e2e8f0; }}
+.sbar span {{ display: block; height: 100%; }}
+
 /* ── Back to top button ── */
 #back-top {{ position: fixed; bottom: 1.5rem; right: 1.5rem; width: 2.5rem; height: 2.5rem;
     background: #2563eb; color: #fff; border: none; border-radius: 50%; font-size: 1.1rem;
@@ -253,6 +326,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   <div class="card c-ma"><div class="n">{counts[MANUAL]}</div><div class="l">📋 Manual</div></div>
 </div>
 <canvas id="pie" width="160" height="160" style="margin:1rem auto; display:block;"></canvas>
+{sub_table}
 <div class="filters">
   <label>Filter:</label>
   <input id="s" placeholder="Search control ID or title...">
@@ -296,19 +370,24 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 
   /* Counts passed from Python for chart drawing */
   var JS_COUNTS = {{PASS: {counts[PASS]}, FAIL: {counts[FAIL]}, ERROR: {counts[ERROR]}}};
+
+  /* Active subscription filter — empty string means "show all" */
+  var subF = '';
+
   function filter(){{
     var sv  = s.value.toLowerCase();    // Search value (lowercase for case-insensitive match)
     var stv = st.value;                 // Selected status ("PASS", "FAIL", etc. or "")
     var lvv = lv.value;                 // Selected level ("L1", "L2", or "")
 
-    /* Show/hide data rows based on all three filters */
+    /* Show/hide data rows based on all four filters */
     document.querySelectorAll('#tb tr:not(.sh)').forEach(function(r){{
       var badge = r.querySelector('.badge');  // Status badge element
       var lb    = r.querySelector('.lv');     // Level badge element
 
       var ok = (!sv  || r.textContent.toLowerCase().includes(sv))    // Text search
               && (!stv || (badge && badge.textContent.includes(stv))) // Status filter
-              && (!lvv || (lb    && lb.textContent === lvv));         // Level filter
+              && (!lvv || (lb    && lb.textContent === lvv))          // Level filter
+              && (!subF || r.dataset.sub === subF);                   // Subscription filter
 
       r.style.display = ok ? '' : 'none';
     }});
@@ -330,6 +409,21 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   s.addEventListener('input', filter);
   st.addEventListener('change', filter);
   lv.addEventListener('change', filter);
+
+  /* Subscription summary row click — click to filter, click again to deselect */
+  document.querySelectorAll('.sub-row').forEach(function(row) {{
+    row.addEventListener('click', function() {{
+      if (subF === row.dataset.sub) {{
+        subF = '';
+        row.classList.remove('active');
+      }} else {{
+        subF = row.dataset.sub;
+        document.querySelectorAll('.sub-row').forEach(function(r) {{ r.classList.remove('active'); }});
+        row.classList.add('active');
+      }}
+      filter();
+    }});
+  }});
 
   /* Export button handlers */
   btnJSON.addEventListener('click', exportJSON);

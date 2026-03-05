@@ -2,7 +2,7 @@
 
 **Version:** 1.0.0-beta3
 **Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
-**Coverage:** 93 of 95 automated controls · 2 manual controls noted in output
+**Coverage:** 93 automated controls · 1 manual control noted in output · 1 control pending (2.1.1)
 
 ---
 

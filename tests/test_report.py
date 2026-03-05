@@ -30,7 +30,7 @@ class TestGenerateHtml(unittest.TestCase):
     def tearDown(self) -> None:
         self._tmp.cleanup()
 
-    def _generate(self, results=None, scope_info=None) -> str:
+    def _generate(self, results: list | None = None, scope_info: dict | None = None) -> str:
         generate_html(results or _results(), self._out, scope_info)
         return Path(self._out).read_text(encoding="utf-8")
 

@@ -101,7 +101,7 @@ def generate_html(
         # Count passing checks in this section (INFO and MANUAL excluded)
         sp = sum(1 for r in grp if r.status == PASS)
         rows += (
-            f'<tr class="sh" data-sec-id="{sec_id}" onclick="toggleSec(\'{sec_id}\', this)">'
+            f'<tr class="sh" data-sec-id="{sec_id}">'
             f'<td colspan="6">'
             f'<span class="sec-arrow">▼</span>'
             f"<b>{html.escape(sec)}</b>"
@@ -131,7 +131,7 @@ def generate_html(
             # data-* attributes are used by the JavaScript filter function
             rows += (
                 f'<tr style="background:{bg}" '
-                f'data-sec="{sec_id}" '
+                f'data-sec="{sec_id}" data-sec-name="{html.escape(sec)}" '
                 f'data-status="{r.status}" data-level="L{r.level}" '
                 f'data-sub="{html.escape(r.subscription_name or "")}">'
                 f"<td><code>{html.escape(r.control_id)}</code></td>"
@@ -275,16 +275,27 @@ def generate_html(
         scope_rows += f'<tr><th>Level filter</th><td>Level {html.escape(str(si["level_filter"]))} only</td></tr>\n'
     scope_block = f'<div class="scope-info"><table>{scope_rows}</table></div>' if scope_rows else ""
 
-    # ── Trend chart (collapsible, only when 2+ history entries exist) ─────────
+    # ── Trend chart (collapsible, only when 2+ usable history entries exist) ────
     trend_block = ""
-    if history and len(history) >= 2:
+    if history:
+        # Drop 0% entries (no real audit data) and deduplicate same-day same-score pairs
+        _seen_trend: set[tuple[str, float]] = set()
+        _filtered_hist = []
+        for _h in history:
+            if _h["score"] == 0:
+                continue
+            _key = (_h["timestamp"][:10], _h["score"])
+            if _key not in _seen_trend:
+                _seen_trend.add(_key)
+                _filtered_hist.append(_h)
+    if history and len(_filtered_hist) >= 2:
         trend_js_data = json.dumps(
-            [{"ts": h["timestamp"][:10], "score": h["score"]} for h in history],
+            [{"ts": h["timestamp"][:10], "score": h["score"]} for h in _filtered_hist],
             ensure_ascii=False,
         )
         trend_block = f"""
 <details class="trend-box">
-  <summary>&#128200; Compliance Trend &#8212; last {len(history)} run(s)</summary>
+  <summary>&#128200; Compliance Trend &#8212; last {len(_filtered_hist)} run(s)</summary>
   <div class="trend-inner">
     <canvas id="trend-cv" height="130"></canvas>
   </div>
@@ -605,12 +616,15 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   /* Tracks which section IDs are collapsed (true = collapsed) */
   var _collapsed = {{}};
 
-  /* Toggle a section open/closed and re-apply the filter */
-  function toggleSec(id, hdr) {{
-    _collapsed[id] = !_collapsed[id];
-    hdr.querySelector('.sec-arrow').textContent = _collapsed[id] ? '▶' : '▼';
-    filter();
-  }}
+  /* Section collapse — event delegation (onclick attr can't reach IIFE-scoped functions) */
+  document.querySelectorAll('#tb tr.sh').forEach(function(hdr) {{
+    hdr.addEventListener('click', function() {{
+      var id = hdr.dataset.secId;
+      _collapsed[id] = !_collapsed[id];
+      hdr.querySelector('.sec-arrow').textContent = _collapsed[id] ? '▶' : '▼';
+      filter();
+    }});
+  }});
 
   function filter(){{
     var sv  = s.value.toLowerCase();    // Search value (lowercase for case-insensitive match)
@@ -665,14 +679,51 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
         row.classList.add('active');
       }}
       filter();
+      updateCharts();
     }});
   }});
 
+  /* Recompute and redraw donuts + section breakdown for the selected subscription.
+     When no subscription is selected, restore the full-audit data. */
+  function updateCharts() {{
+    var counts, l1, l2, secs;
+    if (!subF) {{
+      counts = JS_COUNTS;
+      l1     = JS_L1;
+      l2     = JS_L2;
+      secs   = JS_SECTIONS;
+    }} else {{
+      counts = {{PASS: 0, FAIL: 0, ERROR: 0}};
+      l1     = {{pass: 0, fail: 0, error: 0}};
+      l2     = {{pass: 0, fail: 0, error: 0}};
+      secs   = {{}};
+      document.querySelectorAll('#tb tr:not(.sh)').forEach(function(r) {{
+        if (r.dataset.sub !== subF) return;
+        var st  = r.dataset.status;
+        var lvl = r.dataset.level;
+        var sn  = r.dataset.secName;
+        if (!secs[sn]) secs[sn] = {{pass: 0, fail: 0, error: 0, score: 0}};
+        if (st === 'PASS')  {{ counts.PASS++;  secs[sn].pass++;  (lvl === 'L1' ? l1 : l2).pass++;  }}
+        else if (st === 'FAIL')  {{ counts.FAIL++;  secs[sn].fail++;  (lvl === 'L1' ? l1 : l2).fail++;  }}
+        else if (st === 'ERROR') {{ counts.ERROR++; secs[sn].error++; (lvl === 'L1' ? l1 : l2).error++; }}
+      }});
+      Object.keys(secs).forEach(function(sn) {{
+        var d = secs[sn];
+        d.score = Math.round(d.pass / Math.max(d.pass + d.fail + d.error, 1) * 1000) / 10;
+      }});
+    }}
+    ['d-overall', 'd-l1', 'd-l2'].forEach(function(id) {{
+      var cv = document.getElementById(id);
+      if (cv) cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+    }});
+    drawDonut('d-overall', counts.PASS, counts.FAIL, counts.ERROR);
+    drawDonut('d-l1',      l1.pass,     l1.fail,     l1.error);
+    drawDonut('d-l2',      l2.pass,     l2.fail,     l2.error);
+    renderSectionBreakdown(secs);
+  }}
+
   /* Draw three compliance donut charts and section breakdown */
-  drawDonut('d-overall', JS_COUNTS.PASS, JS_COUNTS.FAIL, JS_COUNTS.ERROR);
-  drawDonut('d-l1',      JS_L1.pass,     JS_L1.fail,     JS_L1.error);
-  drawDonut('d-l2',      JS_L2.pass,     JS_L2.fail,     JS_L2.error);
-  renderSectionBreakdown();
+  updateCharts();
 
   /* Donut ring chart: pass (green) / fail (red) / error (neutral gray — not a compliance failure) */
   function drawDonut(id, pass, fail, error) {{
@@ -704,18 +755,19 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   }}
 
   /* Section breakdown: horizontal stacked bars sorted worst → best */
-  function renderSectionBreakdown() {{
+  function renderSectionBreakdown(data) {{
+    data = data || JS_SECTIONS;
     var el = document.getElementById('sec-breakdown');
     if (!el) return;
-    var secs = Object.keys(JS_SECTIONS)
-      .filter(function(a) {{ return JS_SECTIONS[a].pass + JS_SECTIONS[a].fail > 0; }})
+    var secs = Object.keys(data)
+      .filter(function(a) {{ return data[a].pass + data[a].fail > 0; }})
       .sort(function(a,b) {{
-      return JS_SECTIONS[a].score - JS_SECTIONS[b].score;
+      return data[a].score - data[b].score;
     }});
     var h = '<div class="sb-title">Section Breakdown'
           + '<span class="sb-subtitle">worst \u2192 best</span></div>';
     secs.forEach(function(sec) {{
-      var d = JS_SECTIONS[sec];
+      var d = data[sec];
       var scored = d.pass + d.fail + d.error;
       var col = d.score >= 80 ? '#16a34a' : d.score >= 60 ? '#d97706' : '#dc2626';
       var pw = scored ? Math.round(d.pass  / scored * 100) : 0;

@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis_config import ERROR, INFO
-from cis_models import R
+from cis.config import ERROR, INFO
+from cis.models import R
 
 
 def _idx(td: dict[str, Any], key: str, sid: str) -> list[Any]:

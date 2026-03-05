@@ -15,7 +15,7 @@ import unittest
 from typing import Any
 from unittest.mock import patch
 
-import az_client
+import azure.client as az_client
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -132,7 +132,7 @@ class TestFriendlyError(unittest.TestCase):
 class TestAz(unittest.TestCase):
 
     def _patch(self, return_value: tuple[int, str, str]) -> Any:
-        return patch("az_client._run_cmd_with_retries", return_value=return_value)
+        return patch("azure.client._run_cmd_with_retries", return_value=return_value)
 
     def test_success_parses_json(self) -> None:
         payload = json.dumps({"key": "value"})
@@ -161,7 +161,7 @@ class TestAz(unittest.TestCase):
 
     def test_subscription_flag_appended(self) -> None:
         payload = json.dumps([])
-        with patch("az_client._run_cmd_with_retries", return_value=_ok(stdout=payload)) as m:
+        with patch("azure.client._run_cmd_with_retries", return_value=_ok(stdout=payload)) as m:
             az_client.az(["vm", "list"], sub="sub-123")
         cmd_used = m.call_args[0][0]
         self.assertIn("--subscription", cmd_used)
@@ -169,14 +169,14 @@ class TestAz(unittest.TestCase):
 
     def test_no_subscription_flag_when_sub_is_none(self) -> None:
         payload = json.dumps([])
-        with patch("az_client._run_cmd_with_retries", return_value=_ok(stdout=payload)) as m:
+        with patch("azure.client._run_cmd_with_retries", return_value=_ok(stdout=payload)) as m:
             az_client.az(["vm", "list"])
         cmd_used = m.call_args[0][0]
         self.assertNotIn("--subscription", cmd_used)
 
     def test_output_json_always_in_command(self) -> None:
         payload = json.dumps([])
-        with patch("az_client._run_cmd_with_retries", return_value=_ok(stdout=payload)) as m:
+        with patch("azure.client._run_cmd_with_retries", return_value=_ok(stdout=payload)) as m:
             az_client.az(["vm", "list"])
         cmd_used = m.call_args[0][0]
         self.assertIn("--output", cmd_used)
@@ -191,7 +191,7 @@ class TestAz(unittest.TestCase):
 class TestAzRest(unittest.TestCase):
 
     def _patch(self, return_value: tuple[int, str, str]) -> Any:
-        return patch("az_client._run_cmd_with_retries", return_value=return_value)
+        return patch("azure.client._run_cmd_with_retries", return_value=return_value)
 
     def test_success_parses_json(self) -> None:
         payload = json.dumps({"value": []})
@@ -215,7 +215,7 @@ class TestAzRest(unittest.TestCase):
     def test_command_contains_rest_and_url(self) -> None:
         payload = json.dumps({})
         url = "https://graph.microsoft.com/v1.0/test"
-        with patch("az_client._run_cmd_with_retries", return_value=_ok(stdout=payload)) as m:
+        with patch("azure.client._run_cmd_with_retries", return_value=_ok(stdout=payload)) as m:
             az_client.az_rest(url)
         cmd_used = m.call_args[0][0]
         self.assertIn("rest", cmd_used)
@@ -238,7 +238,7 @@ class TestGraphQuery(unittest.TestCase):
 
     def test_single_page_single_batch(self) -> None:
         rows = [{"id": "r1"}, {"id": "r2"}]
-        with patch("az_client._run_cmd_with_retries", return_value=self._response(rows)):
+        with patch("azure.client._run_cmd_with_retries", return_value=self._response(rows)):
             rc, data = az_client.graph_query("Resources | limit 2", ["sub-1"])
         self.assertEqual(rc, 0)
         self.assertEqual(data, rows)
@@ -246,7 +246,7 @@ class TestGraphQuery(unittest.TestCase):
     def test_pagination_follows_skip_token(self) -> None:
         page1 = self._response([{"id": "r1"}], skip_token="tok-abc")
         page2 = self._response([{"id": "r2"}])
-        with patch("az_client._run_cmd_with_retries", side_effect=[page1, page2]) as m:
+        with patch("azure.client._run_cmd_with_retries", side_effect=[page1, page2]) as m:
             rc, data = az_client.graph_query("Resources", ["sub-1"])
         self.assertEqual(rc, 0)
         self.assertEqual(len(data), 2)
@@ -259,7 +259,7 @@ class TestGraphQuery(unittest.TestCase):
         """More than 10 subscriptions must be split into batches of 10."""
         sub_ids = [f"sub-{i}" for i in range(13)]
         single_page = self._response([{"id": "r1"}])
-        with patch("az_client._run_cmd_with_retries", return_value=single_page) as m:
+        with patch("azure.client._run_cmd_with_retries", return_value=single_page) as m:
             rc, data = az_client.graph_query("Resources", sub_ids)
         self.assertEqual(rc, 0)
         # 13 subs → 2 batches → 2 calls
@@ -268,18 +268,18 @@ class TestGraphQuery(unittest.TestCase):
         self.assertEqual(len(data), 2)
 
     def test_subprocess_failure_returns_error(self) -> None:
-        with patch("az_client._run_cmd_with_retries", return_value=_fail(stderr="query failed")):
+        with patch("azure.client._run_cmd_with_retries", return_value=_fail(stderr="query failed")):
             rc, data = az_client.graph_query("Resources", ["sub-1"])
         self.assertEqual(rc, 1)
 
     def test_json_parse_error_returns_error(self) -> None:
-        with patch("az_client._run_cmd_with_retries", return_value=_ok(stdout="not-json")):
+        with patch("azure.client._run_cmd_with_retries", return_value=_ok(stdout="not-json")):
             rc, data = az_client.graph_query("Resources", ["sub-1"])
         self.assertEqual(rc, 1)
         self.assertIn("Parse error", data)
 
     def test_empty_subscription_list_returns_empty(self) -> None:
-        with patch("az_client._run_cmd_with_retries") as m:
+        with patch("azure.client._run_cmd_with_retries") as m:
             rc, data = az_client.graph_query("Resources", [])
         self.assertEqual(rc, 0)
         self.assertEqual(data, [])
@@ -311,7 +311,7 @@ class TestRateLimitCounter(unittest.TestCase):
             (1, "", "429 Too Many Requests"),
             (0, json.dumps({}), ""),
         ]
-        with patch("az_client.subprocess.run") as mock_run, patch("az_client.time.sleep", lambda s: None):
+        with patch("azure.client.subprocess.run") as mock_run, patch("azure.client.time.sleep", lambda s: None):
 
             def _side(cmd: list[str], **kw: Any) -> Any:
                 import subprocess as sp

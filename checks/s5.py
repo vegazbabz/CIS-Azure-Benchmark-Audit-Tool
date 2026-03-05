@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis_config import PASS, FAIL, INFO, MANUAL, TIMEOUTS, ROLE_OWNER, ROLE_UAA
-from cis_models import R
-from cis_check_helpers import _err, _idx
-from azure_helpers import az, az_rest
+from cis.config import PASS, FAIL, INFO, MANUAL, TIMEOUTS, ROLE_OWNER, ROLE_UAA
+from cis.models import R
+from cis.check_helpers import _err, _idx
+from azure.helpers import az, az_rest
 
 
 def check_5_1_1() -> R:

@@ -290,8 +290,8 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 
 /* ── Back to top button ── */
 #back-top {{ position: fixed; bottom: 1.5rem; right: 1.5rem; width: 2.5rem; height: 2.5rem;
-    background: #2563eb; color: #fff; border: none; border-radius: 50%; font-size: 1.1rem;
-    cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    background: #2563eb; color: #fff; border-radius: 50%; font-size: 1.1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2); text-decoration: none;
     display: flex; align-items: center; justify-content: center; z-index: 999; }}
 #back-top:hover {{ background: #1d4ed8; }}
 @media print {{ #back-top {{ display: none; }} }}
@@ -308,6 +308,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 </style>
 </head>
 <body>
+<a id="top"></a>
 <header>
   <h1>🔒 CIS Azure Audit Report — {ts}</h1>
   <p>Audit Tool v{VERSION} &nbsp;·&nbsp; Generated: {ts}</p>
@@ -347,7 +348,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 </tr></thead>
 <tbody id="tb">{rows}</tbody>
 </table></div>
-<button id="back-top" title="Back to top">&#8679;</button>
+<a href="#top" id="back-top" title="Back to top">&#8679;</a>
 <footer>
   CIS Microsoft Azure Foundations Benchmark v{BENCHMARK_VER} (Sep 2025) &nbsp;·&nbsp;
   Tool v{VERSION} &nbsp;·&nbsp;
@@ -493,11 +494,6 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
       start += slice;
     }});
   }}
-  /* ── Back to top ── */
-  var btn = document.getElementById('back-top');
-  btn.addEventListener('click', function() {{
-    window.scrollTo(0, 0);
-  }});
 }})();
 </script>
 </body>

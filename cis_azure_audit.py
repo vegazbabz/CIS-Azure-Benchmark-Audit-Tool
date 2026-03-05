@@ -181,8 +181,9 @@ from azure.helpers import (
     check_user_permissions,
 )
 
-# Optional rich progress bar (used if installed). Falls back to builtin UI
+# Optional rich progress bar + coloured console (used if installed). Falls back to builtin UI
 try:
+    from rich.console import Console as _RichConsole
     from rich.progress import (
         Progress,
         SpinnerColumn,
@@ -194,8 +195,55 @@ try:
     )
 
     HAS_RICH = True
+    _rcon: Any = _RichConsole()
 except Exception:
     HAS_RICH = False
+    _rcon = None
+
+
+def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str: str, score: float) -> None:
+    """Print the final audit summary box.
+
+    Uses Rich markup for coloured output when Rich is installed; falls back to
+    plain LOGGER.info so the output is always human-readable regardless of
+    whether the optional dependency is present.
+
+    Colour scheme:
+      PASS  → green        FAIL → bold red
+      ERROR → yellow       score → green ≥ 80 %, yellow ≥ 50 %, red < 50 %
+    """
+    if HAS_RICH and _rcon is not None:
+        score_color = "green" if score >= 80 else ("yellow" if score >= 50 else "red")
+        sep = "━" * 60
+        _rcon.print(f"\n{sep}")
+        _rcon.print(f"  COMPLETE — {total} checks  |  {n_subs} subscription(s)  |  ⏱ {elapsed_str}")
+        _rcon.print(
+            f"  Compliance Score : [{score_color}]{score}%[/{score_color}]"
+            "  (excludes INFO/MANUAL/SUPPRESSED)"
+        )
+        _rcon.print(
+            f"  ✅ [green]PASS {counts[PASS]:4d}[/green]"
+            f"  ❌ [bold red]FAIL {counts[FAIL]:4d}[/bold red]"
+            f"  ⚠️ [yellow]ERROR {counts[ERROR]:4d}[/yellow]"
+            f"  ℹ️ INFO {counts[INFO]:4d}"
+            f"  📋 MANUAL {counts[MANUAL]:4d}"
+            f"  🔇 SUPPRESSED {counts[SUPPRESSED]:4d}"
+        )
+        _rcon.print(sep)
+    else:
+        LOGGER.info("\n%s", "━" * 60)
+        LOGGER.info("  COMPLETE — %d checks  |  %d subscription(s)  |  ⏱ %s", total, n_subs, elapsed_str)
+        LOGGER.info("  Compliance Score : %s%%  (excludes INFO/MANUAL/SUPPRESSED)", score)
+        LOGGER.info(
+            "  ✅ PASS %4d  ❌ FAIL %4d  ⚠️ ERROR %4d  ℹ️ INFO %4d  📋 MANUAL %4d  🔇 SUPPRESSED %4d",
+            counts[PASS],
+            counts[FAIL],
+            counts[ERROR],
+            counts[INFO],
+            counts[MANUAL],
+            counts[SUPPRESSED],
+        )
+        LOGGER.info("%s", "━" * 60)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1093,19 +1141,7 @@ Examples:
         elapsed = (datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds()
         mins, secs = divmod(int(elapsed), 60)
         elapsed_str = f"{mins}m {secs}s" if mins else f"{secs}s"
-        LOGGER.info("\n%s", "━" * 60)
-        LOGGER.info("  COMPLETE — %d checks  |  %d subscription(s)  |  ⏱ %s", total, len(checkpoints), elapsed_str)
-        LOGGER.info("  Compliance Score : %s%%  (excludes INFO/MANUAL/SUPPRESSED)", score)
-        LOGGER.info(
-            "  ✅ PASS %4d  ❌ FAIL %4d  ⚠️ ERROR %4d  ℹ️ INFO %4d  📋 MANUAL %4d  🔇 SUPPRESSED %4d",
-            counts[PASS],
-            counts[FAIL],
-            counts[ERROR],
-            counts[INFO],
-            counts[MANUAL],
-            counts[SUPPRESSED],
-        )
-        LOGGER.info("%s", "━" * 60)
+        _print_summary(counts, total, len(checkpoints), elapsed_str, score)
         LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)
         sub_timestamps = {cp["subscription_name"]: cp["timestamp"] for cp in checkpoints.values()}
         run_history = load_history(history_path_for(args.output))
@@ -1203,19 +1239,7 @@ Examples:
     mins, secs = divmod(int(elapsed), 60)
     elapsed_str = f"{mins}m {secs}s" if mins else f"{secs}s"
 
-    LOGGER.info("\n%s", "━" * 60)
-    LOGGER.info("  COMPLETE — %d checks  |  %d subscription(s)  |  ⏱ %s", total, len(subs), elapsed_str)
-    LOGGER.info("  Compliance Score : %s%%  (excludes INFO/MANUAL/SUPPRESSED)", score)
-    LOGGER.info(
-        "  ✅ PASS %4d  ❌ FAIL %4d  ⚠️ ERROR %4d  ℹ️ INFO %4d  📋 MANUAL %4d  🔇 SUPPRESSED %4d",
-        counts[PASS],
-        counts[FAIL],
-        counts[ERROR],
-        counts[INFO],
-        counts[MANUAL],
-        counts[SUPPRESSED],
-    )
-    LOGGER.info("%s", "━" * 60)
+    _print_summary(counts, total, len(subs), elapsed_str, score)
     LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)
 
     # ── Append to run history (full audit only — not --report-only) ───────────

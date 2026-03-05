@@ -9,7 +9,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from cis.config import PASS, FAIL, ERROR, TIMEOUTS
+from cis.config import PASS, FAIL, ERROR, TIMEOUTS, LOGGER
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az, _friendly_error
@@ -138,9 +138,12 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     # Fetched here so it can complete while per-account work is parallelised below.
     rc_lk, all_locks = az(["lock", "list", "--subscription", sid], sid, timeout=TIMEOUTS["default"])
 
+    total_accounts = len(accounts)
+
     def _check_one_account(acct: dict[str, Any]) -> list[R]:
         """Audit one storage account (Groups 1–4). Called in parallel by the outer pool."""
         aname = acct.get("name", "?")
+        LOGGER.debug("    [%s] storage account: %s", sname[:24], aname)
         rg = acct.get("resourceGroup", "?")
         acc_results: list[R] = []
 
@@ -608,6 +611,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         return acc_results
 
     # ── Process all accounts in parallel ─────────────────────────────────────
+    LOGGER.info("    [%s] Checking %d storage account(s)...", sname[:24], total_accounts)
     results: list[R] = []
     with ThreadPoolExecutor(max_workers=_ACCOUNT_WORKERS) as pool:
         futures = [pool.submit(_check_one_account, acct) for acct in accounts]

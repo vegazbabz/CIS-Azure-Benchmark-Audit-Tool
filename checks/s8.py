@@ -6,12 +6,21 @@ SECTION 8 — SECURITY SERVICES
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from cis.config import PASS, FAIL, ERROR, INFO, TIMEOUTS
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az, az_rest, is_firewall_error, _friendly_error
+
+# Maximum Key Vaults audited concurrently within one subscription.
+_VAULT_WORKERS = 10
+
+# Maximum concurrent per-key or per-cert calls within a single vault.
+# With _VAULT_WORKERS=10 and _KEY_WORKERS=5, up to 50 concurrent az CLI
+# subprocesses can be running rotation-policy or cert-show calls at once.
+_KEY_WORKERS = 5
 
 
 def check_8_1_defender(sid: str, sname: str) -> list[R]:
@@ -324,15 +333,21 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
     Data sources:
       Resource Graph 'keyvaults' query → vault-level properties (8.3.5-8.3.8)
-      az keyvault key list             → key names and expiry dates (8.3.1-8.3.2)
+      az keyvault key list             → key names, expiry dates (8.3.1-8.3.2, 8.3.9)
       az keyvault secret list          → secret names and expiry dates (8.3.3-8.3.4)
-      az keyvault key rotation-policy  → rotation policy per key (8.3.9)
-      az keyvault certificate list/show → cert validity periods (8.3.11)
+      az keyvault key rotation-policy  → rotation policy per key (8.3.9) — parallelised
+      az keyvault certificate list/show → cert validity periods (8.3.11) — parallelised
 
     RBAC vs non-RBAC distinction:
       Key Vaults can use either RBAC (8.3.1 for keys, 8.3.3 for secrets) or
       Vault Access Policies (8.3.2 for keys, 8.3.4 for secrets) for authorization.
       The split controls exist because the remediation path differs between models.
+
+    Performance:
+      Vaults are audited concurrently (_VAULT_WORKERS). Within each vault,
+      the key list call is reused for both expiry (8.3.1/8.3.2) and rotation
+      (8.3.9), eliminating a redundant CLI call. Rotation-policy and
+      certificate-show calls are fetched in parallel (_KEY_WORKERS).
     """
     vaults = _idx(td, "keyvaults", sid)
     if not vaults:
@@ -361,17 +376,18 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             for ctrl, lvl in controls
         ]
 
-    results = []
-    for v in vaults:
+    def _check_one_vault(v: dict[str, Any]) -> list[R]:
+        """Audit one Key Vault (all controls). Called in parallel by the outer pool."""
         vname = v.get("name", "?")
-        is_rbac = bool(v.get("rbac"))  # True = RBAC mode, False = access policy mode
+        is_rbac = bool(v.get("rbac"))
+        acc: list[R] = []
 
         # ── 8.3.5 — Purge protection ─────────────────────────────────────────
         # Purge protection prevents permanent deletion of vault objects during
         # the soft-delete retention period. Without it, a compromised admin
         # account can permanently destroy all secrets immediately.
         purge = v.get("purgeProtection")
-        results.append(
+        acc.append(
             R(
                 "8.3.5",
                 "Key Vault purge protection enabled",
@@ -391,7 +407,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         # legacy and cannot be managed with the same IAM tooling as the rest
         # of Azure's RBAC. L2 because some organisations legitimately use
         # access policies for compatibility with older SDK versions.
-        results.append(
+        acc.append(
             R(
                 "8.3.6",
                 "Key Vault RBAC authorization enabled",
@@ -415,7 +431,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         # some cases data plane) is reachable from the internet. Disabling it
         # forces all access through private endpoints or approved virtual networks.
         pub = v.get("publicAccess", "Enabled")
-        results.append(
+        acc.append(
             R(
                 "8.3.7",
                 "Key Vault public network access disabled",
@@ -434,7 +450,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         # Private endpoints provide a private IP address for vault access within
         # the customer's VNet, eliminating public internet exposure entirely.
         pe_count = v.get("privateEps") or 0
-        results.append(
+        acc.append(
             R(
                 "8.3.8",
                 "Private endpoints used to access Key Vault",
@@ -449,68 +465,156 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             )
         )
 
-        # ── 8.3.1 / 8.3.2 — Key expiration ───────────────────────────────────
+        # ── 8.3.1 / 8.3.2 + 8.3.9 — Merged key list ─────────────────────────
+        # A single 'az keyvault key list' call returns the data needed for both
+        # the expiry checks (8.3.1/8.3.2) and the rotation-policy checks (8.3.9),
+        # eliminating the redundant second list call from the original code.
+        #
         # CIS requires that all enabled keys have an expiration date set.
         # Keys without expiry can remain valid indefinitely, violating least
         # privilege for cryptographic material. The control number depends on
         # whether the vault uses RBAC (8.3.1) or access policy mode (8.3.2).
-        for ctrl, vault_type in [("8.3.1", True), ("8.3.2", False)]:
-            if is_rbac != vault_type:
-                continue  # Skip — this control applies to the other vault type
-            label = "RBAC" if vault_type else "non-RBAC"
-            rc, keys = az(
-                [
-                    "keyvault",
-                    "key",
-                    "list",
-                    "--vault-name",
-                    vname,
-                    "--query",
-                    "[?attributes.enabled==`true`].{name:name,expires:attributes.expires}",
-                ],
-                sid,
-                timeout=TIMEOUTS["default"],
+        rc_keys, keys_raw = az(
+            [
+                "keyvault",
+                "key",
+                "list",
+                "--vault-name",
+                vname,
+                "--query",
+                "[].{name:name,expires:attributes.expires,enabled:attributes.enabled}",
+            ],
+            sid,
+            timeout=TIMEOUTS["default"],
+        )
+
+        ctrl_key_exp = "8.3.1" if is_rbac else "8.3.2"
+        label = "RBAC" if is_rbac else "non-RBAC"
+
+        if rc_keys != 0:
+            # Single error covers both key expiry and rotation policy checks
+            error_msg = (
+                str(keys_raw)
+                if isinstance(keys_raw, str)
+                else "Access denied or error listing keys (requires Key Vault data plane permissions)"
             )
-            if rc != 0:
-                error_msg = (
-                    str(keys)
-                    if isinstance(keys, str)
-                    else "Access denied or error listing keys (requires Key Vault data plane permissions)"
+            friendly = _friendly_error(error_msg)
+            status = INFO if is_firewall_error(error_msg) else ERROR
+            acc.append(
+                R(
+                    ctrl_key_exp,
+                    f"Key Vault keys have expiration date set ({label})",
+                    1,
+                    "8 - Security Services",
+                    status,
+                    f"Vault '{vname}': Failed to enumerate keys - {friendly}; requires Key Vault data plane permissions",
+                    "",
+                    sid,
+                    sname,
+                    vname,
                 )
-                results.append(
+            )
+            acc.append(
+                R(
+                    "8.3.9",
+                    "Key Vault automatic key rotation enabled",
+                    2,
+                    "8 - Security Services",
+                    status,
+                    f"Vault '{vname}': Failed to enumerate keys - {friendly}; requires Key Vault data plane permissions",
+                    "",
+                    sid,
+                    sname,
+                    vname,
+                )
+            )
+        else:
+            all_keys = keys_raw if isinstance(keys_raw, list) else []
+            enabled_keys = [k for k in all_keys if k.get("enabled")]
+            key_names = [k["name"] for k in all_keys if k.get("name")]
+
+            # 8.3.1 / 8.3.2 — expiry check (enabled keys only)
+            for k in enabled_keys:
+                exp = k.get("expires")
+                acc.append(
                     R(
-                        ctrl,
+                        ctrl_key_exp,
                         f"Key Vault keys have expiration date set ({label})",
                         1,
                         "8 - Security Services",
-                        INFO if is_firewall_error(error_msg) else ERROR,
-                        (
-                            f"Vault '{vname}': Failed to enumerate keys"
-                            f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
-                        ),
-                        "",
+                        PASS if exp else FAIL,
+                        f"Vault '{vname}' key '{k.get('name')}': expires = {exp or 'NOT SET'}",
+                        "Key Vault > Keys > Set expiration date" if not exp else "",
                         sid,
                         sname,
-                        vname,
+                        vname if not exp else "",
                     )
                 )
-            elif isinstance(keys, list):
-                for k in keys:
-                    exp = k.get("expires")
-                    results.append(
-                        R(
-                            ctrl,
-                            f"Key Vault keys have expiration date set ({label})",
-                            1,
-                            "8 - Security Services",
-                            PASS if exp else FAIL,
-                            f"Vault '{vname}' key '{k.get('name')}': expires = {exp or 'NOT SET'}",
-                            "Key Vault > Keys > Set expiration date" if not exp else "",
-                            sid,
-                            sname,
-                            vname if not exp else "",
-                        )
+
+            # 8.3.9 — Automatic key rotation (L2)
+            # A rotation policy with a "Rotate" lifetime action automates key
+            # rotation, eliminating the risk of keys being left unrotated because
+            # no one remembers to do it manually. One result per key.
+            # Rotation-policy calls are independent per key — fetch in parallel.
+            if key_names:
+
+                def _fetch_rotation(kname: str) -> tuple[int, Any]:
+                    return az(
+                        ["keyvault", "key", "rotation-policy", "show", "--vault-name", vname, "--name", kname],
+                        sid,
+                        timeout=TIMEOUTS["default"],
                     )
+
+                workers = min(_KEY_WORKERS, len(key_names))
+                with ThreadPoolExecutor(max_workers=workers) as kpool:
+                    pol_results = list(kpool.map(_fetch_rotation, key_names))
+
+                for kname, (rc2, pol) in zip(key_names, pol_results):
+                    if rc2 != 0:
+                        error_msg = (
+                            str(pol)
+                            if isinstance(pol, str)
+                            else "Access denied (requires Key Vault data plane permissions)"
+                        )
+                        acc.append(
+                            R(
+                                "8.3.9",
+                                "Key Vault automatic key rotation enabled",
+                                2,
+                                "8 - Security Services",
+                                INFO if is_firewall_error(error_msg) else ERROR,
+                                (
+                                    f"Vault '{vname}' key '{kname}': Failed to fetch rotation policy"
+                                    f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
+                                ),
+                                "",
+                                sid,
+                                sname,
+                                vname,
+                            )
+                        )
+                    elif isinstance(pol, dict):
+                        # A rotation policy is compliant if at least one lifetimeAction
+                        # has type == "Rotate" (as opposed to "Notify")
+                        has_rotate = any(
+                            la.get("action", {}).get("type", "").lower() == "rotate"
+                            for la in pol.get("lifetimeActions", [])
+                        )
+                        acc.append(
+                            R(
+                                "8.3.9",
+                                "Key Vault automatic key rotation enabled",
+                                2,
+                                "8 - Security Services",
+                                PASS if has_rotate else FAIL,
+                                f"Vault '{vname}' key '{kname}': auto-rotation "
+                                f"{'configured' if has_rotate else 'NOT configured'}",
+                                "Key Vault > Keys > Rotation policy > Set rotation action" if not has_rotate else "",
+                                sid,
+                                sname,
+                                vname if not has_rotate else "",
+                            )
+                        )
 
         # ── 8.3.3 / 8.3.4 — Secret expiration ────────────────────────────────
         # Same principle as key expiration, applied to secrets.
@@ -519,7 +623,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         for ctrl, vault_type in [("8.3.3", True), ("8.3.4", False)]:
             if is_rbac != vault_type:
                 continue
-            label = "RBAC" if vault_type else "non-RBAC"
+            sec_label = "RBAC" if vault_type else "non-RBAC"
             rc, secrets = az(
                 [
                     "keyvault",
@@ -539,10 +643,10 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     if isinstance(secrets, str)
                     else "Access denied or error listing secrets (requires Key Vault data plane permissions)"
                 )
-                results.append(
+                acc.append(
                     R(
                         ctrl,
-                        f"Key Vault secrets have expiration date set ({label})",
+                        f"Key Vault secrets have expiration date set ({sec_label})",
                         1,
                         "8 - Security Services",
                         INFO if is_firewall_error(error_msg) else ERROR,
@@ -559,10 +663,10 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             elif isinstance(secrets, list):
                 for s in secrets:
                     exp = s.get("expires")
-                    results.append(
+                    acc.append(
                         R(
                             ctrl,
-                            f"Key Vault secrets have expiration date set ({label})",
+                            f"Key Vault secrets have expiration date set ({sec_label})",
                             1,
                             "8 - Security Services",
                             PASS if exp else FAIL,
@@ -574,105 +678,24 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         )
                     )
 
-        # ── 8.3.9 — Automatic key rotation (L2) ──────────────────────────────
-        # A rotation policy with a "Rotate" lifetime action automates key
-        # rotation, eliminating the risk of keys being left unrotated because
-        # no one remembers to do it manually. One result per key.
-        rc, keys2 = az(
-            ["keyvault", "key", "list", "--vault-name", vname, "--query", "[].name"], sid, timeout=TIMEOUTS["default"]
-        )
-        if rc != 0:
-            error_msg = (
-                str(keys2)
-                if isinstance(keys2, str)
-                else "Access denied or error listing keys (requires Key Vault data plane permissions)"
-            )
-            results.append(
-                R(
-                    "8.3.9",
-                    "Key Vault automatic key rotation enabled",
-                    2,
-                    "8 - Security Services",
-                    INFO if is_firewall_error(error_msg) else ERROR,
-                    (
-                        f"Vault '{vname}': Failed to enumerate keys"
-                        f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
-                    ),
-                    "",
-                    sid,
-                    sname,
-                    vname,
-                )
-            )
-        elif isinstance(keys2, list):
-            for kname in keys2:
-                rc2, pol = az(
-                    ["keyvault", "key", "rotation-policy", "show", "--vault-name", vname, "--name", kname],
-                    sid,
-                    timeout=TIMEOUTS["default"],
-                )
-                if rc2 != 0:
-                    error_msg = (
-                        str(pol)
-                        if isinstance(pol, str)
-                        else "Access denied (requires Key Vault data plane permissions)"
-                    )
-                    results.append(
-                        R(
-                            "8.3.9",
-                            "Key Vault automatic key rotation enabled",
-                            2,
-                            "8 - Security Services",
-                            INFO if is_firewall_error(error_msg) else ERROR,
-                            (
-                                f"Vault '{vname}' key '{kname}': Failed to fetch rotation policy"
-                                f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
-                            ),
-                            "",
-                            sid,
-                            sname,
-                            vname,
-                        )
-                    )
-                elif isinstance(pol, dict):
-                    # A rotation policy is compliant if at least one lifetimeAction
-                    # has type == "Rotate" (as opposed to "Notify")
-                    has_rotate = any(
-                        la.get("action", {}).get("type", "").lower() == "rotate"
-                        for la in pol.get("lifetimeActions", [])
-                    )
-                    results.append(
-                        R(
-                            "8.3.9",
-                            "Key Vault automatic key rotation enabled",
-                            2,
-                            "8 - Security Services",
-                            PASS if has_rotate else FAIL,
-                            f"Vault '{vname}' key '{kname}': auto-rotation "
-                            f"{'configured' if has_rotate else 'NOT configured'}",
-                            "Key Vault > Keys > Rotation policy > Set rotation action" if not has_rotate else "",
-                            sid,
-                            sname,
-                            vname if not has_rotate else "",
-                        )
-                    )
-
         # ── 8.3.11 — Certificate validity <= 12 months ────────────────────────
         # Short-lived certificates limit the window of exposure if a private key
         # is compromised. Certificates with >12 month validity require long-term
         # private key protection and delay detection of key compromise.
-        rc, certs = az(
+        # Certificate-show calls are independent per cert — fetch in parallel.
+        rc_certs, cert_ids_raw = az(
             ["keyvault", "certificate", "list", "--vault-name", vname, "--query", "[].id"],
             sid,
             timeout=TIMEOUTS["default"],
         )
-        if rc != 0:
+
+        if rc_certs != 0:
             error_msg = (
-                str(certs)
-                if isinstance(certs, str)
+                str(cert_ids_raw)
+                if isinstance(cert_ids_raw, str)
                 else "Access denied or error listing certificates (requires Key Vault data plane permissions)"
             )
-            results.append(
+            acc.append(
                 R(
                     "8.3.11",
                     "Certificate validity period <= 12 months",
@@ -689,10 +712,11 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     vname,
                 )
             )
-        elif isinstance(certs, list):
-            for cert_id in certs:
-                # Fetch just the validity period from the certificate policy
-                rc2, cert = az(
+        elif isinstance(cert_ids_raw, list) and cert_ids_raw:
+            cert_ids: list[str] = cert_ids_raw
+
+            def _fetch_cert(cert_id: str) -> tuple[int, Any]:
+                return az(
                     [
                         "keyvault",
                         "certificate",
@@ -705,14 +729,20 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     sid,
                     timeout=TIMEOUTS["default"],
                 )
+
+            workers = min(_KEY_WORKERS, len(cert_ids))
+            with ThreadPoolExecutor(max_workers=workers) as cpool:
+                cert_results = list(cpool.map(_fetch_cert, cert_ids))
+
+            for cert_id, (rc2, cert) in zip(cert_ids, cert_results):
+                cname = cert_id.split("/")[-1]
                 if rc2 != 0:
                     error_msg = (
                         str(cert)
                         if isinstance(cert, str)
                         else "Access denied (requires Key Vault data plane permissions)"
                     )
-                    cname = cert_id.split("/")[-1]
-                    results.append(
+                    acc.append(
                         R(
                             "8.3.11",
                             "Certificate validity period <= 12 months",
@@ -736,9 +766,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     except (ValueError, TypeError):
                         ok = False
                         months = cert  # Return raw value for display if not int
-                    # Certificate name is the last segment of its ID URL path
-                    cname = cert_id.split("/")[-1]
-                    results.append(
+                    acc.append(
                         R(
                             "8.3.11",
                             "Certificate validity period <= 12 months",
@@ -756,6 +784,15 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             vname if not ok else "",
                         )
                     )
+
+        return acc
+
+    # ── Process all vaults in parallel ───────────────────────────────────────
+    results: list[R] = []
+    with ThreadPoolExecutor(max_workers=min(_VAULT_WORKERS, len(vaults))) as pool:
+        futures = [pool.submit(_check_one_vault, v) for v in vaults]
+        for fut in as_completed(futures):
+            results.extend(fut.result())
     return results
 
 

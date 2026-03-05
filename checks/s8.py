@@ -9,7 +9,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from cis.config import PASS, FAIL, ERROR, INFO, TIMEOUTS
+from cis.config import PASS, FAIL, ERROR, INFO, TIMEOUTS, LOGGER
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az, az_rest, is_firewall_error, _friendly_error
@@ -66,27 +66,28 @@ def check_8_1_defender(sid: str, sname: str) -> list[R]:
         ("8.1.9.1", "Microsoft Defender for Resource Manager", "Arm", 2),
     ]
 
-    results = []
-    for ctrl, title, plan, level in plans:
+    def _check_plan(entry: tuple[str, str, str, int]) -> R:
+        ctrl, title, plan, level = entry
         rc, data = az(["security", "pricing", "show", "-n", plan], sid, timeout=TIMEOUTS["default"])
         if rc != 0:
-            results.append(_err(ctrl, title, level, "8 - Security Services", str(data), sid, sname))
-            continue
-
+            return _err(ctrl, title, level, "8 - Security Services", str(data), sid, sname)
         tier = data.get("pricingTier", "Free") if isinstance(data, dict) else "Unknown"
-        results.append(
-            R(
-                ctrl,
-                title,
-                level,
-                "8 - Security Services",
-                PASS if tier == "Standard" else FAIL,
-                f"Pricing tier: {tier}",
-                f"Defender for Cloud > Environment settings > Enable '{plan}'" if tier != "Standard" else "",
-                sid,
-                sname,
-            )
+        return R(
+            ctrl,
+            title,
+            level,
+            "8 - Security Services",
+            PASS if tier == "Standard" else FAIL,
+            f"Pricing tier: {tier}",
+            f"Defender for Cloud > Environment settings > Enable '{plan}'" if tier != "Standard" else "",
+            sid,
+            sname,
         )
+
+    # All 12 plan checks are independent — fetch concurrently and restore
+    # the original declaration order so the report is stable across runs.
+    with ThreadPoolExecutor(max_workers=len(plans)) as pool:
+        results = list(pool.map(_check_plan, plans))
     return results
 
 
@@ -379,6 +380,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     def _check_one_vault(v: dict[str, Any]) -> list[R]:
         """Audit one Key Vault (all controls). Called in parallel by the outer pool."""
         vname = v.get("name", "?")
+        LOGGER.debug("    [%s] key vault: %s", sname[:24], vname)
         is_rbac = bool(v.get("rbac"))
         acc: list[R] = []
 
@@ -788,6 +790,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         return acc
 
     # ── Process all vaults in parallel ───────────────────────────────────────
+    LOGGER.info("    [%s] Checking %d Key Vault(s)...", sname[:24], len(vaults))
     results: list[R] = []
     with ThreadPoolExecutor(max_workers=min(_VAULT_WORKERS, len(vaults))) as pool:
         futures = [pool.submit(_check_one_vault, v) for v in vaults]

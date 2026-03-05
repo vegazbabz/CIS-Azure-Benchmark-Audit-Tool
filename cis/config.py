@@ -40,8 +40,28 @@ else:
         _tomllib = None  # type: ignore[assignment]
 
 # ── Tool / benchmark identity ──────────────────────────────────────────────────
-VERSION = "1.0.0"  # Written into checkpoints for change detection
+VERSION = "1.0.0-beta3"  # Written into checkpoints for change detection
 BENCHMARK_VER = "5.0.0"  # CIS Benchmark version this tool targets
+
+
+def _git_hash() -> str:
+    """Return the short git commit hash, or 'unknown' if git is unavailable."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        return result.stdout.strip() if result.returncode == 0 else "unknown"
+    except Exception:
+        return "unknown"
+
+
+GIT_HASH = _git_hash()
+VERSION_FULL = f"{VERSION}+{GIT_HASH}"
 
 # ── Filesystem ────────────────────────────────────────────────────────────────
 CHECKPOINT_DIR = Path("cis_checkpoints")  # Per-subscription result cache

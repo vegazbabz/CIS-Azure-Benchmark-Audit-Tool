@@ -85,6 +85,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 # Configuration constants (version, timeouts, status codes, role GUIDs, etc.)
 from cis.config import (
     VERSION,
+    VERSION_FULL,
     BENCHMARK_VER,
     CHECKPOINT_DIR,
     DEFAULT_PARALLEL,
@@ -946,6 +947,12 @@ Examples:
   python cis_azure_audit.py --report-only
   python cis_azure_audit.py --level 1
         """,
+    )
+
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {VERSION_FULL}",
     )
 
     parser.add_argument(

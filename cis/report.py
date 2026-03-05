@@ -35,6 +35,7 @@ def generate_html(
     results: list[R],
     output: str,
     scope_info: dict[str, Any] | None = None,
+    history: list[dict[str, Any]] | None = None,
 ) -> None:
     """
     Generate a self-contained HTML audit report from a list of R instances.
@@ -57,6 +58,7 @@ def generate_html(
     output     : Output file path (e.g. "cis_azure_audit_report.html")
     scope_info : Optional dict with keys: tenant, user, scope_label,
                  subscriptions (list of name strings), level_filter
+    history    : Optional list of past run summaries for the trend chart
     """
     # ── Counts and score ──────────────────────────────────────────────────────
     counts = {s: sum(1 for r in results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL, SUPPRESSED]}
@@ -242,6 +244,71 @@ def generate_html(
         scope_rows += f'<tr><th>Level filter</th><td>Level {html.escape(str(si["level_filter"]))} only</td></tr>\n'
     scope_block = f'<div class="scope-info"><table>{scope_rows}</table></div>' if scope_rows else ""
 
+    # ── Trend chart (collapsible, only when 2+ history entries exist) ─────────
+    trend_block = ""
+    if history and len(history) >= 2:
+        trend_js_data = json.dumps(
+            [{"ts": h["timestamp"][:10], "score": h["score"]} for h in history],
+            ensure_ascii=False,
+        )
+        trend_block = f"""
+<details class="trend-box">
+  <summary>&#128200; Compliance Trend &#8212; last {len(history)} run(s)</summary>
+  <div class="trend-inner">
+    <canvas id="trend-cv" height="130"></canvas>
+  </div>
+</details>
+<script>
+(function(){{
+  var TREND = {trend_js_data};
+  var cv = document.getElementById('trend-cv');
+  if (!cv || !TREND.length) return;
+  cv.width = cv.parentElement.offsetWidth || 700;
+  var W = cv.width, H = cv.height;
+  var PAD = {{t:20, r:20, b:36, l:44}};
+  var iW = W - PAD.l - PAD.r, iH = H - PAD.t - PAD.b;
+  var ctx = cv.getContext('2d');
+  var scores = TREND.map(function(d){{return d.score;}});
+  var minS = Math.max(0, Math.min.apply(null,scores) - 5);
+  var maxS = Math.min(100, Math.max.apply(null,scores) + 5);
+  function sx(i){{ return PAD.l + (i / (TREND.length - 1)) * iW; }}
+  function sy(v){{ return PAD.t + iH - ((v - minS) / (maxS - minS)) * iH; }}
+  // grid lines
+  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+  [0,25,50,75,100].forEach(function(v){{
+    if (v < minS || v > maxS) return;
+    var y = sy(v);
+    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(PAD.l + iW, y); ctx.stroke();
+    ctx.fillStyle='#94a3b8'; ctx.font='11px sans-serif'; ctx.textAlign='right';
+    ctx.fillText(v+'%', PAD.l - 6, y + 4);
+  }});
+  // filled area
+  ctx.beginPath();
+  ctx.moveTo(sx(0), sy(scores[0]));
+  scores.forEach(function(s,i){{ if(i) ctx.lineTo(sx(i), sy(s)); }});
+  ctx.lineTo(sx(scores.length-1), PAD.t+iH);
+  ctx.lineTo(sx(0), PAD.t+iH);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(37,99,235,0.08)'; ctx.fill();
+  // line
+  ctx.beginPath();
+  scores.forEach(function(s,i){{ i ? ctx.lineTo(sx(i),sy(s)) : ctx.moveTo(sx(i),sy(s)); }});
+  ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2; ctx.stroke();
+  // dots + labels
+  TREND.forEach(function(d,i){{
+    var x=sx(i), y=sy(d.score);
+    var col = d.score>=80?'#16a34a':d.score>=60?'#d97706':'#dc2626';
+    ctx.beginPath(); ctx.arc(x,y,4,0,2*Math.PI);
+    ctx.fillStyle=col; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle=col; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(d.score+'%', x, y-9);
+    ctx.fillStyle='#64748b'; ctx.font='10px sans-serif';
+    ctx.fillText(d.ts, x, H-8);
+  }});
+}})();
+</script>"""
+
     # ── Full HTML page ────────────────────────────────────────────────────────
     page = f"""<!DOCTYPE html>
 <html lang="en">
@@ -275,6 +342,16 @@ header p  {{ opacity: .8; font-size: .9rem; }}
 .c-in .n {{ color: #2563eb; }}
 .c-ma .n {{ color: #7c3aed; }}
 .c-su .n {{ color: #64748b; }}
+
+/* ── Trend box ── */
+.trend-box {{ margin: 0 2rem 1rem; border: 1px solid #e2e8f0; border-radius: 8px;
+    background: #fff; overflow: hidden; }}
+.trend-box > summary {{ padding: .65rem 1rem; font-size: .85rem; font-weight: 600;
+    color: #475569; cursor: pointer; list-style: none; user-select: none; }}
+.trend-box > summary::-webkit-details-marker {{ display: none; }}
+.trend-box > summary:hover {{ background: #f8fafc; }}
+.trend-inner {{ padding: .75rem 1rem 1rem; }}
+.trend-inner canvas {{ width: 100%; display: block; }}
 
 /* ── Filter bar ── */
 .filters {{ display: flex; align-items: center; gap: .75rem; padding: .8rem 2rem;
@@ -438,6 +515,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   </div>
   <div class="sec-breakdown" id="sec-breakdown"></div>
 </div>
+{trend_block}
 {sub_table}
 <div class="filters">
   <label>Filter:</label>

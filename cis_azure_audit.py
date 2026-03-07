@@ -1242,19 +1242,19 @@ Examples:
         LOGGER.info("   • %s  (%s)", s["name"], s["id"])
 
     if not args.skip_preflight and not os.environ.get("SKIP_PREFLIGHT"):
+        LOGGER.info("\n🔐 Checking permissions…")
         if HAS_RICH:
             _pf_prog = Progress(
                 SpinnerColumn(),
-                TextColumn("🔐 Checking permissions…"),
+                TextColumn("   querying {task.fields[n]} subscription(s)…"),
                 TimeElapsedColumn(),
                 transient=True,
                 console=_rcon,
             )
             with _pf_prog:
-                _pf_prog.add_task("", total=None)
+                _pf_prog.add_task("", total=None, n=len(subs))
                 preflight = check_user_permissions([s["id"] for s in subs])
         else:
-            LOGGER.info("\n🔐 Checking permissions...")
             preflight = check_user_permissions([s["id"] for s in subs])
         if preflight.get("user_id"):
             LOGGER.info("   User: %s", preflight["user_id"])

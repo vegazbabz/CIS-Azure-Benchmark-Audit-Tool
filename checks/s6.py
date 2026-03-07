@@ -380,7 +380,6 @@ def check_6_1_1_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     return results
 
 
-
 def check_6_1_2_alerts(sid: str, sname: str) -> list[R]:
     """
     6.1.2.1–6.1.2.11 — Activity Log Alerts for critical operations (Level 1)

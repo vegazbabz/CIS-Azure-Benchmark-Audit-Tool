@@ -278,8 +278,10 @@ def check_7_5(sid: str, sname: str) -> list[R]:
                 2,
                 "7 - Networking Services",
                 FAIL,
-                "No NSG flow logs configured — flow logging has not been enabled for any NSG in this subscription. See also CIS 6.1.1.5 (NSG flow logs to Log Analytics).",
-                "Network Watcher > Flow logs > Create a flow log for each NSG with retention >= 90 days and Traffic Analytics enabled (CIS 6.1.1.5).",
+                "No NSG flow logs configured — flow logging has not been enabled for any NSG in this subscription."
+                " See also CIS 6.1.1.5 (NSG flow logs to Log Analytics).",
+                "Network Watcher > Flow logs > Create a flow log for each NSG with retention >= 90 days"
+                " and Traffic Analytics enabled (CIS 6.1.1.5).",
                 sid,
                 sname,
             )
@@ -407,8 +409,10 @@ def check_7_8(sid: str, sname: str) -> list[R]:
                 2,
                 "7 - Networking Services",
                 FAIL,
-                "No VNet flow logs configured — flow logging has not been enabled for any VNet in this subscription. See also CIS 6.1.1.7 (VNet flow logs to Log Analytics).",
-                "Network Watcher > Flow logs > Create a flow log for each VNet with retention >= 90 days and Traffic Analytics enabled (CIS 6.1.1.7).",
+                "No VNet flow logs configured — flow logging has not been enabled for any VNet in this subscription."
+                " See also CIS 6.1.1.7 (VNet flow logs to Log Analytics).",
+                "Network Watcher > Flow logs > Create a flow log for each VNet with retention >= 90 days"
+                " and Traffic Analytics enabled (CIS 6.1.1.7).",
                 sid,
                 sname,
             )

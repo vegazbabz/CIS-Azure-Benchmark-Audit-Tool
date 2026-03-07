@@ -218,8 +218,7 @@ def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str:
         _rcon.print(f"\n{sep}")
         _rcon.print(f"  COMPLETE — {total} checks  |  {n_subs} subscription(s)  |  ⏱ {elapsed_str}")
         _rcon.print(
-            f"  Compliance Score : [{score_color}]{score}%[/{score_color}]"
-            "  (excludes INFO/MANUAL/SUPPRESSED)"
+            f"  Compliance Score : [{score_color}]{score}%[/{score_color}]" "  (excludes INFO/MANUAL/SUPPRESSED)"
         )
         _rcon.print(
             f"  ✅ [green]PASS {counts[PASS]:4d}[/green]"

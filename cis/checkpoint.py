@@ -22,6 +22,105 @@ from typing import Any
 from cis.config import BENCHMARK_VER, CHECKPOINT_DIR, LOGGER, VERSION
 from cis.models import R
 
+_CLEAN_KV_AUTHZ_MSG = (
+    "Audit incomplete — account lacks Key Vault data-plane permissions. "
+    "Grant 'Key Vault Reader' data-plane role (or an access policy) to include this vault."
+)
+
+# Tokens whose presence in a stored ERROR result's `details` field means the
+# result should be downgraded to INFO on load.  This lets --report-only (and
+# checkpoint-resume runs) reflect fixes without requiring a full re-audit.
+#
+# Only FeatureNotSupportedForAccount is reclassified to INFO — it is genuinely
+# "not applicable" (the account type has no blob/file service).
+#
+# KV data-plane permission errors are intentionally kept as ERROR: the control
+# DOES apply, the audit just couldn't verify compliance.  That is an audit gap
+# and must be visible in the report so the auditor knows to investigate.
+# Old checkpoints may have the raw CLI blob in `details` — we replace it with
+# the clean actionable message.
+_RECLASSIFY_NOTAPPLICABLE_TOKENS = frozenset(
+    [
+        "featurenotsupportedforaccount",
+        "feature not supported for this account type",
+    ]
+)
+_KV_AUTHZ_TOKENS = frozenset(
+    [
+        "requires key vault data plane permissions",
+        "insufficient permissions",
+    ]
+)
+
+# Mapping of section names that were stored incorrectly in old checkpoints.
+# Applied on load so --report-only reflects corrections without a full re-audit.
+_SECTION_NAME_FIXES: dict[str, str] = {
+    "7 - Networking & Governance": "7 - Networking Services",
+}
+
+
+def _reclassify(r: R) -> R:
+    """Downgrade ERROR→INFO only for genuinely not-applicable results.
+
+    FeatureNotSupportedForAccount errors indicate the account type has no
+    blob or file service — INFO is correct (the control doesn't apply).
+
+    KV data-plane permission errors are kept as ERROR: the vault exists,
+    the control applies, and compliance is unknown.  The error message is
+    now a clean, actionable string rather than a raw CLI dump.
+    """
+    from cis.config import ERROR, INFO  # avoid circular at module level
+
+    # Fix known section name typos stored in old checkpoints.
+    if r.section in _SECTION_NAME_FIXES:
+        r = R(
+            r.control_id,
+            r.title,
+            r.level,
+            _SECTION_NAME_FIXES[r.section],
+            r.status,
+            r.details,
+            r.remediation,
+            r.subscription_id,
+            r.subscription_name,
+            r.resource,
+        )
+
+    if r.status != ERROR:
+        return r
+    low = r.details.lower()
+    if any(t in low for t in _RECLASSIFY_NOTAPPLICABLE_TOKENS):
+        return R(
+            r.control_id,
+            r.title,
+            r.level,
+            r.section,
+            INFO,
+            r.details,
+            "",  # no remediation for INFO
+            r.subscription_id,
+            r.subscription_name,
+            "",  # clear resource marker — nothing to flag
+        )
+    # Old checkpoints store the raw CLI dump for KV auth errors — replace with
+    # the clean, actionable message so --report-only shows readable output.
+    if any(t in low for t in _KV_AUTHZ_TOKENS):
+        # Preserve the vault/key/cert prefix (everything before the first " - ")
+        prefix = r.details.split(" - ")[0] if " - " in r.details else r.details.split(":")[0]
+        return R(
+            r.control_id,
+            r.title,
+            r.level,
+            r.section,
+            ERROR,
+            f"{prefix}: {_CLEAN_KV_AUTHZ_MSG}",
+            "Grant Key Vault data-plane permissions to the audit account",
+            r.subscription_id,
+            r.subscription_name,
+            r.resource,
+        )
+    return r
+
 
 def save_checkpoint(sid: str, sname: str, results: list[R], status: str = "completed") -> None:
     """
@@ -133,7 +232,7 @@ def results_from_checkpoint(cp: dict[str, Any]) -> list[R]:
         # Only pass fields that the current R dataclass knows about
         filtered = {k: v for k, v in r.items() if k in valid_fields}
         try:
-            results.append(R(**filtered))
+            results.append(_reclassify(R(**filtered)))
         except TypeError:
             pass  # Skip records that cannot be reconstructed
 

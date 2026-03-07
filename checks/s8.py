@@ -12,7 +12,7 @@ from typing import Any
 from cis.config import PASS, FAIL, ERROR, INFO, TIMEOUTS, LOGGER
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
-from azure.helpers import az, az_rest, is_authz_error, is_firewall_error, _friendly_error
+from azure.helpers import az, az_rest, is_firewall_error, _friendly_error
 
 # Maximum Key Vaults audited concurrently within one subscription.
 _VAULT_WORKERS = 10
@@ -501,7 +501,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 else "Access denied or error listing keys (requires Key Vault data plane permissions)"
             )
             friendly = _friendly_error(error_msg)
-            status = INFO if (is_firewall_error(error_msg) or is_authz_error(error_msg)) else ERROR
+            status = INFO if is_firewall_error(error_msg) else ERROR
             acc.append(
                 R(
                     ctrl_key_exp,
@@ -586,7 +586,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                                 "Key Vault automatic key rotation enabled",
                                 2,
                                 "8 - Security Services",
-                                INFO if (is_firewall_error(error_msg) or is_authz_error(error_msg)) else ERROR,
+                                INFO if is_firewall_error(error_msg) else ERROR,
                                 (
                                     f"Vault '{vname}' key '{kname}': Failed to fetch rotation policy"
                                     f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
@@ -653,7 +653,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         f"Key Vault secrets have expiration date set ({sec_label})",
                         1,
                         "8 - Security Services",
-                        INFO if (is_firewall_error(error_msg) or is_authz_error(error_msg)) else ERROR,
+                        INFO if is_firewall_error(error_msg) else ERROR,
                         (
                             f"Vault '{vname}': Failed to enumerate secrets"
                             f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
@@ -705,7 +705,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "Certificate validity period <= 12 months",
                     1,
                     "8 - Security Services",
-                    INFO if (is_firewall_error(error_msg) or is_authz_error(error_msg)) else ERROR,
+                    INFO if is_firewall_error(error_msg) else ERROR,
                     (
                         f"Vault '{vname}': Failed to enumerate certificates"
                         f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"
@@ -752,7 +752,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             "Certificate validity period <= 12 months",
                             1,
                             "8 - Security Services",
-                            INFO if (is_firewall_error(error_msg) or is_authz_error(error_msg)) else ERROR,
+                            INFO if is_firewall_error(error_msg) else ERROR,
                             (
                                 f"Vault '{vname}' cert '{cname}': Failed to fetch certificate"
                                 f" - {_friendly_error(error_msg)}; requires Key Vault data plane permissions"

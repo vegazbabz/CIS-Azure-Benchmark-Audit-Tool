@@ -145,7 +145,10 @@ def _friendly_error(msg: str) -> str:
         return "Feature not supported for this account type"
     lowered = str(msg).lower()
     if any(t in lowered for t in _AUTHZ_TOKENS):
-        return "Insufficient permissions"
+        return (
+            "Audit incomplete — service principal lacks Key Vault data-plane permissions. "
+            "Grant 'Key Vault Reader' data-plane role (or an access policy) to include this vault."
+        )
     first = _first_error_line(msg)
     return first[:160] if len(first) > 160 else first
 

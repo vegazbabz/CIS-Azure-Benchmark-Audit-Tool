@@ -22,41 +22,53 @@ from typing import Any
 from cis.config import BENCHMARK_VER, CHECKPOINT_DIR, LOGGER, VERSION
 from cis.models import R
 
+_CLEAN_KV_AUTHZ_MSG = (
+    "Audit incomplete — service principal lacks Key Vault data-plane permissions. "
+    "Grant 'Key Vault Reader' data-plane role (or an access policy) to include this vault."
+)
+
 # Tokens whose presence in a stored ERROR result's `details` field means the
 # result should be downgraded to INFO on load.  This lets --report-only (and
 # checkpoint-resume runs) reflect fixes without requiring a full re-audit.
 #
-# Authz: service principal lacks Key Vault data-plane role / access policy.
-_RECLASSIFY_AUTHZ_TOKENS = frozenset(
-    [
-        "requires key vault data plane permissions",
-        "insufficient permissions",
-    ]
-)
-# NotApplicable: account type doesn't support the queried service (blob/file).
+# Only FeatureNotSupportedForAccount is reclassified to INFO — it is genuinely
+# "not applicable" (the account type has no blob/file service).
+#
+# KV data-plane permission errors are intentionally kept as ERROR: the control
+# DOES apply, the audit just couldn't verify compliance.  That is an audit gap
+# and must be visible in the report so the auditor knows to investigate.
+# Old checkpoints may have the raw CLI blob in `details` — we replace it with
+# the clean actionable message.
 _RECLASSIFY_NOTAPPLICABLE_TOKENS = frozenset(
     [
         "featurenotsupportedforaccount",
         "feature not supported for this account type",
     ]
 )
+_KV_AUTHZ_TOKENS = frozenset(
+    [
+        "requires key vault data plane permissions",
+        "insufficient permissions",
+    ]
+)
 
 
 def _reclassify(r: R) -> R:
-    """Downgrade ERROR→INFO for results that represent expected non-errors.
+    """Downgrade ERROR→INFO only for genuinely not-applicable results.
 
-    Older checkpoints may contain ERROR entries for conditions that are now
-    correctly classified as INFO (e.g. missing KV data-plane permissions,
-    FeatureNotSupportedForAccount on ADLS Gen2 storage accounts).  Fixing
-    the status on load means --report-only and checkpoint-resume runs show
-    the corrected status without a full re-audit.
+    FeatureNotSupportedForAccount errors indicate the account type has no
+    blob or file service — INFO is correct (the control doesn't apply).
+
+    KV data-plane permission errors are kept as ERROR: the vault exists,
+    the control applies, and compliance is unknown.  The error message is
+    now a clean, actionable string rather than a raw CLI dump.
     """
     from cis.config import ERROR, INFO  # avoid circular at module level
 
     if r.status != ERROR:
         return r
     low = r.details.lower()
-    if any(t in low for t in _RECLASSIFY_AUTHZ_TOKENS) or any(t in low for t in _RECLASSIFY_NOTAPPLICABLE_TOKENS):
+    if any(t in low for t in _RECLASSIFY_NOTAPPLICABLE_TOKENS):
         return R(
             r.control_id,
             r.title,
@@ -68,6 +80,23 @@ def _reclassify(r: R) -> R:
             r.subscription_id,
             r.subscription_name,
             "",  # clear resource marker — nothing to flag
+        )
+    # Old checkpoints store the raw CLI dump for KV auth errors — replace with
+    # the clean, actionable message so --report-only shows readable output.
+    if any(t in low for t in _KV_AUTHZ_TOKENS):
+        # Preserve the vault/key/cert prefix (everything before the first " - ")
+        prefix = r.details.split(" - ")[0] if " - " in r.details else r.details.split(":")[0]
+        return R(
+            r.control_id,
+            r.title,
+            r.level,
+            r.section,
+            ERROR,
+            f"{prefix}: {_CLEAN_KV_AUTHZ_MSG}",
+            "Grant Key Vault data-plane permissions to the audit service principal",
+            r.subscription_id,
+            r.subscription_name,
+            r.resource,
         )
     return r
 

@@ -748,7 +748,9 @@ def run_audit(
     """
     checkpoints = load_checkpoints() if resume else {}
     if checkpoints:
-        LOGGER.info("\n💾 %d subscription(s) were already audited in a previous run — loading saved results.", len(checkpoints))
+        LOGGER.info(
+            "\n💾 %d subscription(s) were already audited in a previous run — loading saved results.", len(checkpoints)
+        )
 
     # Split subscriptions into already-done (skip) and still-todo (audit)
     done = [s for s in subs if s["id"] in checkpoints]
@@ -763,7 +765,9 @@ def run_audit(
         all_results.extend(results_from_checkpoint(checkpoints[sub["id"]]))
 
     if not todo:
-        LOGGER.info("✅ All subscriptions were already audited — nothing new to scan. Use --fresh to re-audit from scratch.")
+        LOGGER.info(
+            "✅ All subscriptions were already audited — nothing new to scan. Use --fresh to re-audit from scratch."
+        )
         return all_results
 
     requested_parallel = max(1, parallel)

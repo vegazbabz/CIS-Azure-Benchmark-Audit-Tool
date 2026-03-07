@@ -19,6 +19,7 @@ from azure.client import (  # noqa: F401
     get_and_reset_rate_limit_retry_count,
     graph_query,
     is_firewall_error,
+    kill_running_procs,
     logger,
 )
 from azure.identity import (  # noqa: F401

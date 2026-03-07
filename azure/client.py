@@ -28,6 +28,28 @@ logger = logging.getLogger(__name__)
 _rate_limit_retries = 0
 _rate_limit_lock = threading.Lock()
 
+# Registry of currently-running az subprocesses. Populated by _run_cmd_with_retries
+# so that kill_running_procs() can terminate them all immediately on Ctrl+C,
+# unblocking worker threads that are stuck in proc.communicate().
+_running_procs: set[subprocess.Popen[str]] = set()
+_running_procs_lock = threading.Lock()
+
+
+def kill_running_procs() -> None:
+    """Kill all az subprocesses currently tracked in _running_procs.
+
+    Called on KeyboardInterrupt so that worker threads blocked in
+    proc.communicate() unblock immediately instead of waiting for az to exit.
+    """
+    with _running_procs_lock:
+        procs = list(_running_procs)
+    for proc in procs:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
 # On Windows, Python cannot find 'az' without the .cmd extension.
 AZ = "az.cmd" if sys.platform == "win32" else "az"
 
@@ -64,6 +86,15 @@ _AUTHZ_TOKENS = frozenset(
     ]
 )
 
+# Errors that indicate the requested feature is not supported on this account
+# type (e.g. Azure Files on a blob-only or ADLS Gen2 storage account). These
+# are expected during storage checks and should not surface as ERROR log lines.
+_NOTAPPLICABLE_TOKENS = frozenset(
+    [
+        "featurenotsupportedforaccount",
+    ]
+)
+
 # Firewall-block tokens must be checked BEFORE generic auth tokens because
 # "ForbiddenByFirewall" contains "forbidden" which would otherwise match _AUTHZ_TOKENS.
 _FIREWALL_TOKENS = frozenset(
@@ -72,6 +103,9 @@ _FIREWALL_TOKENS = frozenset(
         "public network access is disabled",
         "not allowed by its firewall rules",
         "caller's ip address",
+        # Private endpoint / service endpoint blocks
+        "connection is not an approved private link",
+        "not an approved private link and caller was ignored",
     ]
 )
 
@@ -116,10 +150,18 @@ def _run_cmd_with_retries(
     for attempt in range(1, max_retries + 1):
         logger.debug("running command attempt %d: %s", attempt, cmd)
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-            stdout = r.stdout or ""
-            stderr = r.stderr or ""
-            if r.returncode != 0:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            with _running_procs_lock:
+                _running_procs.add(proc)
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout)
+            finally:
+                with _running_procs_lock:
+                    _running_procs.discard(proc)
+            r_returncode = proc.returncode
+            stdout = stdout or ""
+            stderr = stderr or ""
+            if r_returncode != 0:
                 low = stderr.lower() if isinstance(stderr, str) else ""
                 transient_tokens = ("429", "too many requests", "rate limit", "throttl")
                 is_transient = any(tok in low for tok in transient_tokens)
@@ -132,20 +174,27 @@ def _run_cmd_with_retries(
                     time.sleep(sleep_for)
                     continue
                 is_authz = any(tok in low for tok in _AUTHZ_TOKENS)
+                is_notapplicable = any(tok in low for tok in _NOTAPPLICABLE_TOKENS)
                 summary = _first_error_line(stderr)
                 if is_authz:
-                    logger.debug("command denied by permissions (rc=%d): %s", r.returncode, summary)
+                    logger.debug("command denied by permissions (rc=%d): %s", r_returncode, summary)
+                elif is_notapplicable:
+                    logger.debug("command not applicable for account type (rc=%d): %s", r_returncode, summary)
                 elif summary.strip() in ("^C", ""):
                     # az subprocess killed by Ctrl+C (Windows forwards SIGINT to
                     # all console processes); not a real error — suppress the noise.
-                    logger.debug("command interrupted (rc=%d)", r.returncode)
+                    logger.debug("command interrupted (rc=%d)", r_returncode)
                 else:
-                    logger.error("command failed (rc=%d): %s", r.returncode, summary)
-                return r.returncode, stdout, stderr
+                    logger.error("command failed (rc=%d): %s", r_returncode, summary)
+                return r_returncode, stdout, stderr
             logger.debug("command succeeded")
             return 0, stdout, stderr
 
         except subprocess.TimeoutExpired:
+            with _running_procs_lock:
+                _running_procs.discard(proc)
+            proc.kill()
+            proc.communicate()  # drain pipes to avoid ResourceWarning
             if attempt < max_retries:
                 sleep_for = base_backoff * (2 ** (attempt - 1))
                 time.sleep(sleep_for)

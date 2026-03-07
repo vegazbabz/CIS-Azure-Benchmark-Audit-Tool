@@ -179,6 +179,7 @@ from azure.helpers import (
     get_signed_in_user_id,
     list_role_names_for_user,
     check_user_permissions,
+    kill_running_procs,
 )
 
 # Optional rich progress bar + coloured console (used if installed). Falls back to builtin UI
@@ -194,7 +195,7 @@ try:
     )
 
     HAS_RICH = True
-    _rcon: Any = _RichConsole()
+    _rcon: Any = _RichConsole(highlight=False)
 except Exception:
     HAS_RICH = False
     _rcon = None
@@ -748,14 +749,16 @@ def run_audit(
     """
     checkpoints = load_checkpoints() if resume else {}
     if checkpoints:
-        LOGGER.info("\n💾 Found checkpoints for %d subscription(s).", len(checkpoints))
+        LOGGER.info(
+            "\n💾 %d subscription(s) were already audited in a previous run — loading saved results.", len(checkpoints)
+        )
 
     # Split subscriptions into already-done (skip) and still-todo (audit)
     done = [s for s in subs if s["id"] in checkpoints]
     todo = [s for s in subs if s["id"] not in checkpoints]
 
     if done:
-        LOGGER.info("⏭️  Skipping (checkpointed): %s", ", ".join(s["name"] for s in done))
+        LOGGER.info("⏭️  Skipping (already audited): %s", ", ".join(s["name"] for s in done))
 
     # Seed the results with data from completed checkpoints
     all_results = []
@@ -763,7 +766,9 @@ def run_audit(
         all_results.extend(results_from_checkpoint(checkpoints[sub["id"]]))
 
     if not todo:
-        LOGGER.info("✅ All subscriptions already checkpointed.")
+        LOGGER.info(
+            "✅ All subscriptions were already audited — nothing new to scan. Use --fresh to re-audit from scratch."
+        )
         return all_results
 
     requested_parallel = max(1, parallel)
@@ -1236,8 +1241,20 @@ Examples:
         LOGGER.info("   • %s  (%s)", s["name"], s["id"])
 
     if not args.skip_preflight and not os.environ.get("SKIP_PREFLIGHT"):
-        LOGGER.info("\n🔐 Checking permissions...")
-        preflight = check_user_permissions([s["id"] for s in subs])
+        LOGGER.info("\n🔐 Checking permissions…")
+        if HAS_RICH:
+            _pf_prog = Progress(
+                SpinnerColumn(),
+                TextColumn("   querying {task.fields[n]} subscription(s)…"),
+                TimeElapsedColumn(),
+                transient=True,
+                console=_rcon,
+            )
+            with _pf_prog:
+                _pf_prog.add_task("", total=None, n=len(subs))
+                preflight = check_user_permissions([s["id"] for s in subs])
+        else:
+            preflight = check_user_permissions([s["id"] for s in subs])
         if preflight.get("user_id"):
             LOGGER.info("   User: %s", preflight["user_id"])
             roles = preflight.get("roles", [])
@@ -1336,5 +1353,10 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\n⚠️  Interrupted. Checkpoints saved for completed subscriptions — re-run to resume.")
-        sys.exit(1)
+        kill_running_procs()  # kill in-flight az subprocesses before exiting
+        print(
+            "\n\n⚠️  Interrupted. Re-run the same command to resume from where it stopped"
+            " (or add --fresh to start over)."
+        )
+        sys.stdout.flush()
+        os._exit(1)  # immediate hard exit — kills all worker threads without atexit

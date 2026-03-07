@@ -32,10 +32,12 @@ Reports are reviewed on a **best-effort, volunteer basis**. There is no guarante
 This tool is **read-only** — it makes no changes to your Azure environment.
 
 In-scope for vulnerability reports:
+
 - Code that could exfiltrate credentials or execute arbitrary commands
 - Logic errors causing materially incorrect audit results (e.g. a critical FAIL always reported as PASS)
 
 Out of scope:
+
 - Issues in the Azure CLI, Python runtime, or GitHub Actions infrastructure
 - Audit results that differ from your environment (report these as regular bugs)
 - Feature requests or benchmark interpretation disagreements

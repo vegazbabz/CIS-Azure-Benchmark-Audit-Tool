@@ -124,7 +124,8 @@ def check_user_permissions(sub_ids: list[str]) -> dict[str, Any]:
     last_error = None
 
     max_workers = min(8, max(1, total_subs))
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+    pool = ThreadPoolExecutor(max_workers=max_workers)
+    try:
         futures = {pool.submit(list_role_names_for_user, user_id, sub): sub for sub in query_subs}
         for future in as_completed(futures):
             rc, result = future.result()
@@ -134,6 +135,10 @@ def check_user_permissions(sub_ids: list[str]) -> dict[str, Any]:
                     role_sub_count[r] = role_sub_count.get(r, 0) + 1
             elif rc != 0:
                 last_error = result
+        pool.shutdown(wait=True)
+    except KeyboardInterrupt:
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
 
     if not all_roles and last_error:
         warnings.append(f"Could not enumerate user roles: {last_error}")

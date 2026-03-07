@@ -145,11 +145,11 @@ python cis_azure_audit.py [options]
 
 | Option | Description |
 | --- | --- |
-| `-s`, `--subscription` | Audit one or more subscriptions by name or GUID (repeatable) |
+| `-s`, `--subscription` | Audit one or more subscriptions by name or GUID. Multiple values follow a single flag: `-s Sub1 Sub2 Sub3` |
 | `-o`, `--output` | Output HTML filename (default: `cis_azure_audit_report.html`) |
 | `--output-dir` | Directory for all output files (HTML, JSON, CSV, checkpoints) |
-| `-p`, `--parallel` | Concurrent subscription workers (default: from config or 2) |
-| `--executor` | Worker backend: `thread` (default on Windows) or `process` |
+| `-p`, `--parallel` | Concurrent subscription workers (default: from config or 3) |
+| `--executor` | Worker backend: `thread` (default) or `process` |
 | `--no-adaptive-concurrency` | Disable dynamic worker tuning when throttling is detected |
 | `-l`, `--level` | Filter output to Level `1` or `2` controls only |
 | `--fresh` | Clear all checkpoints and start a full re-audit |
@@ -420,7 +420,7 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 
 > **2.1.1** (Databricks in customer-managed VNet) — pending implementation.
 
-### Section 5 — Identity Services (9 automated)
+### Section 5 — Identity Services (8 automated · 1 manual)
 
 | Control | Title | Level |
 | --- | --- | --- |
@@ -479,7 +479,7 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 | 7.14 | WAF request body inspection enabled | L2 |
 | 7.15 | WAF bot protection enabled | L2 |
 
-### Section 8 — Security Services (29 automated)
+### Section 8 — Security Services (30 automated)
 
 | Control | Title | Level |
 | --- | --- | --- |

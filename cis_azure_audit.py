@@ -42,8 +42,8 @@ during a write never produces a corrupt checkpoint file.
 PARALLEL EXECUTION
 ───────────────────
 Subscriptions are audited concurrently using either a ThreadPoolExecutor or
-ProcessPoolExecutor. The default is process mode with 2 workers
-(`--executor thread --parallel 3`). You can override both values via CLI.
+ProcessPoolExecutor. The default is thread mode with 3 workers.
+You can override both values via CLI.
 Higher parallelism can speed up large tenants but may increase Azure API
 throttling (HTTP 429).
 
@@ -737,9 +737,9 @@ def run_audit(
     Parameters
     ──────────
     subs     : Full list of subscription dicts to audit (id, name)
-    parallel             : Max concurrent workers requested (default 2)
+    parallel             : Max concurrent workers requested (default 3)
     resume               : If True, skip subscriptions with existing checkpoints
-    executor_mode        : "process" (default) or "thread"
+    executor_mode        : "thread" (default) or "process"
     adaptive_concurrency : If True, reduce/increase workers based on throttling
 
     Returns

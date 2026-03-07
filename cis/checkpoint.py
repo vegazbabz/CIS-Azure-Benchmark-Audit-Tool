@@ -52,6 +52,12 @@ _KV_AUTHZ_TOKENS = frozenset(
     ]
 )
 
+# Mapping of section names that were stored incorrectly in old checkpoints.
+# Applied on load so --report-only reflects corrections without a full re-audit.
+_SECTION_NAME_FIXES: dict[str, str] = {
+    "7 - Networking & Governance": "7 - Networking Services",
+}
+
 
 def _reclassify(r: R) -> R:
     """Downgrade ERROR→INFO only for genuinely not-applicable results.
@@ -64,6 +70,21 @@ def _reclassify(r: R) -> R:
     now a clean, actionable string rather than a raw CLI dump.
     """
     from cis.config import ERROR, INFO  # avoid circular at module level
+
+    # Fix known section name typos stored in old checkpoints.
+    if r.section in _SECTION_NAME_FIXES:
+        r = R(
+            r.control_id,
+            r.title,
+            r.level,
+            _SECTION_NAME_FIXES[r.section],
+            r.status,
+            r.details,
+            r.remediation,
+            r.subscription_id,
+            r.subscription_name,
+            r.resource,
+        )
 
     if r.status != ERROR:
         return r

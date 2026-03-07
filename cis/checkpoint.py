@@ -22,6 +22,55 @@ from typing import Any
 from cis.config import BENCHMARK_VER, CHECKPOINT_DIR, LOGGER, VERSION
 from cis.models import R
 
+# Tokens whose presence in a stored ERROR result's `details` field means the
+# result should be downgraded to INFO on load.  This lets --report-only (and
+# checkpoint-resume runs) reflect fixes without requiring a full re-audit.
+#
+# Authz: service principal lacks Key Vault data-plane role / access policy.
+_RECLASSIFY_AUTHZ_TOKENS = frozenset(
+    [
+        "requires key vault data plane permissions",
+        "insufficient permissions",
+    ]
+)
+# NotApplicable: account type doesn't support the queried service (blob/file).
+_RECLASSIFY_NOTAPPLICABLE_TOKENS = frozenset(
+    [
+        "featurenotsupportedforaccount",
+        "feature not supported for this account type",
+    ]
+)
+
+
+def _reclassify(r: R) -> R:
+    """Downgrade ERROR→INFO for results that represent expected non-errors.
+
+    Older checkpoints may contain ERROR entries for conditions that are now
+    correctly classified as INFO (e.g. missing KV data-plane permissions,
+    FeatureNotSupportedForAccount on ADLS Gen2 storage accounts).  Fixing
+    the status on load means --report-only and checkpoint-resume runs show
+    the corrected status without a full re-audit.
+    """
+    from cis.config import ERROR, INFO  # avoid circular at module level
+
+    if r.status != ERROR:
+        return r
+    low = r.details.lower()
+    if any(t in low for t in _RECLASSIFY_AUTHZ_TOKENS) or any(t in low for t in _RECLASSIFY_NOTAPPLICABLE_TOKENS):
+        return R(
+            r.control_id,
+            r.title,
+            r.level,
+            r.section,
+            INFO,
+            r.details,
+            "",  # no remediation for INFO
+            r.subscription_id,
+            r.subscription_name,
+            "",  # clear resource marker — nothing to flag
+        )
+    return r
+
 
 def save_checkpoint(sid: str, sname: str, results: list[R], status: str = "completed") -> None:
     """
@@ -133,7 +182,7 @@ def results_from_checkpoint(cp: dict[str, Any]) -> list[R]:
         # Only pass fields that the current R dataclass knows about
         filtered = {k: v for k, v in r.items() if k in valid_fields}
         try:
-            results.append(R(**filtered))
+            results.append(_reclassify(R(**filtered)))
         except TypeError:
             pass  # Skip records that cannot be reconstructed
 

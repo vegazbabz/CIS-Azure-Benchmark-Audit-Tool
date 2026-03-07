@@ -9,10 +9,10 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from cis.config import PASS, FAIL, ERROR, TIMEOUTS, LOGGER
+from cis.config import PASS, FAIL, ERROR, INFO, TIMEOUTS, LOGGER
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
-from azure.helpers import az, _friendly_error
+from azure.helpers import az, _friendly_error, is_notapplicable_error
 
 # Maximum number of storage accounts audited concurrently within one subscription.
 # Each account makes 4 az CLI calls (blob props, file props, key policy, activity log).
@@ -394,8 +394,12 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 )
             )
         else:
-            # API call failed — emit ERRORs for all three blob checks rather
-            # than silently skipping them (which would artificially inflate PASS count)
+            # API call failed — emit result for all three blob checks.
+            # FeatureNotSupportedForAccount means the account type (e.g. ADLS Gen2)
+            # simply doesn't have a blob service — that's INFO, not an ERROR.
+            _blob_err = str(blob_props)
+            _blob_status = INFO if is_notapplicable_error(_blob_err) else ERROR
+            _blob_detail = _friendly_error(_blob_err)
             for ctrl, title, lvl in [
                 ("9.2.1", "Blob soft delete enabled", 1),
                 ("9.2.2", "Container soft delete enabled", 1),
@@ -407,12 +411,12 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         title,
                         lvl,
                         "9 - Storage Services",
-                        ERROR,
-                        f"Account '{aname}': {str(blob_props)[:100]}",
+                        _blob_status,
+                        f"Account '{aname}': {_blob_detail}",
                         "",
                         sid,
                         sname,
-                        aname,
+                        aname if _blob_status == ERROR else "",
                     )
                 )
 
@@ -493,6 +497,11 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 )
             )
         else:
+            # FeatureNotSupportedForAccount means this account type doesn't support
+            # Azure Files (e.g. ADLS Gen2 / Data Lake Storage accounts).
+            _file_err = str(file_props)
+            _file_status = INFO if is_notapplicable_error(_file_err) else ERROR
+            _file_detail = _friendly_error(_file_err)
             for ctrl, title, lvl in [
                 ("9.1.1", "Azure Files soft delete enabled", 1),
                 ("9.1.2", "SMB protocol version >= 3.1.1", 1),
@@ -504,12 +513,12 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         title,
                         lvl,
                         "9 - Storage Services",
-                        ERROR,
-                        f"Account '{aname}': {str(file_props)[:100]}",
+                        _file_status,
+                        f"Account '{aname}': {_file_detail}",
                         "",
                         sid,
                         sname,
-                        aname,
+                        aname if _file_status == ERROR else "",
                     )
                 )
 

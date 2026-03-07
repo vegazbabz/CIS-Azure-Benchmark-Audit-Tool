@@ -201,6 +201,24 @@ except Exception:
     _rcon = None
 
 
+def _dedup_results(results: list[R]) -> list[R]:
+    """Remove identical duplicate R instances while preserving order.
+
+    Duplicates can arise when Azure Resource Graph returns the same resource
+    row more than once (a known pagination quirk).  Two results are considered
+    identical when all five audit-meaningful fields match: control ID,
+    subscription ID, resource name, status, and detail text.
+    """
+    seen: set[tuple[str, ...]] = set()
+    out: list[R] = []
+    for r in results:
+        key = (r.control_id, r.subscription_id, r.resource, r.status, r.details)
+        if key not in seen:
+            seen.add(key)
+            out.append(r)
+    return out
+
+
 def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str: str, score: float) -> None:
     """Print the final audit summary box.
 
@@ -980,7 +998,7 @@ def run_audit(
     # They must not be inside the parallel loop or they will be duplicated
     # once per subscription.
     all_results.extend(tenant_results)
-    return all_results
+    return _dedup_results(all_results)
 
 
 def preflight_permissions(subs_list: list[dict[str, Any]]) -> None:
@@ -1188,8 +1206,18 @@ Examples:
         for sub_id, cp in checkpoints.items():
             all_results.extend(results_from_checkpoint(cp))
             LOGGER.info("   ✅ Loaded: %s", cp.get("subscription_name", sub_id))
+        # Tenant-level checks are not stored in checkpoints (they run once and
+        # require only static logic or a single Graph call).  Re-run them here
+        # so that MANUAL results (e.g. 5.1.2) appear in the regenerated report.
+        LOGGER.info("   🔍 Re-running tenant checks...")
+        for fn in [check_5_1_1, check_5_1_2, check_5_4, check_5_14, check_5_15, check_5_16]:
+            try:
+                all_results.append(fn())
+            except Exception as e:
+                LOGGER.warning("   ⚠️  Skipped tenant check %s: %s", fn.__name__, e)
         if args.level:
             all_results = [r for r in all_results if r.level == args.level]
+        all_results = _dedup_results(all_results)
         all_results = apply_suppressions(all_results, suppressions)
         counts = {
             s: sum(1 for r in all_results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL, SUPPRESSED]

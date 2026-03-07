@@ -103,16 +103,14 @@ class TestFriendlyError(unittest.TestCase):
         self.assertIn("Firewall blocked", result)
 
     def test_authz_error_collapsed(self) -> None:
-        self.assertEqual(
-            az_client._friendly_error("AuthorizationFailed"),
-            "Insufficient permissions",
-        )
+        result = az_client._friendly_error("AuthorizationFailed")
+        self.assertIn("Audit incomplete", result)
+        self.assertIn("data-plane permissions", result)
 
     def test_not_authorized_collapsed(self) -> None:
-        self.assertEqual(
-            az_client._friendly_error("The client is not authorized to perform this action"),
-            "Insufficient permissions",
-        )
+        result = az_client._friendly_error("The client is not authorized to perform this action")
+        self.assertIn("Audit incomplete", result)
+        self.assertIn("data-plane permissions", result)
 
     def test_plain_error_first_line(self) -> None:
         result = az_client._friendly_error("Resource not found\nDetails follow")

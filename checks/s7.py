@@ -729,7 +729,7 @@ def check_7_15(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "7.15",
             "WAF bot protection enabled",
             2,
-            "7 - Networking & Governance",
+            "7 - Networking Services",
             # botEnabled field contains the mode string: "Prevention" or "Detection"
             PASS if str(pol.get("botEnabled", "")).lower() == "prevention" else FAIL,
             f"WAF policy '{pol.get('name')}': mode = {pol.get('botEnabled')}",

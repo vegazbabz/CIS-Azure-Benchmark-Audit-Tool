@@ -1,19 +1,20 @@
 # CIS Microsoft Azure Foundations Benchmark v5.0.0 — Audit Tool
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![CIS Benchmark](https://img.shields.io/badge/CIS%20Benchmark-v5.0.0-orange.svg)](https://www.cisecurity.org/)
+[![CIS Benchmark](https://img.shields.io/badge/CIS%20Benchmark-v5.0.0-orange.svg)](https://www.cisecurity.org/benchmark/azure)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![CI](https://github.com/vegazbabz/CIS-Azure-Benchmark-Audit-Tool/actions/workflows/ci.yml/badge.svg)](https://github.com/vegazbabz/CIS-Azure-Benchmark-Audit-Tool/actions/workflows/ci.yml)
 
 **Version:** 1.0.0-beta3
-**Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
+**Benchmark:** [CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure) (September 2025)
 **Coverage:** 93 automated controls · 1 manual control noted in output · 1 control pending (2.1.1)
 
 ---
 
 ## Overview
 
-A Python tool that audits an Azure tenant against the CIS Microsoft Azure Foundations Benchmark v5.0.0.
+A Python tool that audits an Azure tenant against the **[CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure)** — the industry-standard hardening guide for Azure environments, published by the [Center for Internet Security (CIS)](https://www.cisecurity.org/).
+
 It requires no pip installs beyond the standard library — only Python 3.10+ and the Azure CLI.
 
 Results are saved as checkpoints after each subscription completes, so a failed or interrupted run
@@ -47,7 +48,7 @@ are generated alongside the HTML automatically.
 > secrets, and certificates. This requires data plane access in addition to Reader.
 > For RBAC-enabled vaults assign **Key Vault Reader**; for access-policy vaults, add the
 > runner account to the vault's access policy. Without this, affected checks return ERROR with a
-> note in the report.
+> clear explanation and remediation hint in the report — compliance is unknown, not assumed clean.
 
 ### Development prerequisites
 
@@ -85,7 +86,7 @@ enabled subscriptions, run all checks, and save the report files in the current 
 cis_azure_audit.py          Main entry point and CLI
 cis_audit.toml              Optional configuration file (parallel, timeouts, etc.)
 azure/
-  client.py                 az CLI wrappers, retry logic, error helpers
+  client.py                 az CLI wrappers, retry logic, error classification helpers
   helpers.py                Shared Azure utilities
   identity.py               Permission preflight and role helpers
 checks/
@@ -96,7 +97,7 @@ checks/
   s8.py                     Section 8 — Security Services
   s9.py                     Section 9 — Storage
 cis/
-  checkpoint.py             Checkpoint read/write
+  checkpoint.py             Checkpoint read/write, result reclassification on load
   check_helpers.py          Shared check utilities (port ranges, NSG rules, etc.)
   config.py                 Config file loader (cis_audit.toml)
   helpers.py                Logging setup, console output
@@ -289,15 +290,25 @@ For tenant-level identity checks not available via the az CLI:
 - `graph.microsoft.com/v1.0/policies/authorizationPolicy` — covers 5.4, 5.14, 5.15, 5.16
 - ARM REST for WDATP integration settings (8.1.3.3) and attack path notifications (8.1.15)
 
+### Permission preflight
+
+Before the audit begins, the tool checks whether the runner account holds the required roles on
+every subscription. On large tenants this runs in parallel (up to 8 subscriptions at once) so the
+check completes in seconds rather than minutes.
+
 ### Checkpoints and resume
 
 After each subscription completes, results are written to `cis_checkpoints/<subscription-id>.json`.
 If the script is stopped or crashes mid-run, re-running it will skip completed subscriptions and
 continue from where it left off. Use `--fresh` to discard all checkpoints and start over.
 
+Pressing **Ctrl+C once** exits cleanly: in-flight Azure CLI subprocesses are killed immediately,
+a message is printed telling you how to resume or start fresh, and the process exits without
+leaving orphaned background processes or a frozen terminal.
+
 ### Parallel execution
 
-Subscriptions run concurrently via Python's `concurrent.futures` executor. The default is 2 parallel
+Subscriptions run concurrently via Python's `concurrent.futures` executor. The default is 3 parallel
 workers (configurable in `cis_audit.toml` or via `--parallel`). The Resource Graph prefetch always
 runs once before the parallel loop begins.
 
@@ -313,7 +324,7 @@ The generated report is a self-contained HTML file with no external dependencies
 - **Per-subscription summary** — stacked-bar table showing pass/fail/error counts per subscription; click a row to filter the results table to that subscription.
 - **Filterable table** — filter simultaneously by free-text search, subscription, status, and level (L1/L2). Section headers collapse when all their results are filtered out.
 - **Per-resource results** — each NSG, storage account, Key Vault, subnet, and Databricks workspace is reported individually, not aggregated to a single pass/fail per control.
-- **Remediation hints** — every FAIL result includes the Azure portal navigation path to fix the issue.
+- **Remediation hints** — every FAIL result includes the Azure portal navigation path to fix the issue. ERROR results include an actionable explanation of what access is missing.
 - **Export** — JSON and CSV files are generated alongside the HTML at report time. Click **Export JSON** or **Export CSV** in the report to download them.
 - **Compliance trend** — after two or more full audit runs, a collapsible chart appears above the results table showing the compliance score over time. Collapsed by default so it does not distract from current findings.
 - **Back to top** — fixed button in the bottom-right corner for long reports.
@@ -324,10 +335,40 @@ The generated report is a self-contained HTML file with no external dependencies
 | --- | --- |
 | PASS | Control is compliant |
 | FAIL | Control is non-compliant — remediation hint provided |
-| ERROR | Check could not complete (permissions issue, timeout, or API error) |
-| INFO | Not applicable — no resources of this type exist, or control does not apply |
+| ERROR | Check could not complete — audit gap (permissions missing, timeout, or API error). Compliance is **unknown**; do not treat as clean. |
+| INFO | Not applicable — the resource type doesn't exist, the account type doesn't support the feature, or the vault is behind a private endpoint unreachable from the runner |
 | MANUAL | Cannot be automated — requires manual verification per the CIS PDF |
 | SUPPRESSED | Accepted risk — defined in `suppressions.toml` with a justification and expiry |
+
+> **ERROR vs INFO distinction:**
+> `ERROR` means *"the control applies, but the audit couldn't evaluate it"* — flag it for follow-up.
+> `INFO` means *"the control genuinely doesn't apply here"* — for example, an ADLS Gen2 storage account
+> has no blob/file service by design, or a vault locked behind a private endpoint is itself a sign of
+> strong network controls. In both INFO cases there is nothing to fix.
+
+### `--report-only`: regenerate the report without re-auditing
+
+```powershell
+python cis_azure_audit.py --report-only
+```
+
+Loads all existing checkpoints and regenerates the HTML, JSON, and CSV — no Azure API calls are made.
+Useful after:
+
+- Editing `suppressions.toml` to accept a finding
+- Upgrading the tool (the new error classification and message formatting is applied on load)
+- Changing the `--level` filter
+
+Section 5 tenant-level identity checks (5.1.1, 5.1.2, 5.4, 5.14, 5.15, 5.16) are **re-run** at
+report time because they are not stored in subscription checkpoints. This means MANUAL findings
+(e.g. 5.1.2 MFA) will always appear, and live Graph API results (5.4, 5.14, 5.15, 5.16) will
+reflect the current state of your tenant. If Graph is unreachable, those checks are skipped with
+a warning and the report is still generated from checkpoints.
+
+Results loaded from checkpoints are automatically reclassified using the current tool logic:
+`FeatureNotSupportedForAccount` storage errors recorded as ERROR in older checkpoints are shown
+as INFO, Key Vault permission errors are rewritten with clean actionable messages, and any section
+name corrections introduced in newer versions of the tool are applied on load.
 
 ### Output files
 
@@ -514,6 +555,12 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 | 8.4.1 | Azure Bastion Host exists | L2 |
 | 8.5 | DDoS Network Protection enabled on VNets | L2 |
 
+> **Key Vault data-plane checks (8.3.1–8.3.4, 8.3.9, 8.3.11):** these require data-plane access
+> beyond subscription Reader. Vaults behind a private endpoint that is unreachable from the runner
+> return INFO (the network restriction is itself a positive security signal). Vaults where the
+> runner lacks a Key Vault data-plane role or access policy return ERROR with an actionable message
+> explaining exactly what permission to grant — compliance is unknown, not assumed clean.
+
 ### Section 9 — Storage Services (21 automated)
 
 | Control | Title | Level |
@@ -539,6 +586,10 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 | 9.3.9 | Storage account has CanNotDelete resource lock | L1 |
 | 9.3.10 | Storage account has ReadOnly resource lock | L2 |
 | 9.3.11 | Redundancy set to geo-redundant (GRS) | L2 |
+
+> **ADLS Gen2 / Data Lake storage accounts** do not have a blob or file service — the 9.1.x and
+> 9.2.x checks return INFO for these account types (not ERROR), because the controls genuinely
+> do not apply.
 
 ---
 
@@ -592,6 +643,11 @@ Each file contains the full result set for that subscription, a UTC timestamp, a
 status. Delete the `cis_checkpoints/` folder or use `--fresh` to discard all checkpoints.
 Use `--report-only` to regenerate the HTML report from existing checkpoints without running any checks.
 
+When checkpoints are loaded, results are automatically reclassified using the current tool logic.
+This means upgrading the tool and running `--report-only` will apply corrected error classifications,
+message improvements, and control-metadata fixes from the new version to your existing checkpoint
+data — in most cases no re-audit is required.
+
 ---
 
 ## Known Limitations
@@ -603,7 +659,8 @@ Use `--report-only` to regenerate the HTML report from existing checkpoints with
 **Key Vault data plane access** — listing keys, secrets, and certificates requires data plane
 permissions in addition to subscription Reader. Assign **Key Vault Reader** (RBAC vaults) or add
 the runner account to the vault's access policy (non-RBAC vaults). Without this, affected checks
-return ERROR with a note in the report.
+return ERROR with an explanatory message. The report clearly distinguishes this from a clean
+result — compliance is unknown, not assumed clean.
 
 **Graph API for identity checks** — controls 5.4, 5.14, 5.15, and 5.16 call the Graph API via
 `az rest`. If the required Graph permissions have not been consented for the Azure CLI app, these
@@ -616,8 +673,9 @@ az rest --method get --url "https://graph.microsoft.com/v1.0/policies/authorizat
 **Conditional Access policies (5.2.x)** — marked Manual in the benchmark and not checked by this
 tool. They require review in the Entra ID portal.
 
-**Large tenants** — Resource Graph handles bulk data efficiently. The main bottleneck at scale is
-per-subscription CLI calls. Use `--parallel 5` or higher, or tune via `cis_audit.toml`.
+**Large tenants** — Resource Graph handles bulk data efficiently, and the permission preflight
+runs subscriptions in parallel. The main bottleneck at scale is per-subscription CLI calls.
+Use `--parallel 5` or higher, or tune via `cis_audit.toml`.
 
 ---
 
@@ -637,9 +695,10 @@ az rest --method get --url "https://graph.microsoft.com/v1.0/policies/authorizat
 If this fails, ask your Entra ID admin to grant Global Reader or consent to the required Graph API
 permissions for the Azure CLI app (app ID: `04b07795-8ddb-461a-bbee-02f9e1bf7b46`).
 
-**Key Vault checks return ERROR (Insufficient permissions)**
+**Key Vault checks return ERROR (audit incomplete)**
 The runner account needs Key Vault data plane access. For RBAC-enabled vaults assign the
 **Key Vault Reader** role; for access-policy vaults, add the account to the vault's access policy.
+The ERROR message in the report states exactly what is missing.
 
 **A check consistently times out**
 All `az` CLI calls have configurable timeouts (default 20 seconds). Increase them in `cis_audit.toml`:
@@ -655,6 +714,11 @@ Timed-out checks are recorded as ERROR and the audit continues.
 Subscription names are matched exactly (case-sensitive). Run `az account list --output table` to
 see the exact names available to your account.
 
+**Interrupted run**
+Press Ctrl+C once. In-flight Azure CLI calls are killed immediately, checkpoints for completed
+subscriptions are preserved, and the process exits cleanly. Re-run the same command to resume
+from where it stopped, or add `--fresh` to start over.
+
 ---
 
 ## Disclaimer
@@ -666,7 +730,13 @@ at your own risk. See [LICENSE](LICENSE) for the full MIT disclaimer.
 
 ## Attribution
 
-This is an independent community implementation referencing the publicly available CIS Microsoft
-Azure Foundations Benchmark v5.0.0. CIS Benchmarks are the property of the Center for Internet
-Security (<https://www.cisecurity.org>). This tool is not affiliated with, endorsed by, or
-approved by CIS.
+This is an independent community implementation referencing the publicly available
+**[CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure)**.
+CIS Benchmarks are the property of the Center for Internet Security (<https://www.cisecurity.org>).
+This tool is not affiliated with, endorsed by, or approved by CIS.
+
+
+**Version:** 1.0.0-beta3
+**Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
+**Coverage:** 93 automated controls · 1 manual control noted in output · 1 control pending (2.1.1)
+

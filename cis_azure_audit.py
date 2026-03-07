@@ -201,6 +201,24 @@ except Exception:
     _rcon = None
 
 
+def _dedup_results(results: list[R]) -> list[R]:
+    """Remove identical duplicate R instances while preserving order.
+
+    Duplicates can arise when Azure Resource Graph returns the same resource
+    row more than once (a known pagination quirk).  Two results are considered
+    identical when all five audit-meaningful fields match: control ID,
+    subscription ID, resource name, status, and detail text.
+    """
+    seen: set[tuple[str, ...]] = set()
+    out: list[R] = []
+    for r in results:
+        key = (r.control_id, r.subscription_id, r.resource, r.status, r.details)
+        if key not in seen:
+            seen.add(key)
+            out.append(r)
+    return out
+
+
 def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str: str, score: float) -> None:
     """Print the final audit summary box.
 
@@ -980,7 +998,7 @@ def run_audit(
     # They must not be inside the parallel loop or they will be duplicated
     # once per subscription.
     all_results.extend(tenant_results)
-    return all_results
+    return _dedup_results(all_results)
 
 
 def preflight_permissions(subs_list: list[dict[str, Any]]) -> None:
@@ -1199,6 +1217,7 @@ Examples:
                 LOGGER.warning("   ⚠️  Skipped tenant check %s: %s", fn.__name__, e)
         if args.level:
             all_results = [r for r in all_results if r.level == args.level]
+        all_results = _dedup_results(all_results)
         all_results = apply_suppressions(all_results, suppressions)
         counts = {
             s: sum(1 for r in all_results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL, SUPPRESSED]

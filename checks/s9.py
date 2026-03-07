@@ -138,8 +138,6 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     # Fetched here so it can complete while per-account work is parallelised below.
     rc_lk, all_locks = az(["lock", "list", "--subscription", sid], sid, timeout=TIMEOUTS["default"])
 
-    total_accounts = len(accounts)
-
     def _check_one_account(acct: dict[str, Any]) -> list[R]:
         """Audit one storage account (Groups 1–4). Called in parallel by the outer pool."""
         aname = acct.get("name", "?")
@@ -298,13 +296,31 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         with ThreadPoolExecutor(max_workers=2) as svc_pool:
             f_blob = svc_pool.submit(
                 az,
-                ["storage", "account", "blob-service-properties", "show", "--account-name", aname, "--resource-group", rg],
+                [
+                    "storage",
+                    "account",
+                    "blob-service-properties",
+                    "show",
+                    "--account-name",
+                    aname,
+                    "--resource-group",
+                    rg,
+                ],
                 sid,
                 timeout=TIMEOUTS["storage_svc"],
             )
             f_file = svc_pool.submit(
                 az,
-                ["storage", "account", "file-service-properties", "show", "--account-name", aname, "--resource-group", rg],
+                [
+                    "storage",
+                    "account",
+                    "file-service-properties",
+                    "show",
+                    "--account-name",
+                    aname,
+                    "--resource-group",
+                    rg,
+                ],
                 sid,
                 timeout=TIMEOUTS["storage_svc"],
             )

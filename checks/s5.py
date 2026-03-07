@@ -343,7 +343,7 @@ def check_5_27(sid: str, sname: str, td: dict[str, Any]) -> R:
             return f"Group:{name}"
         if ptype == "serviceprincipal":
             return f"SP:{name}"
-        return name
+        return str(name)
 
     labels = [_label(o) for o in owners]
     has_groups = any(o.get("principalType", "").lower() == "group" for o in owners)

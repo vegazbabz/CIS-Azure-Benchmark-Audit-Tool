@@ -509,7 +509,8 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     1,
                     "8 - Security Services",
                     status,
-                    f"Vault '{vname}': Failed to enumerate keys - {friendly}; requires Key Vault data plane permissions",
+                    f"Vault '{vname}': Failed to enumerate keys - {friendly};"
+                    " requires Key Vault data plane permissions",
                     "",
                     sid,
                     sname,
@@ -523,7 +524,8 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     2,
                     "8 - Security Services",
                     status,
-                    f"Vault '{vname}': Failed to enumerate keys - {friendly}; requires Key Vault data plane permissions",
+                    f"Vault '{vname}': Failed to enumerate keys - {friendly};"
+                    " requires Key Vault data plane permissions",
                     "",
                     sid,
                     sname,

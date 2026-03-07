@@ -78,10 +78,10 @@ def setup_logging(
 
             console_handler: logging.Handler = RichHandler(
                 console=rich_console,
-                show_time=False,   # keep the same minimal format as the plain handler
+                show_time=False,  # keep the same minimal format as the plain handler
                 show_level=False,
                 show_path=False,
-                markup=False,      # don't interpret [ ] in Azure resource names as markup
+                markup=False,  # don't interpret [ ] in Azure resource names as markup
                 highlighter=None,  # no syntax colouring on log messages
             )
         except Exception:

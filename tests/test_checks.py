@@ -512,11 +512,13 @@ class TestCheck75(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, ERROR)
 
-    def test_no_watchers_returns_info(self) -> None:
+    def test_no_watchers_returns_fail(self) -> None:
+        # No watchers → no flow logs possible → non-compliant (FAIL)
+        # check_7_6 separately covers the missing Network Watcher itself.
         with patch("checks.s7.az", return_value=(0, [])):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].status, INFO)
+        self.assertEqual(results[0].status, FAIL)
 
     def test_flow_log_retention_90_days_enabled_returns_pass(self) -> None:
         watcher = {"location": "eastus", "name": "watcher1"}

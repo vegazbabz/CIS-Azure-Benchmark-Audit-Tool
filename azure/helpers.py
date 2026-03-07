@@ -18,7 +18,9 @@ from azure.client import (  # noqa: F401
     az_rest,
     get_and_reset_rate_limit_retry_count,
     graph_query,
+    is_authz_error,
     is_firewall_error,
+    is_notapplicable_error,
     kill_running_procs,
     logger,
 )

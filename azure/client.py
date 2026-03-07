@@ -83,6 +83,8 @@ _AUTHZ_TOKENS = frozenset(
         "does not have certificate get permission",
         "does not have secret get permission",
         "does not have key get permission",
+        # Key Vault data-plane errors from newer SDK / tenants with many groups
+        "requires key vault data plane permissions",
     ]
 )
 
@@ -116,6 +118,18 @@ def is_firewall_error(msg: str) -> bool:
     return any(t.lower() in lowered for t in _FIREWALL_TOKENS)
 
 
+def is_authz_error(msg: str) -> bool:
+    """Return True if the error indicates a missing authorisation / permission."""
+    lowered = str(msg).lower()
+    return any(t in lowered for t in _AUTHZ_TOKENS)
+
+
+def is_notapplicable_error(msg: str) -> bool:
+    """Return True if the error indicates the feature is not supported on this account type."""
+    lowered = str(msg).lower()
+    return any(t in lowered for t in _NOTAPPLICABLE_TOKENS)
+
+
 def _friendly_error(msg: str) -> str:
     """Return a short, human-readable version of an Azure CLI error string.
 
@@ -127,6 +141,8 @@ def _friendly_error(msg: str) -> str:
         return "Unknown error"
     if is_firewall_error(msg):
         return "Firewall blocked — vault not reachable from this runner IP"
+    if is_notapplicable_error(msg):
+        return "Feature not supported for this account type"
     lowered = str(msg).lower()
     if any(t in lowered for t in _AUTHZ_TOKENS):
         return "Insufficient permissions"

@@ -135,6 +135,10 @@ def _run_cmd_with_retries(
                 summary = _first_error_line(stderr)
                 if is_authz:
                     logger.debug("command denied by permissions (rc=%d): %s", r.returncode, summary)
+                elif summary.strip() in ("^C", ""):
+                    # az subprocess killed by Ctrl+C (Windows forwards SIGINT to
+                    # all console processes); not a real error — suppress the noise.
+                    logger.debug("command interrupted (rc=%d)", r.returncode)
                 else:
                     logger.error("command failed (rc=%d): %s", r.returncode, summary)
                 return r.returncode, stdout, stderr

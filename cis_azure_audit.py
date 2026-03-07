@@ -865,12 +865,17 @@ def run_audit(
             return ", ".join(names)
         return f"{names[0]} +{len(names) - 1} more"
 
-    while remaining:
+    try:
+      while remaining:
         batch = remaining[:current_parallel]
         remaining = remaining[current_parallel:]
 
         executor_cls: Any = ProcessPoolExecutor if mode == "process" else ThreadPoolExecutor
-        with executor_cls(max_workers=current_parallel) as pool:
+        # Use manual pool management instead of a context manager so that a
+        # KeyboardInterrupt can call shutdown(wait=False) rather than blocking
+        # indefinitely on shutdown(wait=True) waiting for in-flight az calls.
+        pool = executor_cls(max_workers=current_parallel)
+        try:
             futures: dict[Any, tuple[dict[str, Any], int]] = {}
             for sub in batch:
                 with _counter:
@@ -909,6 +914,11 @@ def run_audit(
                     _active_names.discard(sub.get("name", ""))
                     progress.update(task_id, completed=completed_in_todo, description=_progress_desc())
 
+            pool.shutdown(wait=True)
+        except KeyboardInterrupt:
+            pool.shutdown(wait=False, cancel_futures=True)
+            raise
+
         if adaptive_enabled:
             throttled_retries = get_and_reset_rate_limit_retry_count()
             reduce_threshold = max(2, len(batch))
@@ -939,6 +949,17 @@ def run_audit(
                 stable_batches = 0
         else:
             _ = get_and_reset_rate_limit_retry_count()
+
+    except KeyboardInterrupt:
+        # Clean up the progress bar before printing the interrupt message.
+        if progress:
+            try:
+                progress.stop()
+            except Exception:
+                pass
+        elif not quiet:
+            console_finish()
+        raise
 
     # Ensure the progress UI finishes cleanly after workers complete
     if progress:
@@ -1312,4 +1333,8 @@ Examples:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Interrupted. Checkpoints saved for completed subscriptions — re-run to resume.")
+        sys.exit(1)

@@ -180,6 +180,7 @@ from azure.helpers import (
     get_signed_in_user_id,
     list_role_names_for_user,
     check_user_permissions,
+    kill_running_procs,
 )
 
 # Optional rich progress bar + coloured console (used if installed). Falls back to builtin UI
@@ -1354,5 +1355,6 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         signal.signal(signal.SIGINT, signal.SIG_IGN)  # silence any further Ctrl+C during cleanup
+        kill_running_procs()  # unblock worker threads stuck in az subprocess calls
         print("\n\n⚠️  Interrupted. Checkpoints saved for completed subscriptions — re-run to resume.")
         sys.exit(1)

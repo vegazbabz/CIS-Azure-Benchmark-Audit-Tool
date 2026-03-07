@@ -51,13 +51,13 @@ are generated alongside the HTML automatically.
 
 ### Development prerequisites
 
-Install the development dependencies for linting, formatting, and type checking:
+Dev dependencies (`black`, `flake8`, `mypy`, and optionally `rich`) are listed in `requirements-dev.txt`. Install them if you want to run the linters and type checker locally:
 
 ```bash
 pip install -r requirements-dev.txt
 ```
 
-This installs `black`, `flake8`, `mypy`, and optionally `rich` for local progress bars.
+The audit tool itself has no pip dependencies — only Python 3.10+ and the Azure CLI are required to run it.
 
 ---
 
@@ -145,11 +145,11 @@ python cis_azure_audit.py [options]
 
 | Option | Description |
 | --- | --- |
-| `-s`, `--subscription` | Audit one or more subscriptions by name or GUID (repeatable) |
+| `-s`, `--subscription` | Audit one or more subscriptions by name or GUID. Multiple values follow a single flag: `-s Sub1 Sub2 Sub3` |
 | `-o`, `--output` | Output HTML filename (default: `cis_azure_audit_report.html`) |
 | `--output-dir` | Directory for all output files (HTML, JSON, CSV, checkpoints) |
-| `-p`, `--parallel` | Concurrent subscription workers (default: from config or 2) |
-| `--executor` | Worker backend: `thread` (default on Windows) or `process` |
+| `-p`, `--parallel` | Concurrent subscription workers (default: from config or 3) |
+| `--executor` | Worker backend: `thread` (default) or `process` |
 | `--no-adaptive-concurrency` | Disable dynamic worker tuning when throttling is detected |
 | `-l`, `--level` | Filter output to Level `1` or `2` controls only |
 | `--fresh` | Clear all checkpoints and start a full re-audit |
@@ -173,7 +173,7 @@ python cis_azure_audit.py
 python cis_azure_audit.py -s "Production"
 
 # Audit multiple subscriptions
-python cis_azure_audit.py -s "Production" -s "Staging"
+python cis_azure_audit.py -s "Production" "Staging"
 
 # Run faster with more parallel workers
 python cis_azure_audit.py --parallel 5
@@ -420,7 +420,7 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 
 > **2.1.1** (Databricks in customer-managed VNet) — pending implementation.
 
-### Section 5 — Identity Services (9 automated)
+### Section 5 — Identity Services (8 automated · 1 manual)
 
 | Control | Title | Level |
 | --- | --- | --- |
@@ -479,7 +479,7 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 | 7.14 | WAF request body inspection enabled | L2 |
 | 7.15 | WAF bot protection enabled | L2 |
 
-### Section 8 — Security Services (29 automated)
+### Section 8 — Security Services (30 automated)
 
 | Control | Title | Level |
 | --- | --- | --- |

@@ -64,6 +64,15 @@ _AUTHZ_TOKENS = frozenset(
     ]
 )
 
+# Errors that indicate the requested feature is not supported on this account
+# type (e.g. Azure Files on a blob-only or ADLS Gen2 storage account). These
+# are expected during storage checks and should not surface as ERROR log lines.
+_NOTAPPLICABLE_TOKENS = frozenset(
+    [
+        "featurenotsupportedforaccount",
+    ]
+)
+
 # Firewall-block tokens must be checked BEFORE generic auth tokens because
 # "ForbiddenByFirewall" contains "forbidden" which would otherwise match _AUTHZ_TOKENS.
 _FIREWALL_TOKENS = frozenset(
@@ -132,9 +141,12 @@ def _run_cmd_with_retries(
                     time.sleep(sleep_for)
                     continue
                 is_authz = any(tok in low for tok in _AUTHZ_TOKENS)
+                is_notapplicable = any(tok in low for tok in _NOTAPPLICABLE_TOKENS)
                 summary = _first_error_line(stderr)
                 if is_authz:
                     logger.debug("command denied by permissions (rc=%d): %s", r.returncode, summary)
+                elif is_notapplicable:
+                    logger.debug("command not applicable for account type (rc=%d): %s", r.returncode, summary)
                 elif summary.strip() in ("^C", ""):
                     # az subprocess killed by Ctrl+C (Windows forwards SIGINT to
                     # all console processes); not a real error — suppress the noise.

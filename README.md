@@ -657,8 +657,16 @@ see the exact names available to your account.
 
 ---
 
+## Disclaimer
+
+This tool is provided **as-is, with no warranty of any kind**. The maintainers and contributors
+offer no SLA, make no guarantee of accuracy or completeness, and accept no legal responsibility
+or liability for the use of this tool or any decisions made based on its output. Use is entirely
+at your own risk. See [LICENSE](LICENSE) for the full MIT disclaimer.
+
 ## Attribution
 
-This tool is an independent implementation referencing the publicly available CIS Microsoft Azure
-Foundations Benchmark v5.0.0. CIS Benchmarks are the property of the Center for Internet Security
-(<https://www.cisecurity.org>). This tool is not affiliated with or endorsed by CIS.
+This is an independent community implementation referencing the publicly available CIS Microsoft
+Azure Foundations Benchmark v5.0.0. CIS Benchmarks are the property of the Center for Internet
+Security (<https://www.cisecurity.org>). This tool is not affiliated with, endorsed by, or
+approved by CIS.

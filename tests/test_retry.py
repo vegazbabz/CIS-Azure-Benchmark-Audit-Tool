@@ -68,7 +68,7 @@ class TestRunCmdWithRetries(unittest.TestCase):
         def raise_fnf(*args: Any, **kwargs: Any) -> None:
             raise FileNotFoundError()
 
-        with patch("azure.client.subprocess.run", side_effect=raise_fnf):
+        with patch("azure.client.subprocess.Popen", side_effect=raise_fnf):
             rc, out, err = az_client._run_cmd_with_retries(["az", "dummy"], timeout=1)
             self.assertEqual(rc, 1)
             self.assertEqual(out, "")

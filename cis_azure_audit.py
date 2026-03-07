@@ -42,8 +42,8 @@ during a write never produces a corrupt checkpoint file.
 PARALLEL EXECUTION
 ───────────────────
 Subscriptions are audited concurrently using either a ThreadPoolExecutor or
-ProcessPoolExecutor. The default is process mode with 2 workers
-(`--executor thread --parallel 3`). You can override both values via CLI.
+ProcessPoolExecutor. The default is thread mode with 3 workers.
+You can override both values via CLI.
 Higher parallelism can speed up large tenants but may increase Azure API
 throttling (HTTP 429).
 
@@ -190,7 +190,6 @@ try:
         BarColumn,
         TextColumn,
         TimeElapsedColumn,
-        TimeRemainingColumn,
         MofNCompleteColumn,
     )
 
@@ -738,9 +737,9 @@ def run_audit(
     Parameters
     ──────────
     subs     : Full list of subscription dicts to audit (id, name)
-    parallel             : Max concurrent workers requested (default 2)
+    parallel             : Max concurrent workers requested (default 3)
     resume               : If True, skip subscriptions with existing checkpoints
-    executor_mode        : "process" (default) or "thread"
+    executor_mode        : "thread" (default) or "process"
     adaptive_concurrency : If True, reduce/increase workers based on throttling
 
     Returns
@@ -827,7 +826,6 @@ def run_audit(
             BarColumn(complete_style="green", finished_style="bright_green"),
             MofNCompleteColumn(),
             TimeElapsedColumn(),
-            TimeRemainingColumn(),
             transient=True,
             console=_rcon,
         )
@@ -867,80 +865,101 @@ def run_audit(
             return ", ".join(names)
         return f"{names[0]} +{len(names) - 1} more"
 
-    while remaining:
-        batch = remaining[:current_parallel]
-        remaining = remaining[current_parallel:]
+    try:
+        while remaining:
+            batch = remaining[:current_parallel]
+            remaining = remaining[current_parallel:]
 
-        executor_cls: Any = ProcessPoolExecutor if mode == "process" else ThreadPoolExecutor
-        with executor_cls(max_workers=current_parallel) as pool:
-            futures: dict[Any, tuple[dict[str, Any], int]] = {}
-            for sub in batch:
-                with _counter:
-                    _started += 1
-                    n = _started
+            executor_cls: Any = ProcessPoolExecutor if mode == "process" else ThreadPoolExecutor
+            # Use manual pool management instead of a context manager so that a
+            # KeyboardInterrupt can call shutdown(wait=False) rather than blocking
+            # indefinitely on shutdown(wait=True) waiting for in-flight az calls.
+            pool = executor_cls(max_workers=current_parallel)
+            try:
+                futures: dict[Any, tuple[dict[str, Any], int]] = {}
+                for sub in batch:
+                    with _counter:
+                        _started += 1
+                        n = _started
 
-                if progress is not None:
-                    _active_names.add(sub.get("name", ""))
-                    progress.update(task_id, description=_progress_desc())
-                else:
-                    if not quiet:
-                        console_update(n, _total, sub.get("name", ""))
+                    if progress is not None:
+                        _active_names.add(sub.get("name", ""))
+                        progress.update(task_id, description=_progress_desc())
+                    else:
+                        if not quiet:
+                            console_update(n, _total, sub.get("name", ""))
 
-                LOGGER.debug("  ▶  [%d/%d] Starting:  %s", n, _total, sub["name"])
-                progress_label = f"{n}/{_total} "
-                fut = pool.submit(_audit_subscription_worker, sub, td, progress_label)
-                futures[fut] = (sub, n)
+                    LOGGER.debug("  ▶  [%d/%d] Starting:  %s", n, _total, sub["name"])
+                    progress_label = f"{n}/{_total} "
+                    fut = pool.submit(_audit_subscription_worker, sub, td, progress_label)
+                    futures[fut] = (sub, n)
 
-            for future in as_completed(futures):
-                sub, n = futures[future]
-                try:
-                    sub_results, err = future.result()
-                except Exception as ex:
-                    sub_results, err = [], str(ex)
+                for future in as_completed(futures):
+                    sub, n = futures[future]
+                    try:
+                        sub_results, err = future.result()
+                    except Exception as ex:
+                        sub_results, err = [], str(ex)
 
-                if err:
-                    LOGGER.error("  ❌ [%d/%d] Failed:    %s — %s", n, _total, sub["name"], err)
-                    save_checkpoint(sub["id"], sub["name"], [], status="failed")
-                else:
-                    all_results.extend(sub_results)
-                    save_checkpoint(sub["id"], sub["name"], sub_results)
-                    LOGGER.debug("  ✅ [%d/%d] Completed: %s", n, _total, sub["name"])
+                    if err:
+                        LOGGER.error("  ❌ [%d/%d] Failed:    %s — %s", n, _total, sub["name"], err)
+                        save_checkpoint(sub["id"], sub["name"], [], status="failed")
+                    else:
+                        all_results.extend(sub_results)
+                        save_checkpoint(sub["id"], sub["name"], sub_results)
+                        LOGGER.debug("  ✅ [%d/%d] Completed: %s", n, _total, sub["name"])
 
-                completed_in_todo += 1
-                if progress is not None:
-                    _active_names.discard(sub.get("name", ""))
-                    progress.update(task_id, completed=completed_in_todo, description=_progress_desc())
+                    completed_in_todo += 1
+                    if progress is not None:
+                        _active_names.discard(sub.get("name", ""))
+                        progress.update(task_id, completed=completed_in_todo, description=_progress_desc())
 
-        if adaptive_enabled:
-            throttled_retries = get_and_reset_rate_limit_retry_count()
-            reduce_threshold = max(2, len(batch))
+                pool.shutdown(wait=True)
+            except KeyboardInterrupt:
+                pool.shutdown(wait=False, cancel_futures=True)
+                raise
 
-            if throttled_retries >= reduce_threshold and current_parallel > 1:
-                new_parallel = max(1, current_parallel - 1)
-                LOGGER.warning(
-                    "⚠️  Detected %d transient throttling retries in last batch; reducing workers %d → %d",
-                    throttled_retries,
-                    current_parallel,
-                    new_parallel,
-                )
-                current_parallel = new_parallel
-                stable_batches = 0
-            elif throttled_retries == 0 and current_parallel < requested_parallel and remaining:
-                stable_batches += 1
-                if stable_batches >= 2:
-                    new_parallel = min(requested_parallel, current_parallel + 1)
-                    LOGGER.info(
-                        "✅ No throttling for %d batch(es); increasing workers %d → %d",
-                        stable_batches,
+            if adaptive_enabled:
+                throttled_retries = get_and_reset_rate_limit_retry_count()
+                reduce_threshold = max(2, len(batch))
+
+                if throttled_retries >= reduce_threshold and current_parallel > 1:
+                    new_parallel = max(1, current_parallel - 1)
+                    LOGGER.warning(
+                        "⚠️  Detected %d transient throttling retries in last batch; reducing workers %d → %d",
+                        throttled_retries,
                         current_parallel,
                         new_parallel,
                     )
                     current_parallel = new_parallel
                     stable_batches = 0
+                elif throttled_retries == 0 and current_parallel < requested_parallel and remaining:
+                    stable_batches += 1
+                    if stable_batches >= 2:
+                        new_parallel = min(requested_parallel, current_parallel + 1)
+                        LOGGER.info(
+                            "✅ No throttling for %d batch(es); increasing workers %d → %d",
+                            stable_batches,
+                            current_parallel,
+                            new_parallel,
+                        )
+                        current_parallel = new_parallel
+                        stable_batches = 0
+                else:
+                    stable_batches = 0
             else:
-                stable_batches = 0
-        else:
-            _ = get_and_reset_rate_limit_retry_count()
+                _ = get_and_reset_rate_limit_retry_count()
+
+    except KeyboardInterrupt:
+        # Clean up the progress bar before printing the interrupt message.
+        if progress:
+            try:
+                progress.stop()
+            except Exception:
+                pass
+        elif not quiet:
+            console_finish()
+        raise
 
     # Ensure the progress UI finishes cleanly after workers complete
     if progress:
@@ -1314,4 +1333,8 @@ Examples:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Interrupted. Checkpoints saved for completed subscriptions — re-run to resume.")
+        sys.exit(1)

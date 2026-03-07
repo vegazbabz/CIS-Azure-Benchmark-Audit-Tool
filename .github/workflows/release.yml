@@ -44,7 +44,7 @@ jobs:
             ## CIS Azure Foundations Benchmark Audit Tool ${{ github.ref_name }}
 
             **Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0
-            **Coverage:** 93 of 95 automated controls
+            **Coverage:** See [README](https://github.com/${{ github.repository }}/blob/main/README.md) for current control coverage
 
             ### Requirements
             - Python 3.10+

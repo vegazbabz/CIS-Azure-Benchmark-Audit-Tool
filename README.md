@@ -51,13 +51,13 @@ are generated alongside the HTML automatically.
 
 ### Development prerequisites
 
-Install the development dependencies for linting, formatting, and type checking:
+Dev dependencies (`black`, `flake8`, `mypy`, and optionally `rich`) are listed in `requirements-dev.txt`. Install them if you want to run the linters and type checker locally:
 
 ```bash
 pip install -r requirements-dev.txt
 ```
 
-This installs `black`, `flake8`, `mypy`, and optionally `rich` for local progress bars.
+The audit tool itself has no pip dependencies — only Python 3.10+ and the Azure CLI are required to run it.
 
 ---
 
@@ -173,7 +173,7 @@ python cis_azure_audit.py
 python cis_azure_audit.py -s "Production"
 
 # Audit multiple subscriptions
-python cis_azure_audit.py -s "Production" -s "Staging"
+python cis_azure_audit.py -s "Production" "Staging"
 
 # Run faster with more parallel workers
 python cis_azure_audit.py --parallel 5

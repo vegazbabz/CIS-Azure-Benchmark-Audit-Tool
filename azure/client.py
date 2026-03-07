@@ -103,6 +103,9 @@ _FIREWALL_TOKENS = frozenset(
         "public network access is disabled",
         "not allowed by its firewall rules",
         "caller's ip address",
+        # Private endpoint / service endpoint blocks
+        "connection is not an approved private link",
+        "not an approved private link and caller was ignored",
     ]
 )
 

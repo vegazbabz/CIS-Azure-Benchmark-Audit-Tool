@@ -73,7 +73,6 @@ from typing import Any
 # ─── Standard library imports ─────────────────────────────────────────────────
 # No third-party packages required — everything ships with Python 3.8+
 import sys  # sys.exit(), sys.platform (Windows vs Unix az path)
-import signal  # suppress second Ctrl+C during atexit cleanup
 import argparse  # CLI argument parsing
 import datetime  # Timestamps in checkpoints and reports
 import logging  # setLevel override for --quiet
@@ -1354,7 +1353,7 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)  # silence any further Ctrl+C during cleanup
-        kill_running_procs()  # unblock worker threads stuck in az subprocess calls
+        kill_running_procs()  # kill in-flight az subprocesses before exiting
         print("\n\n⚠️  Interrupted. Checkpoints saved for completed subscriptions — re-run to resume.")
-        sys.exit(1)
+        sys.stdout.flush()
+        os._exit(1)  # immediate hard exit — kills all worker threads without atexit

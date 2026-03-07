@@ -23,7 +23,7 @@ from cis.config import BENCHMARK_VER, CHECKPOINT_DIR, LOGGER, VERSION
 from cis.models import R
 
 _CLEAN_KV_AUTHZ_MSG = (
-    "Audit incomplete — service principal lacks Key Vault data-plane permissions. "
+    "Audit incomplete — account lacks Key Vault data-plane permissions. "
     "Grant 'Key Vault Reader' data-plane role (or an access policy) to include this vault."
 )
 
@@ -93,7 +93,7 @@ def _reclassify(r: R) -> R:
             r.section,
             ERROR,
             f"{prefix}: {_CLEAN_KV_AUTHZ_MSG}",
-            "Grant Key Vault data-plane permissions to the audit service principal",
+            "Grant Key Vault data-plane permissions to the audit account",
             r.subscription_id,
             r.subscription_name,
             r.resource,

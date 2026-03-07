@@ -1188,6 +1188,15 @@ Examples:
         for sub_id, cp in checkpoints.items():
             all_results.extend(results_from_checkpoint(cp))
             LOGGER.info("   ✅ Loaded: %s", cp.get("subscription_name", sub_id))
+        # Tenant-level checks are not stored in checkpoints (they run once and
+        # require only static logic or a single Graph call).  Re-run them here
+        # so that MANUAL results (e.g. 5.1.2) appear in the regenerated report.
+        LOGGER.info("   🔍 Re-running tenant checks...")
+        for fn in [check_5_1_1, check_5_1_2, check_5_4, check_5_14, check_5_15, check_5_16]:
+            try:
+                all_results.append(fn())
+            except Exception as e:
+                LOGGER.warning("   ⚠️  Skipped tenant check %s: %s", fn.__name__, e)
         if args.level:
             all_results = [r for r in all_results if r.level == args.level]
         all_results = apply_suppressions(all_results, suppressions)

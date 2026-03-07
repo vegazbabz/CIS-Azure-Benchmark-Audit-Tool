@@ -146,7 +146,7 @@ def _friendly_error(msg: str) -> str:
     lowered = str(msg).lower()
     if any(t in lowered for t in _AUTHZ_TOKENS):
         return (
-            "Audit incomplete — service principal lacks Key Vault data-plane permissions. "
+            "Audit incomplete — account lacks Key Vault data-plane permissions. "
             "Grant 'Key Vault Reader' data-plane role (or an access policy) to include this vault."
         )
     first = _first_error_line(msg)

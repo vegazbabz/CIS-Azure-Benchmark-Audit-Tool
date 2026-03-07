@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from azure.client import az
@@ -121,14 +122,23 @@ def check_user_permissions(sub_ids: list[str]) -> dict[str, Any]:
     query_subs: list[str | None] = [*sub_ids] if sub_ids else [None]
     total_subs = len(query_subs)
     last_error = None
-    for sub in query_subs:
-        rc, result = list_role_names_for_user(user_id, subscription=sub)
-        if rc == 0 and isinstance(result, list):
-            all_roles.update(result)
-            for r in result:
-                role_sub_count[r] = role_sub_count.get(r, 0) + 1
-        elif rc != 0:
-            last_error = result
+
+    max_workers = min(8, max(1, total_subs))
+    pool = ThreadPoolExecutor(max_workers=max_workers)
+    try:
+        futures = {pool.submit(list_role_names_for_user, user_id, sub): sub for sub in query_subs}
+        for future in as_completed(futures):
+            rc, result = future.result()
+            if rc == 0 and isinstance(result, list):
+                all_roles.update(result)
+                for r in result:
+                    role_sub_count[r] = role_sub_count.get(r, 0) + 1
+            elif rc != 0:
+                last_error = result
+        pool.shutdown(wait=True)
+    except KeyboardInterrupt:
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
 
     if not all_roles and last_error:
         warnings.append(f"Could not enumerate user roles: {last_error}")

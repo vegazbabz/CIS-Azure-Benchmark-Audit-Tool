@@ -13,7 +13,7 @@ Covers:
 import json
 import unittest
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import azure.client as az_client
 
@@ -311,18 +311,17 @@ class TestRateLimitCounter(unittest.TestCase):
             (1, "", "429 Too Many Requests"),
             (0, json.dumps({}), ""),
         ]
-        with patch("azure.client.subprocess.run") as mock_run, patch("azure.client.time.sleep", lambda s: None):
+        with patch("azure.client.subprocess.Popen") as mock_popen, patch("azure.client.time.sleep", lambda s: None):
 
             def _side(cmd: list[str], **kw: Any) -> Any:
-                import subprocess as sp
+                call_num = mock_popen.call_count - 1
+                rc_val, out_val, err_val = responses[call_num]
+                proc = MagicMock()
+                proc.returncode = rc_val
+                proc.communicate.return_value = (out_val, err_val)
+                return proc
 
-                rc_val, out_val, err_val = responses[mock_run.call_count - 1]
-                r: sp.CompletedProcess[str] = sp.CompletedProcess(cmd, rc_val)
-                r.stdout = out_val
-                r.stderr = err_val
-                return r
-
-            mock_run.side_effect = _side
+            mock_popen.side_effect = _side
             az_client.az(["account", "show"])
         count = az_client.get_and_reset_rate_limit_retry_count()
         self.assertGreaterEqual(count, 1)

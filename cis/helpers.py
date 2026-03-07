@@ -32,10 +32,22 @@ _console: dict[str, int] = {"total": 0, "last_len": 0}
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def setup_logging(log_level: str, verbose: bool = False, debug: bool = False, log_file: str | None = None) -> None:
+def setup_logging(
+    log_level: str,
+    verbose: bool = False,
+    debug: bool = False,
+    log_file: str | None = None,
+    rich_console: Any = None,
+) -> None:
     """Configure root logging for console output and optional log file.
 
     Precedence: --debug > --verbose > --log-level.
+
+    When rich_console is provided (a rich.console.Console instance that is
+    shared with the Rich Progress bar), a RichHandler is used instead of a
+    plain StreamHandler.  This lets Rich suspend the progress bar, print the
+    log line cleanly above it, and then redraw the bar — eliminating the
+    garbled interleaving of progress output and log messages.
     """
     if debug:
         effective_level = TRACE_LEVEL
@@ -59,9 +71,27 @@ def setup_logging(log_level: str, verbose: bool = False, debug: bool = False, lo
             sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
         except Exception:
             pass
-    console_handler = logging.StreamHandler(sys.stdout)
+
+    if rich_console is not None:
+        try:
+            from rich.logging import RichHandler  # noqa: PLC0415
+
+            console_handler: logging.Handler = RichHandler(
+                console=rich_console,
+                show_time=False,   # keep the same minimal format as the plain handler
+                show_level=False,
+                show_path=False,
+                markup=False,      # don't interpret [ ] in Azure resource names as markup
+                highlighter=None,  # no syntax colouring on log messages
+            )
+        except Exception:
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setFormatter(logging.Formatter("%(message)s"))
+    else:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(logging.Formatter("%(message)s"))
+
     console_handler.setLevel(effective_level)
-    console_handler.setFormatter(logging.Formatter("%(message)s"))
     root_logger.addHandler(console_handler)
 
     if log_file:

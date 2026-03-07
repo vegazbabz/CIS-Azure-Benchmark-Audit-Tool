@@ -607,7 +607,20 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("9.3.11", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.11")),
     ]
 
+    _SECTION_LABELS: dict[str, str] = {
+        "2": "Databricks",
+        "5": "Identity",
+        "6": "Monitoring",
+        "7": "Networking",
+        "8": "Security",
+        "9": "Storage",
+    }
+    _cur_sec = ""
     for ctrl_id, fn in checks:
+        new_sec = ctrl_id.split(".")[0]
+        if new_sec != _cur_sec:
+            _cur_sec = new_sec
+            LOGGER.debug("    [%s] %s...", sname[:24], _SECTION_LABELS.get(new_sec, f"Section {new_sec}"))
         LOGGER.debug("    [%s%s] %-12s", progress, sname[:24], ctrl_id)
         try:
             result = fn()
@@ -812,11 +825,12 @@ def run_audit(
         progress = Progress(
             SpinnerColumn(),
             TextColumn("{task.description}"),
-            BarColumn(),
+            BarColumn(complete_style="green", finished_style="bright_green"),
             MofNCompleteColumn(),
             TimeElapsedColumn(),
             TimeRemainingColumn(),
             transient=True,
+            console=_rcon,
         )
         progress.start()
         task_id: Any = progress.add_task("Preparing...", total=len(todo))
@@ -841,6 +855,19 @@ def run_audit(
     _ = get_and_reset_rate_limit_retry_count()
 
     # ── Parallel execution (batch-based for adaptive concurrency) ───────────
+    _active_names: set[str] = set()  # subscriptions currently in-flight
+
+    def _progress_desc() -> str:
+        """Build a progress bar description from the currently-running subscriptions."""
+        if not _active_names:
+            return "…"
+        names = sorted(_active_names)
+        if len(names) == 1:
+            return names[0]
+        if len(names) <= 3:
+            return ", ".join(names)
+        return f"{names[0]} +{len(names) - 1} more"
+
     while remaining:
         batch = remaining[:current_parallel]
         remaining = remaining[current_parallel:]
@@ -854,7 +881,8 @@ def run_audit(
                     n = _started
 
                 if progress is not None:
-                    progress.update(task_id, description=sub.get("name", ""))
+                    _active_names.add(sub.get("name", ""))
+                    progress.update(task_id, description=_progress_desc())
                 else:
                     if not quiet:
                         console_update(n, _total, sub.get("name", ""))
@@ -881,7 +909,8 @@ def run_audit(
 
                 completed_in_todo += 1
                 if progress is not None:
-                    progress.update(task_id, completed=completed_in_todo, description=sub.get("name", ""))
+                    _active_names.discard(sub.get("name", ""))
+                    progress.update(task_id, completed=completed_in_todo, description=_progress_desc())
 
         if adaptive_enabled:
             throttled_retries = get_and_reset_rate_limit_retry_count()
@@ -1090,7 +1119,13 @@ Examples:
 
     args = parser.parse_args()
 
-    setup_logging(args.log_level, verbose=args.verbose, debug=args.debug, log_file=args.log_file)
+    setup_logging(
+        args.log_level,
+        verbose=args.verbose,
+        debug=args.debug,
+        log_file=args.log_file,
+        rich_console=_rcon if HAS_RICH else None,
+    )
 
     # ── --quiet: suppress INFO-level console output ───────────────────────────
     if args.quiet and not args.verbose and not args.debug:

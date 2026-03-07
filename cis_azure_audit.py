@@ -190,7 +190,6 @@ try:
         BarColumn,
         TextColumn,
         TimeElapsedColumn,
-        TimeRemainingColumn,
         MofNCompleteColumn,
     )
 
@@ -827,7 +826,6 @@ def run_audit(
             BarColumn(complete_style="green", finished_style="bright_green"),
             MofNCompleteColumn(),
             TimeElapsedColumn(),
-            TimeRemainingColumn(),
             transient=True,
             console=_rcon,
         )

@@ -54,6 +54,13 @@ _AUTHZ_TOKENS = frozenset(
         "authorizationfailed",
         "does not have authorization",
         "caller is not authorized",
+        # Key Vault data-plane permission errors (list/get keys, secrets, certs)
+        "does not have certificates list permission",
+        "does not have secrets list permission",
+        "does not have keys list permission",
+        "does not have certificate get permission",
+        "does not have secret get permission",
+        "does not have key get permission",
     ]
 )
 

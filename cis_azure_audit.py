@@ -194,7 +194,7 @@ try:
     )
 
     HAS_RICH = True
-    _rcon: Any = _RichConsole()
+    _rcon: Any = _RichConsole(highlight=False)
 except Exception:
     HAS_RICH = False
     _rcon = None

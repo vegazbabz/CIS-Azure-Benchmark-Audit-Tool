@@ -790,7 +790,6 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         return acc
 
     # ── Process all vaults in parallel ───────────────────────────────────────
-    LOGGER.info("    [%s] Checking %d Key Vault(s)...", sname[:24], len(vaults))
     results: list[R] = []
     with ThreadPoolExecutor(max_workers=min(_VAULT_WORKERS, len(vaults))) as pool:
         futures = [pool.submit(_check_one_vault, v) for v in vaults]

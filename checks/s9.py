@@ -611,7 +611,6 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         return acc_results
 
     # ── Process all accounts in parallel ─────────────────────────────────────
-    LOGGER.info("    [%s] Checking %d storage account(s)...", sname[:24], total_accounts)
     results: list[R] = []
     with ThreadPoolExecutor(max_workers=_ACCOUNT_WORKERS) as pool:
         futures = [pool.submit(_check_one_account, acct) for acct in accounts]

@@ -1355,7 +1355,8 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         kill_running_procs()  # kill in-flight az subprocesses before exiting
         print(
-            "\n\n⚠️  Interrupted. Re-run the same command to resume from where it stopped (or add --fresh to start over)."
+            "\n\n⚠️  Interrupted. Re-run the same command to resume from where it stopped"
+            " (or add --fresh to start over)."
         )
         sys.stdout.flush()
         os._exit(1)  # immediate hard exit — kills all worker threads without atexit

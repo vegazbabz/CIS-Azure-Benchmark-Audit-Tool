@@ -9,6 +9,7 @@ dist/
 build/
 
 # ── Audit outputs (contain tenant/subscription data) ──────────────────────────
+reports/
 *.html
 *.log
 *.json

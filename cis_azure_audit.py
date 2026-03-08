@@ -1100,8 +1100,8 @@ Examples:
     parser.add_argument(
         "--output",
         "-o",
-        default="cis_azure_audit_report.html",
-        help="Output HTML report filename (default: cis_azure_audit_report.html)",
+        default=None,
+        help="Output HTML report filename (default: reports/cis_azure_audit_report_<timestamp>.html)",
     )
     parser.add_argument(
         "--output-dir",
@@ -1172,6 +1172,16 @@ Examples:
     if args.fresh and args.report_only:
         parser.error("--fresh and --report-only are mutually exclusive: --fresh deletes checkpoints while --report-only reads them.")
 
+    # Capture run timestamp early — used both for elapsed time and the default
+    # report filename so the filename reflects when the audit started.
+    start_time = datetime.datetime.now(datetime.timezone.utc)
+
+    # ── Default output path: reports/<name>_<timestamp>.html ─────────────────
+    if args.output is None:
+        _reports_dir = Path("reports")
+        _reports_dir.mkdir(exist_ok=True)
+        args.output = str(_reports_dir / f"cis_azure_audit_report_{start_time.strftime('%Y-%m-%dT%H%M')}.html")
+
     setup_logging(
         args.log_level,
         verbose=args.verbose,
@@ -1202,9 +1212,6 @@ Examples:
     if args.list_suppressions:
         list_suppressions(suppressions, suppressions_path)
         return
-
-    # Start timer for elapsed time display in final summary
-    start_time = datetime.datetime.now(datetime.timezone.utc)
 
     LOGGER.info("\n🔒 CIS Azure Foundations Benchmark v%s — Audit Tool v%s\n", BENCHMARK_VER, VERSION)
 

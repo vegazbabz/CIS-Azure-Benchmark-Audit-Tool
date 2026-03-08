@@ -9,6 +9,7 @@ Import from those modules directly in new code.
 
 from azure.client import (  # noqa: F401
     AZ,
+    _CLEAN_STORAGE_AUTHZ_MSG,
     _friendly_error,
     az,
     az_rest,

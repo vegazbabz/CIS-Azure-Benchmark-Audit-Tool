@@ -108,7 +108,7 @@ def generate_html(
         rows += (
             f'<tr class="sh" data-sec-id="{sec_id}">'
             f'<td colspan="6">'
-            f'<span class="sec-arrow">▼</span>'
+            f'<span class="sec-arrow open">▼</span>'
             f"<b>{html.escape(sec)}</b>"
             f'<span class="ss">{sp} of {len(grp)} checks passed</span>'
             f"</td></tr>\n"
@@ -429,7 +429,10 @@ tr.sh td {{ background: #f1f5f9; font-size: .8rem; color: #475569;
 tr.sh  {{ cursor: pointer; user-select: none; }}
 tr.sh:hover td {{ background: #e2e8f0; }}
 .sec-arrow {{ display: inline-block; margin-right: .45rem; font-size: .8rem;
-              transition: transform .15s; }}
+              transition: transform .2s ease; }}
+.sec-arrow.open {{ transform: rotate(0deg); }}
+.sec-arrow.closed {{ transform: rotate(-90deg); }}
+.row-hidden {{ display: none !important; }}
 .ss    {{ float: right; color: #94a3b8; font-weight: normal; }}
 
 /* ── Status badge ── */
@@ -655,7 +658,9 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     hdr.addEventListener('click', function() {{
       var id = hdr.dataset.secId;
       _collapsed[id] = !_collapsed[id];
-      hdr.querySelector('.sec-arrow').textContent = _collapsed[id] ? '▶' : '▼';
+      var arrow = hdr.querySelector('.sec-arrow');
+      arrow.classList.toggle('closed', _collapsed[id]);
+      arrow.classList.toggle('open', !_collapsed[id]);
       filter();
     }});
   }});
@@ -680,7 +685,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
       r.dataset.filterMatch = ok ? '1' : '0';
 
       /* When filtering, show all matching rows regardless of collapse state */
-      r.style.display = (ok && (!_collapsed[r.dataset.sec] || filtering)) ? '' : 'none';
+      r.classList.toggle('row-hidden', !(ok && (!_collapsed[r.dataset.sec] || filtering)));
     }});
 
     /* Hide section header rows only when no children match the current filter */
@@ -692,7 +697,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
         if (sib.dataset.filterMatch === '1') anyMatch = true;
         sib = sib.nextElementSibling;
       }}
-      h.style.display = anyMatch ? '' : 'none';
+      h.classList.toggle('row-hidden', !anyMatch);
     }});
   }}
 

@@ -1187,9 +1187,11 @@ Examples:
         help="Print all active suppressions and exit",
     )
     parser.add_argument(
-        "--open",
-        action="store_true",
-        help="Open the HTML report in the default browser when the audit is complete",
+        "--no-open",
+        dest="open",
+        action="store_false",
+        default=True,
+        help="Do not automatically open the HTML report in the browser when the audit is complete",
     )
 
     args = parser.parse_args()
@@ -1282,12 +1284,15 @@ Examples:
         generate_html(all_results, args.output, history=run_history, sub_timestamps=sub_timestamps)
         if args.open:
             _html_path = Path(args.output).resolve()
-            if sys.platform == "win32":
-                os.startfile(str(_html_path))
-            else:
-                import webbrowser
+            try:
+                if sys.platform == "win32":
+                    os.startfile(str(_html_path))
+                else:
+                    import webbrowser
 
-                webbrowser.open(_html_path.as_uri())
+                    webbrowser.open(_html_path.as_uri())
+            except Exception as exc:  # noqa: BLE001
+                LOGGER.warning("Could not open report automatically: %s", exc)
         return
 
     # ── Prerequisite: az CLI available ────────────────────────────────────────
@@ -1438,12 +1443,15 @@ Examples:
     generate_html(all_results, args.output, scope_info, run_history, sub_timestamps)
     if args.open:
         _html_path = Path(args.output).resolve()
-        if sys.platform == "win32":
-            os.startfile(str(_html_path))
-        else:
-            import webbrowser
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(_html_path))
+            else:
+                import webbrowser
 
-            webbrowser.open(_html_path.as_uri())
+                webbrowser.open(_html_path.as_uri())
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("Could not open report automatically: %s", exc)
 
 
 if __name__ == "__main__":

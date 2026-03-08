@@ -12,7 +12,7 @@ from typing import Any
 from cis.config import PASS, FAIL, ERROR, INFO, TIMEOUTS, LOGGER
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
-from azure.helpers import az, _friendly_error, is_notapplicable_error
+from azure.helpers import az, _friendly_error, is_firewall_error, is_notapplicable_error
 
 # Maximum number of storage accounts audited concurrently within one subscription.
 # Each account makes 4 az CLI calls (blob props, file props, key policy, activity log).
@@ -397,8 +397,10 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             # API call failed — emit result for all three blob checks.
             # FeatureNotSupportedForAccount means the account type (e.g. ADLS Gen2)
             # simply doesn't have a blob service — that's INFO, not an ERROR.
+            # Firewall/private-endpoint blocks are also INFO: the account has public
+            # network access disabled, which is itself a positive security control.
             _blob_err = str(blob_props)
-            _blob_status = INFO if is_notapplicable_error(_blob_err) else ERROR
+            _blob_status = INFO if (is_notapplicable_error(_blob_err) or is_firewall_error(_blob_err)) else ERROR
             _blob_detail = _friendly_error(_blob_err)
             for ctrl, title, lvl in [
                 ("9.2.1", "Blob soft delete enabled", 1),
@@ -499,8 +501,9 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         else:
             # FeatureNotSupportedForAccount means this account type doesn't support
             # Azure Files (e.g. ADLS Gen2 / Data Lake Storage accounts).
+            # Firewall/private-endpoint blocks are also INFO — same reasoning as blob.
             _file_err = str(file_props)
-            _file_status = INFO if is_notapplicable_error(_file_err) else ERROR
+            _file_status = INFO if (is_notapplicable_error(_file_err) or is_firewall_error(_file_err)) else ERROR
             _file_detail = _friendly_error(_file_err)
             for ctrl, title, lvl in [
                 ("9.1.1", "Azure Files soft delete enabled", 1),

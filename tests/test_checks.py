@@ -234,10 +234,13 @@ class TestCheck512(unittest.TestCase):
 
     @patch("checks.s5.az_rest_paged")
     def test_all_admins_have_mfa_returns_pass(self, mock: Any) -> None:
-        mock.return_value = (0, [
-            {"userPrincipalName": "a@t.com", "isMfaRegistered": True},
-            {"userPrincipalName": "b@t.com", "isMfaRegistered": True},
-        ])
+        mock.return_value = (
+            0,
+            [
+                {"userPrincipalName": "a@t.com", "isMfaRegistered": True},
+                {"userPrincipalName": "b@t.com", "isMfaRegistered": True},
+            ],
+        )
         result = checks_s5.check_5_1_2()
         self.assertEqual(result.control_id, "5.1.2")
         self.assertEqual(result.status, PASS)
@@ -251,10 +254,13 @@ class TestCheck512(unittest.TestCase):
 
     @patch("checks.s5.az_rest_paged")
     def test_admin_without_mfa_returns_fail(self, mock: Any) -> None:
-        mock.return_value = (0, [
-            {"userPrincipalName": "noMfa@t.com", "isMfaRegistered": False},
-            {"userPrincipalName": "hasMfa@t.com", "isMfaRegistered": True},
-        ])
+        mock.return_value = (
+            0,
+            [
+                {"userPrincipalName": "noMfa@t.com", "isMfaRegistered": False},
+                {"userPrincipalName": "hasMfa@t.com", "isMfaRegistered": True},
+            ],
+        )
         result = checks_s5.check_5_1_2()
         self.assertEqual(result.control_id, "5.1.2")
         self.assertEqual(result.status, FAIL)

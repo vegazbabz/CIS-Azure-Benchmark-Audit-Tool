@@ -66,6 +66,7 @@ def version_full() -> str:
     """Return the full version string including git hash (computed on first call)."""
     return f"{VERSION}+{_git_hash()}"
 
+
 # ── Filesystem ────────────────────────────────────────────────────────────────
 CHECKPOINT_DIR = Path("cis_checkpoints")  # Per-subscription result cache
 

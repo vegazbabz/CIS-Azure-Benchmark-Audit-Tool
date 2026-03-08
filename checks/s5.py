@@ -49,9 +49,7 @@ def check_5_1_1() -> R:
     # Security defaults are disabled — check whether Conditional Access is in use.
     # A tenant with CA policies disables security defaults intentionally; the
     # control goal (enforced sign-in security) is fulfilled by CA instead.
-    rc_ca, ca_data = az_rest(
-        "https://graph.microsoft.com/v1.0/policies/conditionalAccessPolicies?$top=1"
-    )
+    rc_ca, ca_data = az_rest("https://graph.microsoft.com/v1.0/policies/conditionalAccessPolicies?$top=1")
     if rc_ca == 0 and isinstance(ca_data, dict) and ca_data.get("value"):
         return R(
             _CTRL,
@@ -106,17 +104,16 @@ def check_5_1_2() -> R:
     rc, users = az_rest_paged(url, timeout=TIMEOUTS["default"])
     if rc != 0:
         return _err(
-            _CTRL, _TITLE, 1, _SEC,
+            _CTRL,
+            _TITLE,
+            1,
+            _SEC,
             "Unable to retrieve MFA registration details — ensure the service "
             "principal has UserAuthenticationMethod.Read.All or "
             "Reports.Read.All Graph permission.",
         )
 
-    without_mfa = [
-        u.get("userPrincipalName") or u.get("id", "?")
-        for u in users
-        if not u.get("isMfaRegistered")
-    ]
+    without_mfa = [u.get("userPrincipalName") or u.get("id", "?") for u in users if not u.get("isMfaRegistered")]
 
     if not without_mfa:
         n = len(users)
@@ -128,7 +125,12 @@ def check_5_1_2() -> R:
     if len(without_mfa) > 10:
         detail += f" \u2026 and {len(without_mfa) - 10} more"
     return R(
-        _CTRL, _TITLE, 1, _SEC, FAIL, detail,
+        _CTRL,
+        _TITLE,
+        1,
+        _SEC,
+        FAIL,
+        detail,
         "Entra ID > Per-user MFA or Conditional Access > Require MFA for all users.",
     )
 

@@ -112,7 +112,13 @@ from cis.helpers import (
 )
 
 # Checkpoint save/load
-from cis.checkpoint import load_checkpoints, load_tenant_checkpoint, results_from_checkpoint, save_checkpoint, save_tenant_checkpoint
+from cis.checkpoint import (
+    load_checkpoints,
+    load_tenant_checkpoint,
+    results_from_checkpoint,
+    save_checkpoint,
+    save_tenant_checkpoint,
+)
 
 # HTML report generation
 from cis.report import _STATUS_STYLE, generate_html
@@ -1183,7 +1189,9 @@ Examples:
     args = parser.parse_args()
 
     if args.fresh and args.report_only:
-        parser.error("--fresh and --report-only are mutually exclusive: --fresh deletes checkpoints while --report-only reads them.")
+        parser.error(
+            "--fresh and --report-only are mutually exclusive: --fresh deletes checkpoints while --report-only reads them."
+        )
 
     # Capture run timestamp early — used both for elapsed time and the default
     # report filename so the filename reflects when the audit started.

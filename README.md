@@ -82,13 +82,11 @@ az login
 
 # 2. Run the audit (audits all enabled subscriptions)
 python cis_azure_audit.py
-
-# 3. Open the report
-start cis_azure_audit_report.html
 ```
 
-The script will automatically install the `resource-graph` extension if missing, enumerate all
-enabled subscriptions, run all checks, and save the report files in the current directory.
+The report opens automatically in your browser when the audit finishes. The script will also
+automatically install the `resource-graph` extension if missing, enumerate all enabled
+subscriptions, run all checks, and save the report files to a `reports/` subdirectory.
 
 ---
 
@@ -168,7 +166,7 @@ python cis_azure_audit.py [options]
 | Option | Description |
 | --- | --- |
 | `-s`, `--subscription` | Audit one or more subscriptions by name or GUID. Multiple values follow a single flag: `-s Sub1 Sub2 Sub3` |
-| `-o`, `--output` | Output HTML filename (default: `cis_azure_audit_report.html`) |
+| `-o`, `--output` | Output HTML filename (default: `reports/cis_azure_audit_report_<timestamp>.html`) |
 | `--output-dir` | Directory for all output files (HTML, JSON, CSV, checkpoints) |
 | `-p`, `--parallel` | Concurrent subscription workers (default: from config or 3) |
 | `--executor` | Worker backend: `thread` (default) or `process` |
@@ -178,6 +176,7 @@ python cis_azure_audit.py [options]
 | `--report-only` | Regenerate the HTML/JSON/CSV from existing checkpoints — no API calls |
 | `--suppressions` | Path to suppressions TOML file (default: `suppressions.toml` next to the script) |
 | `--list-suppressions` | Print all active suppressions and exit |
+| `--no-open` | Do not auto-open the report in the browser after the audit completes |
 | `--skip-preflight` | Skip permission preflight checks |
 | `-q`, `--quiet` | Suppress per-check progress lines; only show summary |
 | `--log-level` | Base log level: `TRACE`, `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
@@ -347,7 +346,7 @@ The generated report is a self-contained HTML file with no external dependencies
 - **Per-resource results** — each NSG, storage account, Key Vault, subnet, and Databricks workspace is reported individually, not aggregated to a single pass/fail per control.
 - **Remediation hints** — every FAIL result includes the Azure portal navigation path to fix the issue. ERROR results include an actionable explanation of what access is missing.
 - **Export** — JSON and CSV files are generated alongside the HTML at report time. Click **Export JSON** or **Export CSV** in the report to download them.
-- **Compliance trend** — after two or more full audit runs, a collapsible chart appears above the results table showing the compliance score over time. Collapsed by default so it does not distract from current findings.
+- **Compliance trend** — after two or more full-tenant audit runs, a collapsible chart appears above the results table showing the compliance score over time. Collapsed by default so it does not distract from current findings. Not shown when running with `--subscription` filters, since a filtered run reflects a subset of the tenant and cannot be compared to a full-tenant baseline.
 - **Back to top** — fixed button in the bottom-right corner for long reports.
 
 ### Status types
@@ -357,15 +356,14 @@ The generated report is a self-contained HTML file with no external dependencies
 | PASS | Control is compliant |
 | FAIL | Control is non-compliant — remediation hint provided |
 | ERROR | Check could not complete — audit gap (permissions missing, timeout, or API error). Compliance is **unknown**; do not treat as clean. |
-| INFO | Not applicable — the resource type doesn't exist, the account type doesn't support the feature, or the vault is behind a private endpoint unreachable from the runner |
+| INFO | Not applicable — the resource type doesn't exist or the account type doesn't support the feature (e.g. ADLS Gen2 has no blob/file service) |
 | MANUAL | Cannot be automated — requires manual verification per the CIS PDF |
 | SUPPRESSED | Accepted risk — defined in `suppressions.toml` with a justification and expiry |
 
 > **ERROR vs INFO distinction:**
 > `ERROR` means *"the control applies, but the audit couldn't evaluate it"* — flag it for follow-up.
 > `INFO` means *"the control genuinely doesn't apply here"* — for example, an ADLS Gen2 storage account
-> has no blob/file service by design, or a vault locked behind a private endpoint is itself a sign of
-> strong network controls. In both INFO cases there is nothing to fix.
+> has no blob/file service by design, so the blob checks simply don't apply. There is nothing to fix.
 
 ### `--report-only`: regenerate the report without re-auditing
 
@@ -397,13 +395,16 @@ Each run produces three report files and updates the run history:
 
 | File | Contents |
 | --- | --- |
-| `cis_azure_audit_report.html` | Self-contained interactive report |
-| `cis_azure_audit_report.json` | All results as a JSON array |
-| `cis_azure_audit_report.csv` | All results as a flat CSV |
-| `cis_run_history.json` | Compliance score history for the trend chart (last 30 runs) |
+| `reports/cis_azure_audit_report_<timestamp>.html` | Self-contained interactive report (auto-opens in browser) |
+| `reports/cis_azure_audit_report_<timestamp>.json` | All results as a JSON array |
+| `reports/cis_azure_audit_report_<timestamp>.csv` | All results as a flat CSV |
+| `reports/cis_run_history.json` | Compliance score history for the trend chart (last 30 full-tenant runs) |
 
-Use `--output` to change the base name, or `--output-dir` to change the directory.
+Use `--output` to set a custom filename, or `--output-dir` to redirect all output to a different directory.
 The history file is always written to the same directory as the HTML report.
+
+> **History note:** `cis_run_history.json` is only updated on full-tenant runs (no `--subscription` filter).
+> Per-subscription runs do not contribute to the trend chart so the baseline stays consistent.
 
 > **Note:** `--report-only` does **not** update the history file — it regenerates the report from
 > existing checkpoints but is not a new measurement.
@@ -603,10 +604,9 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 | 8.5 | DDoS Network Protection enabled on VNets | L2 |
 
 > **Key Vault data-plane checks (8.3.1–8.3.4, 8.3.9, 8.3.11):** these require data-plane access
-> beyond subscription Reader. Vaults behind a private endpoint that is unreachable from the runner
-> return INFO (the network restriction is itself a positive security signal). Vaults where the
-> runner lacks a Key Vault data-plane role or access policy return ERROR with an actionable message
-> explaining exactly what permission to grant — compliance is unknown, not assumed clean.
+> beyond subscription Reader. If the runner cannot reach the vault (firewall, private endpoint) or
+> lacks a Key Vault data-plane role / access policy, the check returns ERROR with an actionable message
+> explaining exactly what is missing — compliance is unknown, not assumed clean.
 
 ### Section 9 — Storage Services (21 automated)
 

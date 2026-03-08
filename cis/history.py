@@ -28,6 +28,7 @@ History file format (JSON array, oldest first, max MAX_HISTORY entries):
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -53,16 +54,23 @@ def append_history(path: Path, entry: dict[str, Any]) -> None:
     Append a new run entry to the history file, trimming to MAX_HISTORY entries.
 
     Entries are stored oldest-first so they can be iterated in chronological
-    order when drawing a trend chart.
+    order when drawing a trend chart.  Uses an atomic write-and-rename pattern
+    to avoid a truncated history file if the process crashes mid-write.
     """
     history = load_history(path)
     history.append(entry)
     if len(history) > MAX_HISTORY:
         history = history[-MAX_HISTORY:]
+    tmp = path.with_suffix(".json.tmp")
     try:
-        path.write_text(json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.write_text(json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, path)  # atomic on both Windows and POSIX; replaces if target exists
     except Exception as exc:
         LOGGER.warning("⚠️  Could not write run history to %s: %s", path, exc)
+        try:
+            tmp.unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 def history_path_for(output: str) -> Path:

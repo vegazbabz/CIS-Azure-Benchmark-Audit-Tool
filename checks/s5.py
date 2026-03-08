@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, INFO, MANUAL, TIMEOUTS, ROLE_OWNER, ROLE_UAA
+from cis.config import PASS, FAIL, INFO, TIMEOUTS, ROLE_OWNER, ROLE_UAA
 from cis.models import R
 from cis.check_helpers import _err, _idx
-from azure.helpers import az, az_rest
+from azure.helpers import az, az_rest, az_rest_paged
 
 
 def check_5_1_1() -> R:
@@ -24,23 +24,52 @@ def check_5_1_1() -> R:
     cost. They are designed for tenants that do NOT have Microsoft Entra ID
     P1/P2 licences and cannot use Conditional Access.
 
-    For E3/E5 tenants (which use Conditional Access), security defaults are
-    intentionally disabled — a Conditional Access policy that enforces MFA
-    for all users is the equivalent (and superior) control. For those tenants
-    this control is returned as INFO rather than FAIL because the correct
-    state depends on the tenant's licensing tier.
+    Logic:
+      1. Query identitySecurityDefaultsEnforcementPolicy → PASS if isEnabled=true
+      2. If disabled, query conditionalAccessPolicies → INFO if at least one CA
+         policy exists (tenant relies on CA instead, which is the stronger control)
+      3. Neither enabled → FAIL (no baseline identity protection in place)
 
-    If your tenant uses Conditional Access, manually verify that policies
-    enforce MFA for all users to satisfy this control.
+    Graph APIs used:
+      GET /v1.0/policies/identitySecurityDefaultsEnforcementPolicy
+      GET /v1.0/policies/conditionalAccessPolicies?$top=1
     """
+    _CTRL = "5.1.1"
+    _TITLE = "Security defaults enabled in Microsoft Entra ID"
+    _SEC = "5 - Identity Services"
+
+    rc, data = az_rest("https://graph.microsoft.com/v1.0/policies/identitySecurityDefaultsEnforcementPolicy")
+    if rc != 0:
+        return _err(_CTRL, _TITLE, 1, _SEC, str(data))
+
+    is_enabled = data.get("isEnabled", False) if isinstance(data, dict) else False
+    if is_enabled:
+        return R(_CTRL, _TITLE, 1, _SEC, PASS, "Security defaults are enabled.", "")
+
+    # Security defaults are disabled — check whether Conditional Access is in use.
+    # A tenant with CA policies disables security defaults intentionally; the
+    # control goal (enforced sign-in security) is fulfilled by CA instead.
+    rc_ca, ca_data = az_rest("https://graph.microsoft.com/v1.0/policies/conditionalAccessPolicies?$top=1")
+    if rc_ca == 0 and isinstance(ca_data, dict) and ca_data.get("value"):
+        return R(
+            _CTRL,
+            _TITLE,
+            1,
+            _SEC,
+            INFO,
+            "Security defaults disabled — tenant uses Conditional Access. "
+            "Verify CA policies enforce MFA for all users.",
+            "Verify Conditional Access policies enforce MFA for all users.",
+        )
+
     return R(
-        "5.1.1",
-        "Security defaults enabled in Microsoft Entra ID",
+        _CTRL,
+        _TITLE,
         1,
-        "5 - Identity Services",
-        INFO,
-        "Not applicable — tenant uses Conditional Access (E3/E5 licensed).",
-        "Verify Conditional Access policies enforce MFA for all users.",
+        _SEC,
+        FAIL,
+        "Security defaults are disabled and no Conditional Access policies were found.",
+        "Entra ID > Properties > Manage security defaults, or configure Conditional Access to enforce MFA.",
     )
 
 
@@ -48,21 +77,60 @@ def check_5_1_2() -> R:
     """
     5.1.2 — MFA enabled for all privileged users (Level 1)
 
-    The CIS benchmark's prescribed audit method is a Graph PowerShell command:
-      Get-MgUser -All | where {$_.StrongAuthenticationMethods.Count -eq 0}
+    Queries the Microsoft Graph beta authentication-methods registration
+    report, filtered to users that hold at least one admin role
+    (``isAdmin = true``).  Any admin without ``isMfaRegistered = true`` is
+    non-compliant.
 
-    There is no equivalent az CLI or Graph REST API call that returns
-    per-user MFA registration status without additional Graph permissions
-    and a more complex paginated call. This control is marked MANUAL so it
-    appears in the report as a reminder rather than being silently skipped.
+    Pagination is handled transparently by ``az_rest_paged``.
+
+    API:
+      GET /beta/reports/authenticationMethods/userRegistrationDetails
+          ?$filter=isAdmin eq true
+          &$select=userPrincipalName,isMfaRegistered
+
+    Required Graph permission (application):
+      UserAuthenticationMethod.Read.All  *or*  Reports.Read.All
     """
+    _CTRL = "5.1.2"
+    _TITLE = "MFA enabled for all privileged users"
+    _SEC = "5 - Identity Services"
+
+    url = (
+        "https://graph.microsoft.com/beta/reports/authenticationMethods/"
+        "userRegistrationDetails?$filter=isAdmin eq true"
+        "&$select=userPrincipalName,isMfaRegistered"
+    )
+    rc, users = az_rest_paged(url, timeout=TIMEOUTS["default"])
+    if rc != 0:
+        return _err(
+            _CTRL,
+            _TITLE,
+            1,
+            _SEC,
+            "Unable to retrieve MFA registration details — ensure the service "
+            "principal has UserAuthenticationMethod.Read.All or "
+            "Reports.Read.All Graph permission.",
+        )
+
+    without_mfa = [u.get("userPrincipalName") or u.get("id", "?") for u in users if not u.get("isMfaRegistered")]
+
+    if not without_mfa:
+        n = len(users)
+        msg = f"All {n} privileged user(s) have MFA registered." if n else "No privileged users found."
+        return R(_CTRL, _TITLE, 1, _SEC, PASS, msg, "")
+
+    names = without_mfa[:10]
+    detail = f"{len(without_mfa)} privileged user(s) without MFA: {', '.join(names)}"
+    if len(without_mfa) > 10:
+        detail += f" \u2026 and {len(without_mfa) - 10} more"
     return R(
-        "5.1.2",
-        "MFA enabled for all privileged users",
+        _CTRL,
+        _TITLE,
         1,
-        "5 - Identity Services",
-        MANUAL,
-        "Verify via: Get-MgUser -All | where {$_.StrongAuthenticationMethods.Count -eq 0}",
+        _SEC,
+        FAIL,
+        detail,
         "Entra ID > Per-user MFA or Conditional Access > Require MFA for all users.",
     )
 

@@ -7,7 +7,7 @@ from typing import Any
 import unittest
 from unittest.mock import patch
 
-from cis.config import ERROR, FAIL, INFO, MANUAL, PASS
+from cis.config import ERROR, FAIL, INFO, PASS
 
 import checks.s2 as checks_s2
 import checks.s5 as checks_s5
@@ -192,31 +192,103 @@ class TestCheck2111(unittest.TestCase):
 
 
 class TestCheck511(unittest.TestCase):
-    """5.1.1 — Security defaults enabled in Microsoft Entra ID.
+    """5.1.1 — Security defaults enabled in Microsoft Entra ID."""
 
-    The current implementation always returns INFO because the tool assumes
-    a CA-enabled (E3/E5) tenant. We verify the function is callable and
-    returns a single R with the expected control_id.
-    """
-
-    def test_returns_single_result(self) -> None:
+    @patch("checks.s5.az_rest")
+    def test_security_defaults_enabled_returns_pass(self, mock_az_rest: Any) -> None:
+        mock_az_rest.return_value = (0, {"isEnabled": True})
         result = checks_s5.check_5_1_1()
         self.assertEqual(result.control_id, "5.1.1")
-        # The function documents that it returns INFO for CA-enabled tenants
+        self.assertEqual(result.status, PASS)
+
+    @patch("checks.s5.az_rest")
+    def test_security_defaults_disabled_with_ca_returns_info(self, mock_az_rest: Any) -> None:
+        mock_az_rest.side_effect = [
+            (0, {"isEnabled": False}),
+            (0, {"value": [{"id": "policy-1"}]}),
+        ]
+        result = checks_s5.check_5_1_1()
+        self.assertEqual(result.control_id, "5.1.1")
         self.assertEqual(result.status, INFO)
+
+    @patch("checks.s5.az_rest")
+    def test_security_defaults_disabled_no_ca_returns_fail(self, mock_az_rest: Any) -> None:
+        mock_az_rest.side_effect = [
+            (0, {"isEnabled": False}),
+            (0, {"value": []}),
+        ]
+        result = checks_s5.check_5_1_1()
+        self.assertEqual(result.control_id, "5.1.1")
+        self.assertEqual(result.status, FAIL)
+
+    @patch("checks.s5.az_rest")
+    def test_api_error_returns_error(self, mock_az_rest: Any) -> None:
+        mock_az_rest.return_value = (1, "Access denied")
+        result = checks_s5.check_5_1_1()
+        self.assertEqual(result.control_id, "5.1.1")
+        self.assertEqual(result.status, ERROR)
 
 
 class TestCheck512(unittest.TestCase):
-    """5.1.2 — MFA enabled for all privileged users.
+    """5.1.2 — MFA enabled for all privileged users."""
 
-    The current implementation always returns MANUAL because the check
-    cannot be automated via az CLI.
-    """
-
-    def test_returns_manual(self) -> None:
+    @patch("checks.s5.az_rest_paged")
+    def test_all_admins_have_mfa_returns_pass(self, mock: Any) -> None:
+        mock.return_value = (
+            0,
+            [
+                {"userPrincipalName": "a@t.com", "isMfaRegistered": True},
+                {"userPrincipalName": "b@t.com", "isMfaRegistered": True},
+            ],
+        )
         result = checks_s5.check_5_1_2()
         self.assertEqual(result.control_id, "5.1.2")
-        self.assertEqual(result.status, MANUAL)
+        self.assertEqual(result.status, PASS)
+
+    @patch("checks.s5.az_rest_paged")
+    def test_no_admin_users_returns_pass(self, mock: Any) -> None:
+        mock.return_value = (0, [])
+        result = checks_s5.check_5_1_2()
+        self.assertEqual(result.control_id, "5.1.2")
+        self.assertEqual(result.status, PASS)
+
+    @patch("checks.s5.az_rest_paged")
+    def test_admin_without_mfa_returns_fail(self, mock: Any) -> None:
+        mock.return_value = (
+            0,
+            [
+                {"userPrincipalName": "noMfa@t.com", "isMfaRegistered": False},
+                {"userPrincipalName": "hasMfa@t.com", "isMfaRegistered": True},
+            ],
+        )
+        result = checks_s5.check_5_1_2()
+        self.assertEqual(result.control_id, "5.1.2")
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("noMfa@t.com", result.details)
+        self.assertNotIn("hasMfa@t.com", result.details)
+
+    @patch("checks.s5.az_rest_paged")
+    def test_api_error_returns_error(self, mock: Any) -> None:
+        mock.return_value = (1, [])
+        result = checks_s5.check_5_1_2()
+        self.assertEqual(result.control_id, "5.1.2")
+        self.assertEqual(result.status, ERROR)
+
+    @patch("checks.s5.az_rest_paged")
+    def test_many_users_without_mfa_truncates_list(self, mock: Any) -> None:
+        users = [{"userPrincipalName": f"admin{i}@t.com", "isMfaRegistered": False} for i in range(15)]
+        mock.return_value = (0, users)
+        result = checks_s5.check_5_1_2()
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("15 privileged", result.details)
+        self.assertIn("more", result.details)
+
+    @patch("checks.s5.az_rest_paged")
+    def test_upn_fallback_to_id_when_upn_missing(self, mock: Any) -> None:
+        mock.return_value = (0, [{"id": "guid-1234", "isMfaRegistered": False}])
+        result = checks_s5.check_5_1_2()
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("guid-1234", result.details)
 
 
 class TestCheck533(unittest.TestCase):

@@ -74,9 +74,7 @@ def _get_tenant_id() -> str:
     except Exception:
         pass
 
-    raise RuntimeError(
-        "Cannot determine tenant ID — set tenant_id in [graph_auth] or CIS_GRAPH_TENANT_ID env var"
-    )
+    raise RuntimeError("Cannot determine tenant ID — set tenant_id in [graph_auth] or CIS_GRAPH_TENANT_ID env var")
 
 
 def _load_cache() -> Any:

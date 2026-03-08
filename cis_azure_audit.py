@@ -134,6 +134,7 @@ from checks.s2 import check_2_1_2, check_2_1_7, check_2_1_9, check_2_1_10, check
 from checks.s5 import (
     check_5_1_1,
     check_5_1_2,
+    check_5_1_3,
     check_5_3_3,
     check_5_4,
     check_5_14,
@@ -800,7 +801,7 @@ def run_audit(
             all_results.extend(tenant_ckpt)
         else:
             LOGGER.info("   🔍 No tenant checkpoint found — re-running tenant checks (requires az login)...")
-            for fn in [check_5_1_1, check_5_1_2, check_5_4, check_5_14, check_5_15, check_5_16]:
+            for fn in [check_5_1_1, check_5_1_2, check_5_1_3, check_5_4, check_5_14, check_5_15, check_5_16]:
                 try:
                     r = fn()
                     all_results.append(r)
@@ -840,7 +841,7 @@ def run_audit(
     # duplicate results when auditing multiple subscriptions.
     LOGGER.info("\n  [Tenant] Running tenant-level identity checks...")
     tenant_results = []
-    for fn in [check_5_1_1, check_5_1_2, check_5_4, check_5_14, check_5_15, check_5_16]:
+    for fn in [check_5_1_1, check_5_1_2, check_5_1_3, check_5_4, check_5_14, check_5_15, check_5_16]:
         try:
             r = fn()
             tenant_results.append(r)
@@ -1252,7 +1253,7 @@ Examples:
             all_results.extend(tenant_ckpt)
         else:
             LOGGER.info("   🔍 No tenant checkpoint found — re-running tenant checks (requires az login)...")
-            for fn in [check_5_1_1, check_5_1_2, check_5_4, check_5_14, check_5_15, check_5_16]:
+            for fn in [check_5_1_1, check_5_1_2, check_5_1_3, check_5_4, check_5_14, check_5_15, check_5_16]:
                 try:
                     all_results.append(fn())
                 except Exception as e:

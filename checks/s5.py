@@ -88,7 +88,67 @@ def check_5_1_1() -> R:
 
 def check_5_1_2() -> R:
     """
-    5.1.2 — MFA enabled for all privileged users (Level 1)
+    5.1.2 — MFA enabled for all users (Level 1)
+
+    Queries the Microsoft Graph beta authentication-methods registration
+    report for ALL users (no admin filter).  Any user without
+    ``isMfaRegistered = true`` is non-compliant.
+
+    In large tenants this call may paginate across many pages; the timeout
+    is set to TIMEOUTS["graph"] (120 s by default) to accommodate that.
+
+    API:
+      GET /beta/reports/authenticationMethods/userRegistrationDetails
+          ?$select=userPrincipalName,isMfaRegistered
+
+    Required Graph permission (application):
+      UserAuthenticationMethod.Read.All  *or*  Reports.Read.All
+    """
+    _CTRL = "5.1.2"
+    _TITLE = "MFA enabled for all users"
+    _SEC = "5 - Identity Services"
+
+    url = (
+        "https://graph.microsoft.com/beta/reports/authenticationMethods/"
+        "userRegistrationDetails?$select=userPrincipalName,isMfaRegistered"
+    )
+    rc, users = az_rest_paged(url, timeout=TIMEOUTS["graph"])
+    if rc != 0:
+        return _err(
+            _CTRL,
+            _TITLE,
+            1,
+            _SEC,
+            "Unable to retrieve MFA registration details — ensure the service "
+            "principal has UserAuthenticationMethod.Read.All or "
+            "Reports.Read.All Graph permission.",
+        )
+
+    without_mfa = [u.get("userPrincipalName") or u.get("id", "?") for u in users if not u.get("isMfaRegistered")]
+
+    if not without_mfa:
+        n = len(users)
+        msg = f"All {n} user(s) have MFA registered." if n else "No users found."
+        return R(_CTRL, _TITLE, 1, _SEC, PASS, msg, "")
+
+    names = without_mfa[:10]
+    detail = f"{len(without_mfa)} user(s) without MFA: {', '.join(names)}"
+    if len(without_mfa) > 10:
+        detail += f" \u2026 and {len(without_mfa) - 10} more"
+    return R(
+        _CTRL,
+        _TITLE,
+        1,
+        _SEC,
+        FAIL,
+        detail,
+        "Entra ID > Per-user MFA or Conditional Access > Require MFA for all users.",
+    )
+
+
+def check_5_1_3() -> R:
+    """
+    5.1.3 — MFA enabled for all privileged users (Level 1)
 
     Queries the Microsoft Graph beta authentication-methods registration
     report, filtered to users that hold at least one admin role
@@ -105,7 +165,7 @@ def check_5_1_2() -> R:
     Required Graph permission (application):
       UserAuthenticationMethod.Read.All  *or*  Reports.Read.All
     """
-    _CTRL = "5.1.2"
+    _CTRL = "5.1.3"
     _TITLE = "MFA enabled for all privileged users"
     _SEC = "5 - Identity Services"
 
@@ -144,7 +204,7 @@ def check_5_1_2() -> R:
         _SEC,
         FAIL,
         detail,
-        "Entra ID > Per-user MFA or Conditional Access > Require MFA for all users.",
+        "Entra ID > Per-user MFA or Conditional Access > Require MFA for all privileged users.",
     )
 
 

@@ -981,8 +981,8 @@ class TestCheck9Storage(unittest.TestCase):
             self.assertIn(ctrl_id, static_results, f"{ctrl_id} not found in results")
             self.assertEqual(static_results[ctrl_id], PASS, f"{ctrl_id} expected PASS, got {static_results[ctrl_id]}")
 
-    def test_firewall_blocked_blob_and_file_returns_info(self) -> None:
-        """Storage accounts with PublicNetworkAccess=Disabled should yield INFO, not ERROR."""
+    def test_firewall_blocked_blob_and_file_returns_error(self) -> None:
+        """Storage accounts with PublicNetworkAccess=Disabled block the audit — compliance unknown (ERROR)."""
         account = {
             "name": "locked-down",
             "resourceGroup": "rg",
@@ -1016,7 +1016,7 @@ class TestCheck9Storage(unittest.TestCase):
         file_ctrl_ids = {"9.1.1", "9.1.2", "9.1.3"}
         for r in results:
             if r.control_id in blob_ctrl_ids or r.control_id in file_ctrl_ids:
-                self.assertEqual(r.status, INFO, f"{r.control_id} expected INFO for firewall block, got {r.status}")
+                self.assertEqual(r.status, ERROR, f"{r.control_id} expected ERROR for firewall block, got {r.status}")
 
 
 if __name__ == "__main__":

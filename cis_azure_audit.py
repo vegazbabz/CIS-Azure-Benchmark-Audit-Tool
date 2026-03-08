@@ -83,11 +83,10 @@ from pathlib import Path  # --output-dir path manipulation
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed  # Parallel workers
 
 # Configuration constants (version, timeouts, status codes, role GUIDs, etc.)
+import cis.config as _cfg
 from cis.config import (
     VERSION,
-    VERSION_FULL,
     BENCHMARK_VER,
-    CHECKPOINT_DIR,
     DEFAULT_PARALLEL,
     DEFAULT_EXECUTOR,
     PASS,
@@ -113,7 +112,13 @@ from cis.helpers import (
 )
 
 # Checkpoint save/load
-from cis.checkpoint import load_checkpoints, results_from_checkpoint, save_checkpoint
+from cis.checkpoint import (
+    load_checkpoints,
+    load_tenant_checkpoint,
+    results_from_checkpoint,
+    save_checkpoint,
+    save_tenant_checkpoint,
+)
 
 # HTML report generation
 from cis.report import _STATUS_STYLE, generate_html
@@ -262,6 +267,16 @@ def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str:
         )
         LOGGER.info("%s", "━" * 60)
 
+
+# Section number → display label used in console progress output.
+_SECTION_LABELS: dict[str, str] = {
+    "2": "Databricks",
+    "5": "Identity",
+    "6": "Monitoring",
+    "7": "Networking",
+    "8": "Security",
+    "9": "Storage",
+}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RESOURCE GRAPH PREFETCH
@@ -624,14 +639,6 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("9.3.11", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.11")),
     ]
 
-    _SECTION_LABELS: dict[str, str] = {
-        "2": "Databricks",
-        "5": "Identity",
-        "6": "Monitoring",
-        "7": "Networking",
-        "8": "Security",
-        "9": "Storage",
-    }
     _cur_sec = ""
     for ctrl_id, fn in checks:
         new_sec = ctrl_id.split(".")[0]
@@ -787,6 +794,20 @@ def run_audit(
         LOGGER.info(
             "✅ All subscriptions were already audited — nothing new to scan. Use --fresh to re-audit from scratch."
         )
+        tenant_ckpt = load_tenant_checkpoint()
+        if tenant_ckpt is not None:
+            LOGGER.info("   💾 Loaded tenant checks from checkpoint (%d results).", len(tenant_ckpt))
+            all_results.extend(tenant_ckpt)
+        else:
+            LOGGER.info("   🔍 No tenant checkpoint found — re-running tenant checks (requires az login)...")
+            for fn in [check_5_1_1, check_5_1_2, check_5_4, check_5_14, check_5_15, check_5_16]:
+                try:
+                    r = fn()
+                    all_results.append(r)
+                    icon = _STATUS_STYLE.get(r.status, ("", "", "?"))[2]
+                    LOGGER.info("    %-10s %s %s", r.control_id, icon, r.status)
+                except Exception as e:
+                    LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
         return all_results
 
     requested_parallel = max(1, parallel)
@@ -827,6 +848,11 @@ def run_audit(
             LOGGER.info("    %-10s %s %s", r.control_id, icon, r.status)
         except Exception as e:
             LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
+
+    try:
+        save_tenant_checkpoint(tenant_results)
+    except Exception as _ckpt_err:
+        LOGGER.warning("⚠️  Could not save tenant checkpoint (audit will continue): %s", _ckpt_err)
 
     # ── Resource Graph prefetch ───────────────────────────────────────────────
     # Fetch all Resource Graph data ONCE before the parallel loop.
@@ -872,7 +898,6 @@ def run_audit(
     completed_in_todo = 0
     stable_batches = 0
     remaining = list(todo)
-    _ = get_and_reset_rate_limit_retry_count()
 
     # ── Parallel execution (batch-based for adaptive concurrency) ───────────
     _active_names: set[str] = set()  # subscriptions currently in-flight
@@ -888,6 +913,9 @@ def run_audit(
             return ", ".join(names)
         return f"{names[0]} +{len(names) - 1} more"
 
+    # Reset here so that throttles from tenant checks and prefetch don't
+    # bleed into the first batch's adaptive-concurrency decision.
+    _ = get_and_reset_rate_limit_retry_count()
     try:
         while remaining:
             batch = remaining[:current_parallel]
@@ -1078,7 +1106,7 @@ Examples:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"%(prog)s {VERSION_FULL}",
+        version=f"%(prog)s {_cfg.version_full()}",
     )
 
     parser.add_argument(
@@ -1091,8 +1119,8 @@ Examples:
     parser.add_argument(
         "--output",
         "-o",
-        default="cis_azure_audit_report.html",
-        help="Output HTML report filename (default: cis_azure_audit_report.html)",
+        default=None,
+        help="Output HTML report filename (default: reports/cis_azure_audit_report_<timestamp>.html)",
     )
     parser.add_argument(
         "--output-dir",
@@ -1160,6 +1188,22 @@ Examples:
 
     args = parser.parse_args()
 
+    if args.fresh and args.report_only:
+        parser.error(
+            "--fresh and --report-only are mutually exclusive: "
+            "--fresh deletes checkpoints while --report-only reads them."
+        )
+
+    # Capture run timestamp early — used both for elapsed time and the default
+    # report filename so the filename reflects when the audit started.
+    start_time = datetime.datetime.now(datetime.timezone.utc)
+
+    # ── Default output path: reports/<name>_<timestamp>.html ─────────────────
+    if args.output is None:
+        _reports_dir = Path("reports")
+        _reports_dir.mkdir(exist_ok=True)
+        args.output = str(_reports_dir / f"cis_azure_audit_report_{start_time.strftime('%Y-%m-%dT%H%M')}.html")
+
     setup_logging(
         args.log_level,
         verbose=args.verbose,
@@ -1174,14 +1218,10 @@ Examples:
 
     # ── --output-dir: redirect report and checkpoints to a single directory ───
     if args.output_dir:
-        from cis import config as _cfg
-        from cis import checkpoint as _ckpt
-
         out_dir = Path(args.output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         new_ckpt_dir = out_dir / "cis_checkpoints"
         _cfg.CHECKPOINT_DIR = new_ckpt_dir
-        setattr(_ckpt, "CHECKPOINT_DIR", new_ckpt_dir)
         if not Path(args.output).is_absolute():
             args.output = str(out_dir / args.output)
 
@@ -1193,9 +1233,6 @@ Examples:
         list_suppressions(suppressions, suppressions_path)
         return
 
-    # Start timer for elapsed time display in final summary
-    start_time = datetime.datetime.now(datetime.timezone.utc)
-
     LOGGER.info("\n🔒 CIS Azure Foundations Benchmark v%s — Audit Tool v%s\n", BENCHMARK_VER, VERSION)
 
     # ── Report-only: skip all Azure calls, load checkpoints directly ──────────
@@ -1206,15 +1243,20 @@ Examples:
         for sub_id, cp in checkpoints.items():
             all_results.extend(results_from_checkpoint(cp))
             LOGGER.info("   ✅ Loaded: %s", cp.get("subscription_name", sub_id))
-        # Tenant-level checks are not stored in checkpoints (they run once and
-        # require only static logic or a single Graph call).  Re-run them here
-        # so that MANUAL results (e.g. 5.1.2) appear in the regenerated report.
-        LOGGER.info("   🔍 Re-running tenant checks...")
-        for fn in [check_5_1_1, check_5_1_2, check_5_4, check_5_14, check_5_15, check_5_16]:
-            try:
-                all_results.append(fn())
-            except Exception as e:
-                LOGGER.warning("   ⚠️  Skipped tenant check %s: %s", fn.__name__, e)
+        # Load tenant check results from checkpoint if available.  Falls back
+        # to re-running live checks (which make Graph API calls) if no checkpoint
+        # exists — this happens on the first --report-only run after a fresh audit.
+        tenant_ckpt = load_tenant_checkpoint()
+        if tenant_ckpt is not None:
+            LOGGER.info("   💾 Loaded tenant checks from checkpoint (%d results).", len(tenant_ckpt))
+            all_results.extend(tenant_ckpt)
+        else:
+            LOGGER.info("   🔍 No tenant checkpoint found — re-running tenant checks (requires az login)...")
+            for fn in [check_5_1_1, check_5_1_2, check_5_4, check_5_14, check_5_15, check_5_16]:
+                try:
+                    all_results.append(fn())
+                except Exception as e:
+                    LOGGER.warning("   ⚠️  Skipped tenant check %s: %s", fn.__name__, e)
         if args.level:
             all_results = [r for r in all_results if r.level == args.level]
         all_results = _dedup_results(all_results)
@@ -1228,7 +1270,7 @@ Examples:
         mins, secs = divmod(int(elapsed), 60)
         elapsed_str = f"{mins}m {secs}s" if mins else f"{secs}s"
         _print_summary(counts, total, len(checkpoints), elapsed_str, score)
-        LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)
+        LOGGER.info("  Checkpoints: %s/", _cfg.CHECKPOINT_DIR)
         sub_timestamps = {cp["subscription_name"]: cp["timestamp"] for cp in checkpoints.values()}
         run_history = load_history(history_path_for(args.output))
         generate_html(all_results, args.output, history=run_history, sub_timestamps=sub_timestamps)
@@ -1307,8 +1349,8 @@ Examples:
             LOGGER.info("   ✅ Preflight completed successfully.")
 
     # ── Full audit ────────────────────────────────────────────────────────────
-    if args.fresh and CHECKPOINT_DIR.exists():
-        shutil.rmtree(CHECKPOINT_DIR)
+    if args.fresh and _cfg.CHECKPOINT_DIR.exists():
+        shutil.rmtree(_cfg.CHECKPOINT_DIR)
         LOGGER.info("\n🗑️  Cleared checkpoints.")
     all_results = run_audit(
         subs,
@@ -1338,7 +1380,7 @@ Examples:
     elapsed_str = f"{mins}m {secs}s" if mins else f"{secs}s"
 
     _print_summary(counts, total, len(subs), elapsed_str, score)
-    LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)
+    LOGGER.info("  Checkpoints: %s/", _cfg.CHECKPOINT_DIR)
 
     # ── Append to run history (full audit only — not --report-only) ───────────
     hist_path = history_path_for(args.output)

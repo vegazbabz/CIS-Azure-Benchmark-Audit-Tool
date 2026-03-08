@@ -19,13 +19,17 @@ logger = logging.getLogger(__name__)
 
 
 def _upn_to_objectid(upn: str) -> str | None:
-    """Convert a UPN to its Azure AD objectId.
+    """Convert a UPN to its Azure AD object ID.
 
-    Returns ``None`` if the lookup fails (permissions, not found).
+    Queries the full user object and checks both ``id`` (CLI ≥ 2.37) and
+    the legacy ``objectId`` field so the function works across CLI versions.
+    Returns ``None`` if the lookup fails (insufficient permissions, not found).
     """
-    rc, out = az(["ad", "user", "show", "--id", upn, "--query", "objectId"])
-    if rc == 0 and isinstance(out, str) and out:
-        return out.strip()
+    rc, out = az(["ad", "user", "show", "--id", upn])
+    if rc == 0 and isinstance(out, dict):
+        oid = out.get("id") or out.get("objectId")
+        if oid and isinstance(oid, str):
+            return str(oid.strip())
     logger.debug("unable to resolve UPN to objectId: %s (rc=%d out=%r)", upn, rc, out)
     return None
 
@@ -33,12 +37,16 @@ def _upn_to_objectid(upn: str) -> str | None:
 def get_signed_in_user_id() -> str | None:
     """Return an Azure AD object ID for the signed-in user.
 
+    Checks both ``id`` (CLI ≥ 2.37) and the legacy ``objectId`` field so the
+    function works across CLI versions.
     Falls back from ``az ad signed-in-user show`` → ``az account show`` →
     UPN-to-objectId resolution.  Returns ``None`` when unauthenticated.
     """
-    rc, out = az(["ad", "signed-in-user", "show", "--query", "objectId"])
-    if rc == 0 and isinstance(out, str) and out:
-        return out.strip()
+    rc, out = az(["ad", "signed-in-user", "show"])
+    if rc == 0 and isinstance(out, dict):
+        oid = out.get("id") or out.get("objectId")
+        if oid and isinstance(oid, str):
+            return str(oid.strip())
     logger.debug("primary signed-in-user query failed (rc=%d), trying account show", rc)
     rc2, upn = az(["account", "show", "--query", "user.name"])
     if rc2 == 0 and isinstance(upn, str) and upn:

@@ -20,22 +20,22 @@ class TestPermissionHelpers(unittest.TestCase):
     @patch("azure.identity.az")
     def test_get_signed_in_user_id_success(self, mock_az: Any) -> None:
         """Returns object ID when signed-in-user query succeeds immediately."""
-        mock_az.return_value = (0, "abcd-1234\n")
+        mock_az.return_value = (0, {"id": "abcd-1234", "displayName": "Test User"})
         uid = az_identity.get_signed_in_user_id()
         self.assertEqual(uid, "abcd-1234")
-        mock_az.assert_called_with(["ad", "signed-in-user", "show", "--query", "objectId"])
+        mock_az.assert_called_with(["ad", "signed-in-user", "show"])
 
     @patch("azure.identity.az")
     def test_get_signed_in_user_id_upn_fallback(self, mock_az: Any) -> None:
         """Falls back from object-id lookup to UPN resolution path."""
         # first call fails, second returns UPN, third resolves to objectId
-        mock_az.side_effect = [(1, "error"), (0, "user@contoso.com\n"), (0, "abcd-5678\n")]
+        mock_az.side_effect = [(1, "error"), (0, "user@contoso.com"), (0, {"id": "abcd-5678"})]
         uid = az_identity.get_signed_in_user_id()
         self.assertEqual(uid, "abcd-5678")
         expected = [
-            ["ad", "signed-in-user", "show", "--query", "objectId"],
+            ["ad", "signed-in-user", "show"],
             ["account", "show", "--query", "user.name"],
-            ["ad", "user", "show", "--id", "user@contoso.com", "--query", "objectId"],
+            ["ad", "user", "show", "--id", "user@contoso.com"],
         ]
         self.assertEqual(mock_az.call_args_list, [unittest.mock.call(x) for x in expected])
 

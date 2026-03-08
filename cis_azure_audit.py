@@ -1186,6 +1186,11 @@ Examples:
         action="store_true",
         help="Print all active suppressions and exit",
     )
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        help="Open the HTML report in the default browser when the audit is complete",
+    )
 
     args = parser.parse_args()
 
@@ -1275,6 +1280,10 @@ Examples:
         sub_timestamps = {cp["subscription_name"]: cp["timestamp"] for cp in checkpoints.values()}
         run_history = load_history(history_path_for(args.output))
         generate_html(all_results, args.output, history=run_history, sub_timestamps=sub_timestamps)
+        if args.open:
+            import webbrowser
+
+            webbrowser.open(Path(args.output).as_uri())
         return
 
     # ── Prerequisite: az CLI available ────────────────────────────────────────
@@ -1418,6 +1427,10 @@ Examples:
     }
     sub_timestamps = {cp["subscription_name"]: cp["timestamp"] for cp in load_checkpoints().values()}
     generate_html(all_results, args.output, scope_info, run_history, sub_timestamps)
+    if args.open:
+        import webbrowser
+
+        webbrowser.open(Path(args.output).as_uri())
 
 
 if __name__ == "__main__":

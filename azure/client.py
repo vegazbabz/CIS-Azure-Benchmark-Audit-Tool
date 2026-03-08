@@ -231,7 +231,9 @@ def _run_cmd_with_retries(
                 elif is_notapplicable:
                     logger.debug("command not applicable for account type (rc=%d): %s", r_returncode, summary)
                 elif is_fw:
-                    logger.debug("command blocked by network firewall / private endpoint (rc=%d): %s", r_returncode, summary)
+                    logger.debug(
+                        "command blocked by network firewall / private endpoint (rc=%d): %s", r_returncode, summary
+                    )
                 elif summary.strip() in ("^C", ""):
                     # az subprocess killed by Ctrl+C (Windows forwards SIGINT to
                     # all console processes); not a real error — suppress the noise.

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, INFO, ERROR, TIMEOUTS, ROLE_OWNER, ROLE_UAA
+from cis.config import PASS, FAIL, INFO, ERROR, MANUAL, TIMEOUTS, ROLE_OWNER, ROLE_UAA
 from cis.models import R
 from cis.check_helpers import _err, _idx
 from azure.helpers import az, az_rest, az_rest_paged
@@ -148,63 +148,26 @@ def check_5_1_2() -> R:
 
 def check_5_1_3() -> R:
     """
-    5.1.3 — MFA enabled for all privileged users (Level 1)
+    5.1.3 — Allow users to remember MFA on trusted devices is disabled (Manual, Level 1)
 
-    Queries the Microsoft Graph beta authentication-methods registration
-    report, filtered to users that hold at least one admin role
-    (``isAdmin = true``).  Any admin without ``isMfaRegistered = true`` is
-    non-compliant.
+    The 'Allow users to remember multi-factor authentication on devices they
+    trust' setting lets users skip MFA for up to 90 days on a trusted device.
+    It is a legacy Per-user MFA feature (deprecated by Microsoft) and should
+    be disabled. Tenants that have migrated to Conditional Access should
+    enforce sign-in frequency instead.
 
-    Pagination is handled transparently by ``az_rest_paged``.
-
-    API:
-      GET /beta/reports/authenticationMethods/userRegistrationDetails
-          ?$filter=isAdmin eq true
-          &$select=userPrincipalName,isMfaRegistered
-
-    Required Graph permission (application):
-      UserAuthenticationMethod.Read.All  *or*  Reports.Read.All
+    There is no stable Microsoft Graph API for this setting (it lives in the
+    deprecated Per-user MFA portal), so this control cannot be automated.
     """
-    _CTRL = "5.1.3"
-    _TITLE = "MFA enabled for all privileged users"
-    _SEC = "5 - Identity Services"
-
-    url = (
-        "https://graph.microsoft.com/beta/reports/authenticationMethods/"
-        "userRegistrationDetails?$filter=isAdmin eq true"
-        "&$select=userPrincipalName,isMfaRegistered"
-    )
-    rc, users = az_rest_paged(url, timeout=TIMEOUTS["default"])
-    if rc != 0:
-        return _err(
-            _CTRL,
-            _TITLE,
-            1,
-            _SEC,
-            "Unable to retrieve MFA registration details — ensure the service "
-            "principal has UserAuthenticationMethod.Read.All or "
-            "Reports.Read.All Graph permission.",
-        )
-
-    without_mfa = [u.get("userPrincipalName") or u.get("id", "?") for u in users if not u.get("isMfaRegistered")]
-
-    if not without_mfa:
-        n = len(users)
-        msg = f"All {n} privileged user(s) have MFA registered." if n else "No privileged users found."
-        return R(_CTRL, _TITLE, 1, _SEC, PASS, msg, "")
-
-    names = without_mfa[:10]
-    detail = f"{len(without_mfa)} privileged user(s) without MFA: {', '.join(names)}"
-    if len(without_mfa) > 10:
-        detail += f" \u2026 and {len(without_mfa) - 10} more"
     return R(
-        _CTRL,
-        _TITLE,
+        "5.1.3",
+        "Allow users to remember MFA on trusted devices is disabled",
         1,
-        _SEC,
-        FAIL,
-        detail,
-        "Entra ID > Per-user MFA or Conditional Access > Require MFA for all privileged users.",
+        "5 - Identity Services",
+        MANUAL,
+        "Manual verification required — setting is in the deprecated Per-user MFA portal.",
+        "Disable 'Allow users to remember MFA on trusted devices' in the legacy MFA portal, "
+        "or migrate to Conditional Access sign-in frequency policies.",
     )
 
 

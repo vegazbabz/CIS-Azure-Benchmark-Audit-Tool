@@ -7,7 +7,7 @@ from typing import Any
 import unittest
 from unittest.mock import patch
 
-from cis.config import ERROR, FAIL, INFO, PASS
+from cis.config import ERROR, FAIL, INFO, MANUAL, PASS
 
 import checks.s2 as checks_s2
 import checks.s5 as checks_s5
@@ -292,65 +292,12 @@ class TestCheck512(unittest.TestCase):
 
 
 class TestCheck513(unittest.TestCase):
-    """5.1.3 — MFA enabled for all privileged users."""
+    """5.1.3 — Allow users to remember MFA on trusted devices (Manual)."""
 
-    @patch("checks.s5.az_rest_paged")
-    def test_all_privileged_users_have_mfa_returns_pass(self, mock: Any) -> None:
-        mock.return_value = (
-            0,
-            [
-                {"userPrincipalName": "a@t.com", "isMfaRegistered": True},
-                {"userPrincipalName": "b@t.com", "isMfaRegistered": True},
-            ],
-        )
+    def test_returns_manual(self) -> None:
         result = checks_s5.check_5_1_3()
         self.assertEqual(result.control_id, "5.1.3")
-        self.assertEqual(result.status, PASS)
-
-    @patch("checks.s5.az_rest_paged")
-    def test_no_privileged_users_returns_pass(self, mock: Any) -> None:
-        mock.return_value = (0, [])
-        result = checks_s5.check_5_1_3()
-        self.assertEqual(result.control_id, "5.1.3")
-        self.assertEqual(result.status, PASS)
-
-    @patch("checks.s5.az_rest_paged")
-    def test_privileged_user_without_mfa_returns_fail(self, mock: Any) -> None:
-        mock.return_value = (
-            0,
-            [
-                {"userPrincipalName": "noMfa@t.com", "isMfaRegistered": False},
-                {"userPrincipalName": "hasMfa@t.com", "isMfaRegistered": True},
-            ],
-        )
-        result = checks_s5.check_5_1_3()
-        self.assertEqual(result.control_id, "5.1.3")
-        self.assertEqual(result.status, FAIL)
-        self.assertIn("noMfa@t.com", result.details)
-        self.assertNotIn("hasMfa@t.com", result.details)
-
-    @patch("checks.s5.az_rest_paged")
-    def test_api_error_returns_error(self, mock: Any) -> None:
-        mock.return_value = (1, [])
-        result = checks_s5.check_5_1_3()
-        self.assertEqual(result.control_id, "5.1.3")
-        self.assertEqual(result.status, ERROR)
-
-    @patch("checks.s5.az_rest_paged")
-    def test_many_privileged_users_without_mfa_truncates_list(self, mock: Any) -> None:
-        users = [{"userPrincipalName": f"admin{i}@t.com", "isMfaRegistered": False} for i in range(15)]
-        mock.return_value = (0, users)
-        result = checks_s5.check_5_1_3()
-        self.assertEqual(result.status, FAIL)
-        self.assertIn("15 privileged", result.details)
-        self.assertIn("more", result.details)
-
-    @patch("checks.s5.az_rest_paged")
-    def test_upn_fallback_to_id_when_upn_missing(self, mock: Any) -> None:
-        mock.return_value = (0, [{"id": "guid-1234", "isMfaRegistered": False}])
-        result = checks_s5.check_5_1_3()
-        self.assertEqual(result.status, FAIL)
-        self.assertIn("guid-1234", result.details)
+        self.assertEqual(result.status, MANUAL)
 
 
 class TestCheck533(unittest.TestCase):

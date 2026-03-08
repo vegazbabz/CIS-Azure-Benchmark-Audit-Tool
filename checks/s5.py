@@ -10,10 +10,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, INFO, TIMEOUTS, ROLE_OWNER, ROLE_UAA
+from cis.config import PASS, FAIL, INFO, ERROR, TIMEOUTS, ROLE_OWNER, ROLE_UAA
 from cis.models import R
 from cis.check_helpers import _err, _idx
 from azure.helpers import az, az_rest, az_rest_paged
+from azure.client import is_authz_error
 
 
 def check_5_1_1() -> R:
@@ -40,6 +41,18 @@ def check_5_1_1() -> R:
 
     rc, data = az_rest("https://graph.microsoft.com/v1.0/policies/identitySecurityDefaultsEnforcementPolicy")
     if rc != 0:
+        if is_authz_error(str(data)):
+            return R(
+                _CTRL,
+                _TITLE,
+                1,
+                _SEC,
+                ERROR,
+                "Graph API access denied — Policy.Read.All application permission is required "
+                "(for service principals), or Global Reader / Security Administrator / "
+                "Security Reader Entra ID role (for interactive user accounts).",
+                "",
+            )
         return _err(_CTRL, _TITLE, 1, _SEC, str(data))
 
     is_enabled = data.get("isEnabled", False) if isinstance(data, dict) else False

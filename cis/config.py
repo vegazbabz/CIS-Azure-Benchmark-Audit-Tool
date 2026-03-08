@@ -142,9 +142,9 @@ def load_config_file(path: Path | None = None) -> None:
     Missing file → silently ignored (all defaults kept).
     Unknown keys → logged as warnings, not errors.
     """
-    # TIMEOUTS is mutated in-place (dict item assignment) — no global declaration needed.
+    # TIMEOUTS and GRAPH_AUTH are mutated in-place (dict item assignment) — no global declaration needed.
     # The other three are reassigned, so they require global.
-    global DEFAULT_PARALLEL, DEFAULT_EXECUTOR, CHECKPOINT_DIR, GRAPH_AUTH  # noqa: PLW0603
+    global DEFAULT_PARALLEL, DEFAULT_EXECUTOR, CHECKPOINT_DIR  # noqa: PLW0603
 
     # --- resolve config path ---
     if path is None:

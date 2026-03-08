@@ -7,7 +7,7 @@
 
 **Version:** 1.0.0-beta3
 **Benchmark:** [CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure) (September 2025)
-**Coverage:** 93 automated controls · 1 manual control noted in output · 1 control pending (2.1.1)
+**Coverage:** 94 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)
 
 > **Note:** Sections 3 (App Service) and 4 (Virtual Machines) are not yet implemented.
 
@@ -36,6 +36,7 @@ are generated alongside the HTML automatically.
 | Azure CLI | Any recent version — <https://aka.ms/install-azure-cli> |
 | resource-graph extension | Installed automatically on first run |
 | Azure login | `az login` completed before running |
+| msal | `pip install -r requirements.txt` — required for check 5.1.1 (optional, see below) |
 
 ### Azure permissions
 
@@ -52,15 +53,24 @@ are generated alongside the HTML automatically.
 > runner account to the vault's access policy. Without this, affected checks return ERROR with a
 > clear explanation and remediation hint in the report — compliance is unknown, not assumed clean.
 
-### Development prerequisites
+### Dependencies
 
-Dev dependencies (`black`, `flake8`, `mypy`, and optionally `rich`) are listed in `requirements-dev.txt`. Install them if you want to run the linters and type checker locally:
+The tool has one runtime dependency — `msal` — used only for check 5.1.1 (Security defaults).
+Install it with:
+
+```bash
+pip install -r requirements.txt
+```
+
+If `msal` is not installed, check 5.1.1 will still run via the `az` CLI path, but will return
+ERROR because the `az` CLI app cannot acquire `Policy.Read.All`. All other checks have no pip
+dependencies.
+
+Dev dependencies (`black`, `flake8`, `mypy`, and optionally `rich`) are listed in `requirements-dev.txt`:
 
 ```bash
 pip install -r requirements-dev.txt
 ```
-
-The audit tool itself has no pip dependencies — only Python 3.10+ and the Azure CLI are required to run it.
 
 ---
 
@@ -87,8 +97,10 @@ enabled subscriptions, run all checks, and save the report files in the current 
 ```text
 cis_azure_audit.py          Main entry point and CLI
 cis_audit.toml              Optional configuration file (parallel, timeouts, etc.)
+requirements.txt            Runtime pip dependency (msal)
 azure/
   client.py                 az CLI wrappers, retry logic, error classification helpers
+  graph_auth.py             MSAL-based Graph auth for Policy.Read.All (check 5.1.1)
   helpers.py                Shared Azure utilities
   identity.py               Permission preflight and role helpers
 checks/
@@ -132,6 +144,13 @@ storage_list = 30    # az storage account list
 storage_svc  = 15    # Per-account blob/file/table service queries
 activity_log = 25    # Activity log queries
 graph        = 120   # Resource Graph bulk queries
+
+# Optional — enables automated evaluation of 5.1.1 (Security defaults).
+# See "Check 5.1.1 setup" below for the one-time app registration steps.
+[graph_auth]
+# client_id     = "00000000-0000-0000-0000-000000000000"
+# tenant_id     = ""  # optional — auto-detected via az account show
+# client_secret = ""  # SP / CI only; omit for interactive user auth
 ```
 
 CLI flags override `cis_audit.toml` values when both are set.
@@ -361,11 +380,11 @@ Useful after:
 - Upgrading the tool (the new error classification and message formatting is applied on load)
 - Changing the `--level` filter
 
-Section 5 tenant-level identity checks (5.1.1, 5.1.2, 5.4, 5.14, 5.15, 5.16) are **re-run** at
-report time because they are not stored in subscription checkpoints. This means MANUAL findings
-(e.g. 5.1.2 MFA) will always appear, and live Graph API results (5.4, 5.14, 5.15, 5.16) will
-reflect the current state of your tenant. If Graph is unreachable, those checks are skipped with
-a warning and the report is still generated from checkpoints.
+Section 5 tenant-level identity checks (5.1.1, 5.1.2, 5.1.3, 5.4, 5.14, 5.15, 5.16) are
+**re-run** at report time because they are not stored in subscription checkpoints. Live Graph API
+results (5.4, 5.14, 5.15, 5.16) will reflect the current state of your tenant. MANUAL findings
+(5.1.3) will always appear. If Graph is unreachable, those checks are skipped with a warning and
+the report is still generated from checkpoints.
 
 Results loaded from checkpoints are automatically reclassified using the current tool logic:
 `FeatureNotSupportedForAccount` storage errors recorded as ERROR in older checkpoints are shown
@@ -463,25 +482,51 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 
 > **2.1.1** (Databricks in customer-managed VNet) — pending implementation.
 
-### Section 5 — Identity Services (8 automated · 1 manual)
+### Section 5 — Identity Services (9 automated · 2 manual)
 
-| Control | Title | Level |
-| --- | --- | --- |
-| 5.1.1 | Security defaults enabled | L1 |
-| 5.1.2 | MFA enabled for all users | L1 |
-| 5.3.3 | User Access Administrator role restricted | L1 |
-| 5.4 | Restrict non-admin users from creating tenants | L1 |
-| 5.14 | Users cannot register applications | L1 |
-| 5.15 | Guest access restricted to own directory objects | L1 |
-| 5.16 | Guest invite restrictions set to admins or no one | L2 |
-| 5.23 | No custom subscription administrator roles | L1 |
-| 5.27 | Between 2 and 3 subscription owners | L1 |
+| Control | Title | Level | Notes |
+| --- | --- | --- | --- |
+| 5.1.1 | Security defaults enabled | L1 | Requires `[graph_auth]` setup — see below |
+| 5.1.2 | MFA enabled for all users | L1 | |
+| 5.1.3 | Allow users to remember MFA on trusted devices disabled | L1 | **Manual** — no API available |
+| 5.3.3 | User Access Administrator role restricted | L1 | |
+| 5.4 | Restrict non-admin users from creating tenants | L1 | |
+| 5.14 | Users cannot register applications | L1 | |
+| 5.15 | Guest access restricted to own directory objects | L1 | |
+| 5.16 | Guest invite restrictions set to admins or no one | L2 | |
+| 5.23 | No custom subscription administrator roles | L1 | |
+| 5.27 | Between 2 and 3 subscription owners | L1 | |
+| 5.28 | Privileged users protected by phishing-resistant MFA | L1 | **Manual** — Entra ID portal review |
 
-> **5.1.1** — returns INFO for E3/E5 tenants using Conditional Access (security defaults are
-> mutually exclusive with CA policies).
+> **5.1.1** — The `az` CLI app cannot acquire `Policy.Read.All`. Without `[graph_auth]`
+> configured, this check returns ERROR with instructions to set it up. With `[graph_auth]`
+> configured, MSAL is used (browser popup once for user accounts; client credentials for SPs).
+> Returns INFO when security defaults are disabled but Conditional Access policies are present
+> (CA is the stronger control and disabling security defaults is intentional in that case).
 >
-> **5.1.2** — returns MANUAL. The CIS PDF audit method requires `Get-MgUser` via Graph PowerShell;
-> there is no `az` CLI equivalent.
+> **5.1.2** — Uses the Graph beta authentication methods registration report
+> (`/beta/reports/authenticationMethods/userRegistrationDetails`). Any user without
+> `isMfaRegistered = true` is reported as non-compliant.
+>
+> **5.1.3** — Manual. The "Allow users to remember MFA on trusted devices" setting lives in the
+> deprecated Per-user MFA portal, which has no stable Graph API surface.
+
+#### Check 5.1.1 setup (one-time)
+
+1. In Entra ID, go to **App registrations** → **New registration** (any name, single-tenant).
+2. **API permissions** → Add → Microsoft Graph → **Delegated** → `Policy.Read.All` → **Grant admin consent**.
+3. For service principal / CI: also add the **Application** permission `Policy.Read.All` and consent it; set `client_secret` in `[graph_auth]` or the `CIS_GRAPH_CLIENT_SECRET` env var.
+4. Copy the **Application (client) ID** into `cis_audit.toml`:
+   ```toml
+   [graph_auth]
+   client_id = "your-app-client-id"
+   ```
+5. `pip install -r requirements.txt`
+6. Run the tool — a browser window opens once for interactive sign-in; subsequent runs use a token
+   cached at `~/.cis_audit/msal_token_cache.json`.
+
+> **Device code flow is not used.** MSAL is configured to use the authorization code flow with
+> PKCE (interactive browser) in user mode, in line with CIS 5.2.3.
 
 ### Section 6 — Management and Governance (16 automated)
 
@@ -664,6 +709,11 @@ the runner account to the vault's access policy (non-RBAC vaults). Without this,
 return ERROR with an explanatory message. The report clearly distinguishes this from a clean
 result — compliance is unknown, not assumed clean.
 
+**Check 5.1.1 returns ERROR (Policy.Read.All)**
+The `az` CLI app cannot acquire `Policy.Read.All`. This is a Microsoft-imposed limitation — the
+az CLI app (`04b07795-...`) is not pre-authorized for that scope. Configure `[graph_auth]` in
+`cis_audit.toml` with your own app registration to resolve it (see "Check 5.1.1 setup" above).
+
 **Graph API for identity checks** — controls 5.4, 5.14, 5.15, and 5.16 call the Graph API via
 `az rest`. If the required Graph permissions have not been consented for the Azure CLI app, these
 will return ERROR. Test with:
@@ -696,6 +746,10 @@ az rest --method get --url "https://graph.microsoft.com/v1.0/policies/authorizat
 
 If this fails, ask your Entra ID admin to grant Global Reader or consent to the required Graph API
 permissions for the Azure CLI app (app ID: `04b07795-8ddb-461a-bbee-02f9e1bf7b46`).
+
+**5.1.1 returns ERROR specifically (Policy.Read.All)**
+This is expected without `[graph_auth]` configured. The az CLI app cannot acquire this scope.
+See "Check 5.1.1 setup" under the Section 5 controls table.
 
 **Key Vault checks return ERROR (audit incomplete)**
 The runner account needs Key Vault data plane access. For RBAC-enabled vaults assign the
@@ -737,8 +791,6 @@ This is an independent community implementation referencing the publicly availab
 CIS Benchmarks are the property of the Center for Internet Security (<https://www.cisecurity.org>).
 This tool is not affiliated with, endorsed by, or approved by CIS.
 
-
 **Version:** 1.0.0-beta3
 **Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
-**Coverage:** 93 automated controls · 1 manual control noted in output · 1 control pending (2.1.1)
-
+**Coverage:** 94 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)

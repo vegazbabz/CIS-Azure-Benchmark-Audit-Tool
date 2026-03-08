@@ -1337,7 +1337,7 @@ Examples:
         else:
             preflight = check_user_permissions([s["id"] for s in subs])
         if preflight.get("user_id"):
-            LOGGER.info("   User: %s", preflight["user_id"])
+            LOGGER.info("   User: %s", acc.get("user") or preflight["user_id"])
             roles = preflight.get("roles", [])
             role_sub_count = preflight.get("role_sub_count", {})
             total_subs = preflight.get("total_subs", len(subs))

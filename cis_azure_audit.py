@@ -1281,9 +1281,13 @@ Examples:
         run_history = load_history(history_path_for(args.output))
         generate_html(all_results, args.output, history=run_history, sub_timestamps=sub_timestamps)
         if args.open:
-            import webbrowser
+            _html_path = Path(args.output).resolve()
+            if sys.platform == "win32":
+                os.startfile(str(_html_path))
+            else:
+                import webbrowser
 
-            webbrowser.open(Path(args.output).resolve().as_uri())
+                webbrowser.open(_html_path.as_uri())
         return
 
     # ── Prerequisite: az CLI available ────────────────────────────────────────
@@ -1430,9 +1434,13 @@ Examples:
     sub_timestamps = {cp["subscription_name"]: cp["timestamp"] for cp in load_checkpoints().values()}
     generate_html(all_results, args.output, scope_info, run_history, sub_timestamps)
     if args.open:
-        import webbrowser
+        _html_path = Path(args.output).resolve()
+        if sys.platform == "win32":
+            os.startfile(str(_html_path))
+        else:
+            import webbrowser
 
-        webbrowser.open(Path(args.output).resolve().as_uri())
+            webbrowser.open(_html_path.as_uri())
 
 
 if __name__ == "__main__":

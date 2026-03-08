@@ -171,8 +171,10 @@ def _friendly_error(msg: str) -> str:
     # get a Graph-specific message rather than the Key Vault-specific one.
     if any(t in lowered for t in _GRAPH_SCOPE_TOKENS):
         return (
-            "Graph API access denied — service principal is missing required "
-            "OAuth scopes. Grant the necessary Graph application permissions in Entra ID."
+            "Graph API access denied — the signed-in account lacks the required "
+            "permission. Assign 'Reports Reader', 'Security Reader', or 'Global Reader' "
+            "in Entra ID (for user accounts), or grant the required Graph application "
+            "permission (for service principals)."
         )
     if any(t in lowered for t in _AUTHZ_TOKENS):
         return _CLEAN_KV_AUTHZ_MSG

@@ -194,15 +194,19 @@ class TestCheck2111(unittest.TestCase):
 class TestCheck511(unittest.TestCase):
     """5.1.1 — Security defaults enabled in Microsoft Entra ID."""
 
+    # ── az CLI path (MSAL not configured) ─────────────────────────────────────
+
+    @patch("checks.s5.msal_is_configured", return_value=False)
     @patch("checks.s5.az_rest")
-    def test_security_defaults_enabled_returns_pass(self, mock_az_rest: Any) -> None:
+    def test_security_defaults_enabled_returns_pass(self, mock_az_rest: Any, _mc: Any) -> None:
         mock_az_rest.return_value = (0, {"isEnabled": True})
         result = checks_s5.check_5_1_1()
         self.assertEqual(result.control_id, "5.1.1")
         self.assertEqual(result.status, PASS)
 
+    @patch("checks.s5.msal_is_configured", return_value=False)
     @patch("checks.s5.az_rest")
-    def test_security_defaults_disabled_with_ca_returns_info(self, mock_az_rest: Any) -> None:
+    def test_security_defaults_disabled_with_ca_returns_info(self, mock_az_rest: Any, _mc: Any) -> None:
         mock_az_rest.side_effect = [
             (0, {"isEnabled": False}),
             (0, {"value": [{"id": "policy-1"}]}),
@@ -211,8 +215,9 @@ class TestCheck511(unittest.TestCase):
         self.assertEqual(result.control_id, "5.1.1")
         self.assertEqual(result.status, INFO)
 
+    @patch("checks.s5.msal_is_configured", return_value=False)
     @patch("checks.s5.az_rest")
-    def test_security_defaults_disabled_no_ca_returns_fail(self, mock_az_rest: Any) -> None:
+    def test_security_defaults_disabled_no_ca_returns_fail(self, mock_az_rest: Any, _mc: Any) -> None:
         mock_az_rest.side_effect = [
             (0, {"isEnabled": False}),
             (0, {"value": []}),
@@ -221,9 +226,46 @@ class TestCheck511(unittest.TestCase):
         self.assertEqual(result.control_id, "5.1.1")
         self.assertEqual(result.status, FAIL)
 
+    @patch("checks.s5.msal_is_configured", return_value=False)
     @patch("checks.s5.az_rest")
-    def test_api_error_returns_error(self, mock_az_rest: Any) -> None:
-        mock_az_rest.return_value = (1, "Access denied")
+    def test_az_authz_error_returns_error_with_config_hint(self, mock_az_rest: Any, _mc: Any) -> None:
+        mock_az_rest.return_value = (1, "required scopes are missing in the token")
+        result = checks_s5.check_5_1_1()
+        self.assertEqual(result.control_id, "5.1.1")
+        self.assertEqual(result.status, ERROR)
+        self.assertIn("graph_auth", result.details)
+
+    @patch("checks.s5.msal_is_configured", return_value=False)
+    @patch("checks.s5.az_rest")
+    def test_az_generic_error_returns_error(self, mock_az_rest: Any, _mc: Any) -> None:
+        mock_az_rest.return_value = (1, "Connection timeout")
+        result = checks_s5.check_5_1_1()
+        self.assertEqual(result.control_id, "5.1.1")
+        self.assertEqual(result.status, ERROR)
+
+    # ── MSAL path (configured) ─────────────────────────────────────────────────
+
+    @patch("checks.s5.msal_is_configured", return_value=True)
+    @patch("checks.s5.msal_rest")
+    @patch("checks.s5.az_rest")
+    def test_msal_enabled_returns_pass(self, mock_az_rest: Any, mock_msal: Any, _mc: Any) -> None:
+        mock_msal.return_value = (0, {"isEnabled": True})
+        result = checks_s5.check_5_1_1()
+        self.assertEqual(result.status, PASS)
+        mock_az_rest.assert_not_called()
+
+    @patch("checks.s5.msal_is_configured", return_value=True)
+    @patch("checks.s5.msal_rest")
+    def test_msal_disabled_with_ca_returns_info(self, mock_msal: Any, _mc: Any) -> None:
+        mock_msal.return_value = (0, {"isEnabled": False})
+        with patch("checks.s5.az_rest", return_value=(0, {"value": [{"id": "ca1"}]})):
+            result = checks_s5.check_5_1_1()
+        self.assertEqual(result.status, INFO)
+
+    @patch("checks.s5.msal_is_configured", return_value=True)
+    @patch("checks.s5.msal_rest")
+    def test_msal_error_returns_error(self, mock_msal: Any, _mc: Any) -> None:
+        mock_msal.return_value = (1, "MSAL token acquisition failed: consent_required")
         result = checks_s5.check_5_1_1()
         self.assertEqual(result.control_id, "5.1.1")
         self.assertEqual(result.status, ERROR)

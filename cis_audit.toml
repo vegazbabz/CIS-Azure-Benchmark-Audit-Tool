@@ -19,3 +19,23 @@ storage_list = 30   # az storage account list
 storage_svc  = 15   # Per-account blob/file/table service queries
 activity_log = 25   # Activity log queries (90-day window)
 graph        = 120  # Resource Graph bulk queries
+
+# ── Optional: MSAL auth for Graph endpoints unreachable via the az CLI app ────
+# CIS 5.1.1 (Security defaults) requires Policy.Read.All — a scope the az CLI
+# app cannot acquire.  Configuring this section enables automated evaluation.
+#
+# One-time setup:
+#   1. In Entra ID, go to App registrations > New registration.
+#   2. Add delegated permission: Microsoft Graph > Policy.Read.All.
+#   3. Click "Grant admin consent".
+#   4. Copy the Application (client) ID into client_id below.
+#   5. Run the tool — a browser window will open once for interactive sign-in;
+#      subsequent runs use a cached token (~/.cis_audit/msal_token_cache.json).
+#
+# For service principal / CI use, also set client_secret here or via the
+# CIS_GRAPH_CLIENT_SECRET environment variable (recommended for secrets in CI).
+#
+# [graph_auth]
+# client_id     = "00000000-0000-0000-0000-000000000000"
+# tenant_id     = ""  # optional — auto-detected from az account show if omitted
+# client_secret = ""  # SP / CI mode only; omit for interactive user auth

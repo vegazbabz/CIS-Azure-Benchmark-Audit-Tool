@@ -12,6 +12,7 @@ from azure.client import (  # noqa: F401
     _friendly_error,
     az,
     az_rest,
+    az_rest_paged,
     get_and_reset_rate_limit_retry_count,
     graph_query,
     is_authz_error,

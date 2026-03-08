@@ -270,6 +270,29 @@ def az_rest(url: str, timeout: int = 25) -> tuple[int, Any]:
         return 0, stdout.strip()
 
 
+def az_rest_paged(url: str, timeout: int = 25) -> tuple[int, list[Any]]:
+    """Call an OData-paged Graph endpoint and return all items as a flat list.
+
+    Follows ``@odata.nextLink`` cursors until the last page.  Each page must
+    return a JSON object with a ``value`` array (the standard OData envelope).
+
+    Returns
+    -------
+    (0, [items...]) on success, or (non-zero, []) on the first HTTP/parse error.
+    """
+    items: list[Any] = []
+    next_url: str | None = url
+    while next_url:
+        rc, data = az_rest(next_url, timeout=timeout)
+        if rc != 0:
+            return rc, []
+        if not isinstance(data, dict):
+            return 1, []
+        items.extend(data.get("value", []))
+        next_url = data.get("@odata.nextLink")
+    return 0, items
+
+
 def graph_query(query: str, sub_ids: list[str]) -> tuple[int, Any]:
     """Execute a Kusto query against Azure Resource Graph and return all results.
 

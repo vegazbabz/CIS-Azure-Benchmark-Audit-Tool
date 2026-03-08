@@ -1190,7 +1190,8 @@ Examples:
 
     if args.fresh and args.report_only:
         parser.error(
-            "--fresh and --report-only are mutually exclusive: --fresh deletes checkpoints while --report-only reads them."
+            "--fresh and --report-only are mutually exclusive: "
+            "--fresh deletes checkpoints while --report-only reads them."
         )
 
     # Capture run timestamp early — used both for elapsed time and the default

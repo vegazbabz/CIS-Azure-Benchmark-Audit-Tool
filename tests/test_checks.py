@@ -7,7 +7,7 @@ from typing import Any
 import unittest
 from unittest.mock import patch
 
-from cis.config import ERROR, FAIL, INFO, MANUAL, PASS
+from cis.config import ERROR, FAIL, INFO, PASS
 
 import checks.s2 as checks_s2
 import checks.s5 as checks_s5

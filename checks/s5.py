@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, INFO, MANUAL, TIMEOUTS, ROLE_OWNER, ROLE_UAA
+from cis.config import PASS, FAIL, INFO, TIMEOUTS, ROLE_OWNER, ROLE_UAA
 from cis.models import R
 from cis.check_helpers import _err, _idx
 from azure.helpers import az, az_rest, az_rest_paged

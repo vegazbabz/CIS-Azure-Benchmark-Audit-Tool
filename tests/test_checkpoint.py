@@ -8,7 +8,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import cis.checkpoint as cis_checkpoint
 import cis.config as cis_config
 from cis.checkpoint import (
     load_checkpoints,

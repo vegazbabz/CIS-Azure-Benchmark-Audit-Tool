@@ -19,6 +19,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -287,10 +288,23 @@ def az_rest(url: str, timeout: int = 25) -> tuple[int, Any]:
     is added explicitly so the az CLI requests a Graph-scoped token rather
     than an ARM-scoped one.  Without this, Graph returns AccessDenied even
     when the signed-in user has the correct Entra ID directory roles.
+
+    Query parameters are always passed via ``--uri-parameters`` rather than
+    embedded in the URL.  On Windows, Python's subprocess does not quote URL
+    arguments that lack spaces, so an ``&`` in a paginated ``@odata.nextLink``
+    would be interpreted by cmd.exe as a command separator — causing errors
+    like "'$skiptoken' is not recognized as an internal or external command".
+    Splitting the parameters out avoids any ``&`` in the raw command line.
     """
-    cmd = [AZ, "rest", "--method", "get", "--url", url, "--output", "json"]
+    parsed = urllib.parse.urlparse(url)
+    query_params = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    base_url = urllib.parse.urlunparse(parsed._replace(query="")) if query_params else url
+
+    cmd = [AZ, "rest", "--method", "get", "--url", base_url, "--output", "json"]
     if url.startswith("https://graph.microsoft.com/"):
         cmd += ["--resource", "https://graph.microsoft.com"]
+    if query_params:
+        cmd += ["--uri-parameters"] + [f"{k}={v}" for k, v in query_params]
     rc, stdout, stderr = _run_cmd_with_retries(cmd, timeout=timeout)
     if rc != 0:
         return rc, (stderr or "").strip()

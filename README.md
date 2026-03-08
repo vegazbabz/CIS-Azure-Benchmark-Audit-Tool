@@ -356,15 +356,14 @@ The generated report is a self-contained HTML file with no external dependencies
 | PASS | Control is compliant |
 | FAIL | Control is non-compliant — remediation hint provided |
 | ERROR | Check could not complete — audit gap (permissions missing, timeout, or API error). Compliance is **unknown**; do not treat as clean. |
-| INFO | Not applicable — the resource type doesn't exist, the account type doesn't support the feature, or the vault is behind a private endpoint unreachable from the runner |
+| INFO | Not applicable — the resource type doesn't exist or the account type doesn't support the feature (e.g. ADLS Gen2 has no blob/file service) |
 | MANUAL | Cannot be automated — requires manual verification per the CIS PDF |
 | SUPPRESSED | Accepted risk — defined in `suppressions.toml` with a justification and expiry |
 
 > **ERROR vs INFO distinction:**
 > `ERROR` means *"the control applies, but the audit couldn't evaluate it"* — flag it for follow-up.
 > `INFO` means *"the control genuinely doesn't apply here"* — for example, an ADLS Gen2 storage account
-> has no blob/file service by design, or a vault locked behind a private endpoint is itself a sign of
-> strong network controls. In both INFO cases there is nothing to fix.
+> has no blob/file service by design, so the blob checks simply don't apply. There is nothing to fix.
 
 ### `--report-only`: regenerate the report without re-auditing
 
@@ -605,10 +604,9 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 | 8.5 | DDoS Network Protection enabled on VNets | L2 |
 
 > **Key Vault data-plane checks (8.3.1–8.3.4, 8.3.9, 8.3.11):** these require data-plane access
-> beyond subscription Reader. Vaults behind a private endpoint that is unreachable from the runner
-> return INFO (the network restriction is itself a positive security signal). Vaults where the
-> runner lacks a Key Vault data-plane role or access policy return ERROR with an actionable message
-> explaining exactly what permission to grant — compliance is unknown, not assumed clean.
+> beyond subscription Reader. If the runner cannot reach the vault (firewall, private endpoint) or
+> lacks a Key Vault data-plane role / access policy, the check returns ERROR with an actionable message
+> explaining exactly what is missing — compliance is unknown, not assumed clean.
 
 ### Section 9 — Storage Services (21 automated)
 

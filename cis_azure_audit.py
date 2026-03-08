@@ -113,7 +113,7 @@ from cis.helpers import (
 )
 
 # Checkpoint save/load
-from cis.checkpoint import load_checkpoints, results_from_checkpoint, save_checkpoint
+from cis.checkpoint import load_checkpoints, load_tenant_checkpoint, results_from_checkpoint, save_checkpoint, save_tenant_checkpoint
 
 # HTML report generation
 from cis.report import _STATUS_STYLE, generate_html
@@ -828,6 +828,8 @@ def run_audit(
         except Exception as e:
             LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
 
+    save_tenant_checkpoint(tenant_results)
+
     # ── Resource Graph prefetch ───────────────────────────────────────────────
     # Fetch all Resource Graph data ONCE before the parallel loop.
     # The results are shared read-only across all workers (no locking needed
@@ -1206,15 +1208,20 @@ Examples:
         for sub_id, cp in checkpoints.items():
             all_results.extend(results_from_checkpoint(cp))
             LOGGER.info("   ✅ Loaded: %s", cp.get("subscription_name", sub_id))
-        # Tenant-level checks are not stored in checkpoints (they run once and
-        # require only static logic or a single Graph call).  Re-run them here
-        # so that MANUAL results (e.g. 5.1.2) appear in the regenerated report.
-        LOGGER.info("   🔍 Re-running tenant checks...")
-        for fn in [check_5_1_1, check_5_1_2, check_5_4, check_5_14, check_5_15, check_5_16]:
-            try:
-                all_results.append(fn())
-            except Exception as e:
-                LOGGER.warning("   ⚠️  Skipped tenant check %s: %s", fn.__name__, e)
+        # Load tenant check results from checkpoint if available.  Falls back
+        # to re-running live checks (which make Graph API calls) if no checkpoint
+        # exists — this happens on the first --report-only run after a fresh audit.
+        tenant_ckpt = load_tenant_checkpoint()
+        if tenant_ckpt is not None:
+            LOGGER.info("   💾 Loaded tenant checks from checkpoint (%d results).", len(tenant_ckpt))
+            all_results.extend(tenant_ckpt)
+        else:
+            LOGGER.info("   🔍 No tenant checkpoint found — re-running tenant checks (requires az login)...")
+            for fn in [check_5_1_1, check_5_1_2, check_5_4, check_5_14, check_5_15, check_5_16]:
+                try:
+                    all_results.append(fn())
+                except Exception as e:
+                    LOGGER.warning("   ⚠️  Skipped tenant check %s: %s", fn.__name__, e)
         if args.level:
             all_results = [r for r in all_results if r.level == args.level]
         all_results = _dedup_results(all_results)

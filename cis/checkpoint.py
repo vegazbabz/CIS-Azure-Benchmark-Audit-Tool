@@ -16,16 +16,12 @@ from __future__ import annotations
 
 import datetime
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import Any
 
+from azure.client import _CLEAN_KV_AUTHZ_MSG
 from cis.config import BENCHMARK_VER, CHECKPOINT_DIR, LOGGER, VERSION
 from cis.models import R
-
-_CLEAN_KV_AUTHZ_MSG = (
-    "Audit incomplete — account lacks Key Vault data-plane permissions. "
-    "Grant 'Key Vault Reader' data-plane role (or an access policy) to include this vault."
-)
 
 # Tokens whose presence in a stored ERROR result's `details` field means the
 # result should be downgraded to INFO on load.  This lets --report-only (and
@@ -38,7 +34,7 @@ _CLEAN_KV_AUTHZ_MSG = (
 # DOES apply, the audit just couldn't verify compliance.  That is an audit gap
 # and must be visible in the report so the auditor knows to investigate.
 # Old checkpoints may have the raw CLI blob in `details` — we replace it with
-# the clean actionable message.
+# the clean actionable message (imported from azure.client).
 _RECLASSIFY_NOTAPPLICABLE_TOKENS = frozenset(
     [
         "featurenotsupportedforaccount",
@@ -54,6 +50,10 @@ _KV_AUTHZ_TOKENS = frozenset(
 
 # Mapping of section names that were stored incorrectly in old checkpoints.
 # Applied on load so --report-only reflects corrections without a full re-audit.
+#
+# Each entry can be pruned once you are confident no checkpoints older than the
+# fixing commit remain in use (i.e. after running --fresh or re-auditing all
+# subscriptions at least once with the corrected version).
 _SECTION_NAME_FIXES: dict[str, str] = {
     "7 - Networking & Governance": "7 - Networking Services",
 }
@@ -73,51 +73,22 @@ def _reclassify(r: R) -> R:
 
     # Fix known section name typos stored in old checkpoints.
     if r.section in _SECTION_NAME_FIXES:
-        r = R(
-            r.control_id,
-            r.title,
-            r.level,
-            _SECTION_NAME_FIXES[r.section],
-            r.status,
-            r.details,
-            r.remediation,
-            r.subscription_id,
-            r.subscription_name,
-            r.resource,
-        )
+        r = replace(r, section=_SECTION_NAME_FIXES[r.section])
 
     if r.status != ERROR:
         return r
     low = r.details.lower()
     if any(t in low for t in _RECLASSIFY_NOTAPPLICABLE_TOKENS):
-        return R(
-            r.control_id,
-            r.title,
-            r.level,
-            r.section,
-            INFO,
-            r.details,
-            "",  # no remediation for INFO
-            r.subscription_id,
-            r.subscription_name,
-            "",  # clear resource marker — nothing to flag
-        )
+        return replace(r, status=INFO, remediation="", resource="")
     # Old checkpoints store the raw CLI dump for KV auth errors — replace with
     # the clean, actionable message so --report-only shows readable output.
     if any(t in low for t in _KV_AUTHZ_TOKENS):
         # Preserve the vault/key/cert prefix (everything before the first " - ")
         prefix = r.details.split(" - ")[0] if " - " in r.details else r.details.split(":")[0]
-        return R(
-            r.control_id,
-            r.title,
-            r.level,
-            r.section,
-            ERROR,
-            f"{prefix}: {_CLEAN_KV_AUTHZ_MSG}",
-            "Grant Key Vault data-plane permissions to the audit account",
-            r.subscription_id,
-            r.subscription_name,
-            r.resource,
+        return replace(
+            r,
+            details=f"{prefix}: {_CLEAN_KV_AUTHZ_MSG}",
+            remediation="Grant Key Vault data-plane permissions to the audit account",
         )
     return r
 
@@ -185,9 +156,9 @@ def load_checkpoints() -> dict[str, Any]:
         try:
             with open(p, encoding="utf-8") as f:
                 data = json.load(f)
-            # Only load checkpoints that successfully completed
-            if data.get("status") != "completed":
-                continue
+            sid = data.get("subscription_id", "")
+            if not sid or sid.startswith("_"):
+                continue  # skip special non-subscription files (e.g. _tenant.json)
             cp_ver = data.get("tool_version", "unknown")
             if cp_ver != VERSION:
                 LOGGER.warning(
@@ -197,7 +168,9 @@ def load_checkpoints() -> dict[str, Any]:
                     cp_ver,
                     VERSION,
                 )
-            loaded[data["subscription_id"]] = data
+            if data.get("status") != "completed":
+                continue
+            loaded[sid] = data
         except (json.JSONDecodeError, KeyError) as e:
             LOGGER.warning("   \u26a0\ufe0f  Skipping corrupt checkpoint %s: %s", p.name, e)
 
@@ -237,3 +210,68 @@ def results_from_checkpoint(cp: dict[str, Any]) -> list[R]:
             pass  # Skip records that cannot be reconstructed
 
     return results
+
+
+# ── Tenant checkpoint ─────────────────────────────────────────────────────────
+# Tenant-level checks (Section 5 Entra ID checks) are not subscription-scoped
+# and therefore not stored in per-subscription checkpoint files.  A separate
+# _tenant.json checkpoint file saves them so that --report-only does not need
+# to make live Graph API calls on the second and subsequent invocations.
+
+_TENANT_CHECKPOINT_ID = "_tenant"
+
+
+def save_tenant_checkpoint(results: list[R]) -> None:
+    """Write tenant-level (Entra ID) check results to a dedicated checkpoint file.
+
+    Uses the same atomic write pattern as save_checkpoint.  The file is stored
+    in CHECKPOINT_DIR as _tenant.json and is skipped by load_checkpoints() so
+    it does not appear as a subscription entry in the audit summary.
+    """
+    CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+    data = {
+        "tool_version": VERSION,
+        "benchmark_version": BENCHMARK_VER,
+        "subscription_id": _TENANT_CHECKPOINT_ID,
+        "subscription_name": "Tenant (Entra ID)",
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "status": "completed",
+        "results": [asdict(r) for r in results],
+    }
+    target = CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json"
+    tmp = CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    tmp.rename(target)
+
+
+def load_tenant_checkpoint() -> list[R] | None:
+    """Load tenant-level results from checkpoint.
+
+    Returns None (caller should re-run live tenant checks) when:
+      - The checkpoint file does not exist yet (first run after a fresh audit)
+      - The tool version has changed (schema may differ)
+      - The file is corrupt or unreadable
+
+    The caller is responsible for logging a warning when falling back to live
+    API calls, so the operator understands why Graph API calls are being made
+    in --report-only mode.
+    """
+    path = CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json"
+    if not path.exists():
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as exc:
+        LOGGER.warning("   \u26a0\ufe0f  Could not read tenant checkpoint: %s", exc)
+        return None
+    cp_ver = data.get("tool_version", "unknown")
+    if cp_ver != VERSION:
+        LOGGER.warning(
+            "   \u26a0\ufe0f  Tenant checkpoint was written by tool v%s (current: v%s) — re-running tenant checks.",
+            cp_ver,
+            VERSION,
+        )
+        return None
+    return results_from_checkpoint(data)

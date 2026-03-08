@@ -130,6 +130,14 @@ def is_notapplicable_error(msg: str) -> bool:
     return any(t in lowered for t in _NOTAPPLICABLE_TOKENS)
 
 
+# Single source of truth for the KV data-plane permission error message.
+# Also imported by cis/checkpoint.py to reclassify old raw CLI dumps on load.
+_CLEAN_KV_AUTHZ_MSG = (
+    "Audit incomplete — account lacks Key Vault data-plane permissions. "
+    "Grant 'Key Vault Reader' data-plane role (or an access policy) to include this vault."
+)
+
+
 def _friendly_error(msg: str) -> str:
     """Return a short, human-readable version of an Azure CLI error string.
 
@@ -145,10 +153,7 @@ def _friendly_error(msg: str) -> str:
         return "Feature not supported for this account type"
     lowered = str(msg).lower()
     if any(t in lowered for t in _AUTHZ_TOKENS):
-        return (
-            "Audit incomplete — account lacks Key Vault data-plane permissions. "
-            "Grant 'Key Vault Reader' data-plane role (or an access policy) to include this vault."
-        )
+        return _CLEAN_KV_AUTHZ_MSG
     first = _first_error_line(msg)
     return first[:160] if len(first) > 160 else first
 
@@ -166,6 +171,7 @@ def _run_cmd_with_retries(
     tuple[int, str, str]
         ``(returncode, stdout, stderr)``
     """
+    global _rate_limit_retries
     for attempt in range(1, max_retries + 1):
         logger.debug("running command attempt %d: %s", attempt, cmd)
         try:
@@ -186,7 +192,6 @@ def _run_cmd_with_retries(
                 is_transient = any(tok in low for tok in transient_tokens)
                 if attempt < max_retries and is_transient:
                     with _rate_limit_lock:
-                        global _rate_limit_retries
                         _rate_limit_retries += 1
                     sleep_for = base_backoff * (2 ** (attempt - 1)) + random.random() * 0.5
                     logger.warning("transient error detected, sleeping %.1fs before retry", sleep_for)
@@ -244,8 +249,8 @@ def az(args: list[str], sub: str | None = None, timeout: int = 25) -> tuple[int,
 
 def get_and_reset_rate_limit_retry_count() -> int:
     """Return and reset the transient retry counter."""
+    global _rate_limit_retries
     with _rate_limit_lock:
-        global _rate_limit_retries
         count = _rate_limit_retries
         _rate_limit_retries = 0
         return count

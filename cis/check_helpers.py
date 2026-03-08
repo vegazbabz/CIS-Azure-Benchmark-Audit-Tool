@@ -53,7 +53,8 @@ def _err(
     Used when an az CLI call fails and we cannot evaluate the control.
     The error message is truncated at 200 characters to keep the report readable.
     """
-    return R(cid, title, lvl, sec, ERROR, msg[:200], "", sid, sname, resource)
+    truncated = msg[:197] + "..." if len(msg) > 200 else msg
+    return R(cid, title, lvl, sec, ERROR, truncated, "", sid, sname, resource)
 
 
 def _info(

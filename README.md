@@ -9,6 +9,8 @@
 **Benchmark:** [CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure) (September 2025)
 **Coverage:** 93 automated controls · 1 manual control noted in output · 1 control pending (2.1.1)
 
+> **Note:** Sections 3 (App Service) and 4 (Virtual Machines) are not yet implemented.
+
 ---
 
 ## Overview
@@ -92,7 +94,7 @@ azure/
 checks/
   s2.py                     Section 2 — Databricks
   s5.py                     Section 5 — Identity
-  s6.py                     Section 6 — Governance
+  s6.py                     Section 6 — Monitoring
   s7.py                     Section 7 — Networking
   s8.py                     Section 8 — Security Services
   s9.py                     Section 9 — Storage

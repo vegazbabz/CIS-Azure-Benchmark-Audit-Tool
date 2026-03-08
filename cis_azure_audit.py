@@ -1283,7 +1283,7 @@ Examples:
         if args.open:
             import webbrowser
 
-            webbrowser.open(Path(args.output).as_uri())
+            webbrowser.open(Path(args.output).resolve().as_uri())
         return
 
     # ── Prerequisite: az CLI available ────────────────────────────────────────
@@ -1308,11 +1308,12 @@ Examples:
         LOGGER.info("✅ resource-graph extension ready")
 
     # ── Prerequisite: authenticated session ───────────────────────────────────
-    rc, acc = az(["account", "show", "--query", "{user:user.name, tenant:tenantId}"])
+    rc, acc = az(["account", "show", "--query", "{user:user.name, tenant:tenantId, caller_type:user.type}"])
     if rc != 0:
         LOGGER.error("❌ Not logged in.\n   Run: az login")
         sys.exit(1)
-    LOGGER.info("✅ Authenticated as: %s  |  Tenant: %s", acc.get("user"), acc.get("tenant"))
+    _cfg.CALLER_TYPE = acc.get("caller_type", "user") or "user"
+    LOGGER.info("✅ Authenticated as: %s (%s)  |  Tenant: %s", acc.get("user"), _cfg.CALLER_TYPE, acc.get("tenant"))
 
     # ── Resolve subscriptions ─────────────────────────────────────────────────
     subs = get_subscriptions(args.subscription)
@@ -1417,6 +1418,7 @@ Examples:
     scope_info = {
         "tenant": acc.get("tenant", ""),
         "user": acc.get("user", ""),
+        "caller_type": _cfg.CALLER_TYPE,
         "scope_label": (
             "All subscriptions (tenant-wide)"
             if args.subscription is None
@@ -1430,7 +1432,7 @@ Examples:
     if args.open:
         import webbrowser
 
-        webbrowser.open(Path(args.output).as_uri())
+        webbrowser.open(Path(args.output).resolve().as_uri())
 
 
 if __name__ == "__main__":

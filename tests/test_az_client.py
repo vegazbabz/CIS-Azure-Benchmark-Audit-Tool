@@ -109,6 +109,7 @@ class TestFriendlyError(unittest.TestCase):
     def test_firewall_error_message(self) -> None:
         result = az_client._friendly_error("ForbiddenByFirewall")
         self.assertIn("Firewall blocked", result)
+        self.assertNotIn("vault", result.lower())
 
     def test_authz_error_collapsed(self) -> None:
         result = az_client._friendly_error("AuthorizationFailed")

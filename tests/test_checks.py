@@ -1017,6 +1017,46 @@ class TestCheck9Storage(unittest.TestCase):
         for r in results:
             if r.control_id in blob_ctrl_ids or r.control_id in file_ctrl_ids:
                 self.assertEqual(r.status, ERROR, f"{r.control_id} expected ERROR for firewall block, got {r.status}")
+                self.assertNotIn("Key Vault", r.details)
+
+    def test_authz_error_blob_and_file_returns_error_with_storage_message(self) -> None:
+        """Missing read access on storage account returns ERROR with a storage-specific message."""
+        account = {
+            "name": "no-access",
+            "resourceGroup": "rg",
+            "subscriptionId": SID,
+            "httpsOnly": True,
+            "publicAccess": "Enabled",
+            "crossTenant": False,
+            "blobAnon": False,
+            "defaultAction": "Allow",
+            "bypass": "AzureServices",
+            "minTls": "TLS1_2",
+            "keyAccess": False,
+            "oauthDefault": True,
+            "sku": "Standard_LRS",
+            "privateEps": 0,
+        }
+        td = _td("storage", [account])
+
+        auth_error = (
+            "AuthorizationFailed: The client does not have authorization to perform action"
+            " 'Microsoft.Storage/storageAccounts/blobServices/read'."
+        )
+
+        def _az_auth(_args: list, *a: Any, **kw: Any) -> tuple:
+            return (1, auth_error)
+
+        with patch("checks.s9.az", side_effect=_az_auth):
+            results = checks_s9.check_9_storage(SID, SNAME, td)
+
+        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3"}
+        file_ctrl_ids = {"9.1.1", "9.1.2", "9.1.3"}
+        for r in results:
+            if r.control_id in blob_ctrl_ids or r.control_id in file_ctrl_ids:
+                self.assertEqual(r.status, ERROR, f"{r.control_id} expected ERROR for auth failure")
+                self.assertNotIn("Key Vault", r.details)
+                self.assertIn("Reader", r.remediation)
 
 
 if __name__ == "__main__":

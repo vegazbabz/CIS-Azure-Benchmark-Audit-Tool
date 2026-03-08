@@ -153,6 +153,13 @@ _CLEAN_KV_AUTHZ_MSG = (
     "Grant 'Key Vault Reader' data-plane role (or an access policy) to include this vault."
 )
 
+# Storage management-plane permission error message (blob/file service properties).
+# These calls require Reader on the subscription or storage account scope.
+_CLEAN_STORAGE_AUTHZ_MSG = (
+    "Audit incomplete — account lacks read access to this storage account. "
+    "Assign 'Reader' role at the subscription or storage account scope."
+)
+
 
 def _friendly_error(msg: str) -> str:
     """Return a short, human-readable version of an Azure CLI error string.
@@ -164,7 +171,7 @@ def _friendly_error(msg: str) -> str:
     if not msg:
         return "Unknown error"
     if is_firewall_error(msg):
-        return "Firewall blocked — vault not reachable from this runner IP"
+        return "Firewall blocked — resource not reachable from this runner"
     if is_notapplicable_error(msg):
         return "Feature not supported for this account type"
     lowered = str(msg).lower()

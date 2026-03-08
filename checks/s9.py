@@ -12,7 +12,7 @@ from typing import Any
 from cis.config import PASS, FAIL, ERROR, INFO, TIMEOUTS, LOGGER
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
-from azure.helpers import az, _friendly_error, is_notapplicable_error
+from azure.helpers import az, _CLEAN_STORAGE_AUTHZ_MSG, _friendly_error, is_authz_error, is_notapplicable_error
 
 # Maximum number of storage accounts audited concurrently within one subscription.
 # Each account makes 4 az CLI calls (blob props, file props, key policy, activity log).
@@ -395,11 +395,21 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             )
         else:
             # API call failed — emit result for all three blob checks.
-            # FeatureNotSupportedForAccount means the account type (e.g. ADLS Gen2)
-            # simply doesn't have a blob service — that's INFO, not an ERROR.
             _blob_err = str(blob_props)
-            _blob_status = INFO if is_notapplicable_error(_blob_err) else ERROR
-            _blob_detail = _friendly_error(_blob_err)
+            if is_notapplicable_error(_blob_err):
+                # FeatureNotSupportedForAccount: ADLS Gen2 has no blob service — INFO.
+                _blob_status = INFO
+                _blob_detail = "Feature not supported for this account type"
+                _blob_remediation = ""
+            elif is_authz_error(_blob_err):
+                # Missing read access to storage management plane — ERROR.
+                _blob_status = ERROR
+                _blob_detail = _CLEAN_STORAGE_AUTHZ_MSG
+                _blob_remediation = "Assign 'Reader' role at the subscription or storage account scope"
+            else:
+                _blob_status = ERROR
+                _blob_detail = _friendly_error(_blob_err)
+                _blob_remediation = ""
             for ctrl, title, lvl in [
                 ("9.2.1", "Blob soft delete enabled", 1),
                 ("9.2.2", "Container soft delete enabled", 1),
@@ -413,7 +423,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         "9 - Storage Services",
                         _blob_status,
                         f"Account '{aname}': {_blob_detail}",
-                        "",
+                        _blob_remediation,
                         sid,
                         sname,
                         aname if _blob_status == ERROR else "",
@@ -497,11 +507,22 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 )
             )
         else:
-            # FeatureNotSupportedForAccount means this account type doesn't support
-            # Azure Files (e.g. ADLS Gen2 / Data Lake Storage accounts).
+            # API call failed — emit result for all three file checks.
             _file_err = str(file_props)
-            _file_status = INFO if is_notapplicable_error(_file_err) else ERROR
-            _file_detail = _friendly_error(_file_err)
+            if is_notapplicable_error(_file_err):
+                # FeatureNotSupportedForAccount: ADLS Gen2 has no file service — INFO.
+                _file_status = INFO
+                _file_detail = "Feature not supported for this account type"
+                _file_remediation = ""
+            elif is_authz_error(_file_err):
+                # Missing read access to storage management plane — ERROR.
+                _file_status = ERROR
+                _file_detail = _CLEAN_STORAGE_AUTHZ_MSG
+                _file_remediation = "Assign 'Reader' role at the subscription or storage account scope"
+            else:
+                _file_status = ERROR
+                _file_detail = _friendly_error(_file_err)
+                _file_remediation = ""
             for ctrl, title, lvl in [
                 ("9.1.1", "Azure Files soft delete enabled", 1),
                 ("9.1.2", "SMB protocol version >= 3.1.1", 1),
@@ -515,7 +536,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         "9 - Storage Services",
                         _file_status,
                         f"Account '{aname}': {_file_detail}",
-                        "",
+                        _file_remediation,
                         sid,
                         sname,
                         aname if _file_status == ERROR else "",

@@ -281,8 +281,16 @@ def get_and_reset_rate_limit_retry_count() -> int:
 
 
 def az_rest(url: str, timeout: int = 25) -> tuple[int, Any]:
-    """Call an Azure REST or Microsoft Graph endpoint via ``az rest``."""
+    """Call an Azure REST or Microsoft Graph endpoint via ``az rest``.
+
+    For Graph URLs (https://graph.microsoft.com/...) the ``--resource`` flag
+    is added explicitly so the az CLI requests a Graph-scoped token rather
+    than an ARM-scoped one.  Without this, Graph returns AccessDenied even
+    when the signed-in user has the correct Entra ID directory roles.
+    """
     cmd = [AZ, "rest", "--method", "get", "--url", url, "--output", "json"]
+    if url.startswith("https://graph.microsoft.com/"):
+        cmd += ["--resource", "https://graph.microsoft.com"]
     rc, stdout, stderr = _run_cmd_with_retries(cmd, timeout=timeout)
     if rc != 0:
         return rc, (stderr or "").strip()

@@ -879,7 +879,6 @@ def run_audit(
     completed_in_todo = 0
     stable_batches = 0
     remaining = list(todo)
-    _ = get_and_reset_rate_limit_retry_count()
 
     # ── Parallel execution (batch-based for adaptive concurrency) ───────────
     _active_names: set[str] = set()  # subscriptions currently in-flight
@@ -895,6 +894,9 @@ def run_audit(
             return ", ".join(names)
         return f"{names[0]} +{len(names) - 1} more"
 
+    # Reset here so that throttles from tenant checks and prefetch don't
+    # bleed into the first batch's adaptive-concurrency decision.
+    _ = get_and_reset_rate_limit_retry_count()
     try:
         while remaining:
             batch = remaining[:current_parallel]
@@ -1185,13 +1187,11 @@ Examples:
     # ── --output-dir: redirect report and checkpoints to a single directory ───
     if args.output_dir:
         from cis import config as _cfg
-        from cis import checkpoint as _ckpt
 
         out_dir = Path(args.output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         new_ckpt_dir = out_dir / "cis_checkpoints"
         _cfg.CHECKPOINT_DIR = new_ckpt_dir
-        setattr(_ckpt, "CHECKPOINT_DIR", new_ckpt_dir)
         if not Path(args.output).is_absolute():
             args.output = str(out_dir / args.output)
 

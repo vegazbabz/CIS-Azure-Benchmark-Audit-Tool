@@ -20,7 +20,8 @@ from dataclasses import asdict, replace
 from typing import Any
 
 from azure.client import _CLEAN_KV_AUTHZ_MSG
-from cis.config import BENCHMARK_VER, CHECKPOINT_DIR, LOGGER, VERSION
+import cis.config as _config
+from cis.config import BENCHMARK_VER, LOGGER, VERSION
 from cis.models import R
 
 # Tokens whose presence in a stored ERROR result's `details` field means the
@@ -112,7 +113,7 @@ def save_checkpoint(sid: str, sname: str, results: list[R], status: str = "compl
     results : List of R dataclass instances to serialise
     status  : "completed" (default) or "failed" — only "completed" is resumed
     """
-    CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+    _config.CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
 
     data = {
         "tool_version": VERSION,
@@ -124,8 +125,8 @@ def save_checkpoint(sid: str, sname: str, results: list[R], status: str = "compl
         "results": [asdict(r) for r in results],  # Convert dataclasses to dicts
     }
 
-    target = CHECKPOINT_DIR / f"{sid}.json"
-    tmp = CHECKPOINT_DIR / f"{sid}.json.tmp"
+    target = _config.CHECKPOINT_DIR / f"{sid}.json"
+    tmp = _config.CHECKPOINT_DIR / f"{sid}.json.tmp"
 
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
@@ -148,11 +149,11 @@ def load_checkpoints() -> dict[str, Any]:
     dict mapping subscription_id → checkpoint_data_dict
     Only subscriptions with status == "completed" are included.
     """
-    if not CHECKPOINT_DIR.exists():
+    if not _config.CHECKPOINT_DIR.exists():
         return {}
 
     loaded = {}
-    for p in CHECKPOINT_DIR.glob("*.json"):
+    for p in _config.CHECKPOINT_DIR.glob("*.json"):
         try:
             with open(p, encoding="utf-8") as f:
                 data = json.load(f)
@@ -228,7 +229,7 @@ def save_tenant_checkpoint(results: list[R]) -> None:
     in CHECKPOINT_DIR as _tenant.json and is skipped by load_checkpoints() so
     it does not appear as a subscription entry in the audit summary.
     """
-    CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+    _config.CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
     data = {
         "tool_version": VERSION,
         "benchmark_version": BENCHMARK_VER,
@@ -238,8 +239,8 @@ def save_tenant_checkpoint(results: list[R]) -> None:
         "status": "completed",
         "results": [asdict(r) for r in results],
     }
-    target = CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json"
-    tmp = CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json.tmp"
+    target = _config.CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json"
+    tmp = _config.CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     tmp.rename(target)
@@ -257,7 +258,7 @@ def load_tenant_checkpoint() -> list[R] | None:
     API calls, so the operator understands why Graph API calls are being made
     in --report-only mode.
     """
-    path = CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json"
+    path = _config.CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json"
     if not path.exists():
         return None
     try:

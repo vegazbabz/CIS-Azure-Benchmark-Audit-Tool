@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import cis.checkpoint as cis_checkpoint
+import cis.config as cis_config
 from cis.checkpoint import (
     load_checkpoints,
     load_tenant_checkpoint,
@@ -33,7 +34,7 @@ class TestSaveCheckpoint(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self._dir = Path(self._tmp.name)
-        self._patch = patch.object(cis_checkpoint, "CHECKPOINT_DIR", self._dir)
+        self._patch = patch.object(cis_config, "CHECKPOINT_DIR", self._dir)
         self._patch.start()
 
     def tearDown(self) -> None:
@@ -72,7 +73,7 @@ class TestSaveCheckpoint(unittest.TestCase):
 
     def test_creates_directory_if_missing(self) -> None:
         nested = self._dir / "nested" / "checkpoints"
-        with patch.object(cis_checkpoint, "CHECKPOINT_DIR", nested):
+        with patch.object(cis_config, "CHECKPOINT_DIR", nested):
             save_checkpoint("sub-1", "Sub One", [])
         self.assertTrue((nested / "sub-1.json").exists())
 
@@ -83,7 +84,7 @@ class TestLoadCheckpoints(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self._dir = Path(self._tmp.name)
-        self._patch = patch.object(cis_checkpoint, "CHECKPOINT_DIR", self._dir)
+        self._patch = patch.object(cis_config, "CHECKPOINT_DIR", self._dir)
         self._patch.start()
 
     def tearDown(self) -> None:
@@ -105,7 +106,7 @@ class TestLoadCheckpoints(unittest.TestCase):
         (self._dir / f"{sid}.json").write_text(json.dumps(data), encoding="utf-8")
 
     def test_missing_dir_returns_empty(self) -> None:
-        with patch.object(cis_checkpoint, "CHECKPOINT_DIR", self._dir / "no-such-dir"):
+        with patch.object(cis_config, "CHECKPOINT_DIR", self._dir / "no-such-dir"):
             result = load_checkpoints()
         self.assertEqual(result, {})
 
@@ -187,7 +188,7 @@ class TestSaveLoadRoundTrip(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self._dir = Path(self._tmp.name)
-        self._patch = patch.object(cis_checkpoint, "CHECKPOINT_DIR", self._dir)
+        self._patch = patch.object(cis_config, "CHECKPOINT_DIR", self._dir)
         self._patch.start()
 
     def tearDown(self) -> None:
@@ -225,7 +226,7 @@ class TestSaveTenantCheckpoint(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self._dir = Path(self._tmp.name)
-        self._patch = patch.object(cis_checkpoint, "CHECKPOINT_DIR", self._dir)
+        self._patch = patch.object(cis_config, "CHECKPOINT_DIR", self._dir)
         self._patch.start()
 
     def tearDown(self) -> None:
@@ -267,7 +268,7 @@ class TestSaveTenantCheckpoint(unittest.TestCase):
 
     def test_creates_directory_if_missing(self) -> None:
         nested = self._dir / "nested" / "checkpoints"
-        with patch.object(cis_checkpoint, "CHECKPOINT_DIR", nested):
+        with patch.object(cis_config, "CHECKPOINT_DIR", nested):
             save_tenant_checkpoint(_tenant_results())
         self.assertTrue((nested / "_tenant.json").exists())
 
@@ -278,7 +279,7 @@ class TestLoadTenantCheckpoint(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         self._dir = Path(self._tmp.name)
-        self._patch = patch.object(cis_checkpoint, "CHECKPOINT_DIR", self._dir)
+        self._patch = patch.object(cis_config, "CHECKPOINT_DIR", self._dir)
         self._patch.start()
 
     def tearDown(self) -> None:

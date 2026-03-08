@@ -86,7 +86,6 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 import cis.config as _cfg
 from cis.config import (
     VERSION,
-    VERSION_FULL,
     BENCHMARK_VER,
     DEFAULT_PARALLEL,
     DEFAULT_EXECUTOR,
@@ -1101,7 +1100,7 @@ Examples:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"%(prog)s {VERSION_FULL}",
+        version=f"%(prog)s {_cfg.version_full()}",
     )
 
     parser.add_argument(

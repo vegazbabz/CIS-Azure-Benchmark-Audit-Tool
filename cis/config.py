@@ -23,6 +23,7 @@ graph        = 120
 
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import sys
@@ -44,6 +45,7 @@ VERSION = "1.0.0-beta3"  # Written into checkpoints for change detection
 BENCHMARK_VER = "5.0.0"  # CIS Benchmark version this tool targets
 
 
+@functools.lru_cache(maxsize=None)
 def _git_hash() -> str:
     """Return the short git commit hash, or 'unknown' if git is unavailable."""
     import subprocess
@@ -60,8 +62,9 @@ def _git_hash() -> str:
         return "unknown"
 
 
-GIT_HASH = _git_hash()
-VERSION_FULL = f"{VERSION}+{GIT_HASH}"
+def version_full() -> str:
+    """Return the full version string including git hash (computed on first call)."""
+    return f"{VERSION}+{_git_hash()}"
 
 # ── Filesystem ────────────────────────────────────────────────────────────────
 CHECKPOINT_DIR = Path("cis_checkpoints")  # Per-subscription result cache

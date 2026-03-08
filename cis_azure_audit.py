@@ -1397,26 +1397,29 @@ Examples:
     _print_summary(counts, total, len(subs), elapsed_str, score)
     LOGGER.info("  Checkpoints: %s/", _cfg.CHECKPOINT_DIR)
 
-    # ── Append to run history (full audit only — not --report-only) ───────────
+    # ── Append to run history (full tenant scope only — skipped for --subscription filters) ──
     hist_path = history_path_for(args.output)
-    append_history(
-        hist_path,
-        {
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "version": VERSION,
-            "score": score,
-            "pass": counts[PASS],
-            "fail": counts[FAIL],
-            "error": counts[ERROR],
-            "info": counts[INFO],
-            "manual": counts[MANUAL],
-            "suppressed": counts[SUPPRESSED],
-            "total": total,
-            "subscriptions": [s["name"] for s in subs],
-            "level_filter": args.level,
-        },
-    )
-    run_history = load_history(hist_path)
+    if args.subscription is None:
+        append_history(
+            hist_path,
+            {
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "version": VERSION,
+                "score": score,
+                "pass": counts[PASS],
+                "fail": counts[FAIL],
+                "error": counts[ERROR],
+                "info": counts[INFO],
+                "manual": counts[MANUAL],
+                "suppressed": counts[SUPPRESSED],
+                "total": total,
+                "subscriptions": [s["name"] for s in subs],
+                "level_filter": args.level,
+            },
+        )
+        run_history = load_history(hist_path)
+    else:
+        run_history = []
 
     # ── Generate HTML report ──────────────────────────────────────────────────
     scope_info = {

@@ -85,8 +85,19 @@ _AUTHZ_TOKENS = frozenset(
         "does not have key get permission",
         # Key Vault data-plane errors from newer SDK / tenants with many groups
         "requires key vault data plane permissions",
-        # Microsoft Graph scope / consent errors (e.g. check_5_1_2 without
-        # UserAuthenticationMethod.Read.All or Reports.Read.All)
+        # Microsoft Graph scope / consent errors — also in _GRAPH_SCOPE_TOKENS so
+        # _friendly_error can return a Graph-specific message instead of the KV one.
+        "required scopes are missing in the token",
+        "authorization_requestdenied",
+    ]
+)
+
+# Graph-specific access-denied tokens.  These are a strict subset of
+# _AUTHZ_TOKENS so _run_cmd_with_retries still logs them at DEBUG, but
+# _friendly_error checks this set FIRST to return a Graph-specific message
+# instead of the Key Vault-specific _CLEAN_KV_AUTHZ_MSG.
+_GRAPH_SCOPE_TOKENS = frozenset(
+    [
         "required scopes are missing in the token",
         "authorization_requestdenied",
     ]
@@ -156,6 +167,13 @@ def _friendly_error(msg: str) -> str:
     if is_notapplicable_error(msg):
         return "Feature not supported for this account type"
     lowered = str(msg).lower()
+    # Graph scope errors must be checked before the generic RBAC block so they
+    # get a Graph-specific message rather than the Key Vault-specific one.
+    if any(t in lowered for t in _GRAPH_SCOPE_TOKENS):
+        return (
+            "Graph API access denied — service principal is missing required "
+            "OAuth scopes. Grant the necessary Graph application permissions in Entra ID."
+        )
     if any(t in lowered for t in _AUTHZ_TOKENS):
         return _CLEAN_KV_AUTHZ_MSG
     first = _first_error_line(msg)

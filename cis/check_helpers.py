@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from azure.client import _friendly_error
 from cis.config import ERROR, INFO
 from cis.models import R
 
@@ -53,7 +54,8 @@ def _err(
     Used when an az CLI call fails and we cannot evaluate the control.
     The error message is truncated at 200 characters to keep the report readable.
     """
-    truncated = msg[:197] + "..." if len(msg) > 200 else msg
+    friendly = _friendly_error(msg)
+    truncated = friendly[:197] + "..." if len(friendly) > 200 else friendly
     return R(cid, title, lvl, sec, ERROR, truncated, "", sid, sname, resource)
 
 

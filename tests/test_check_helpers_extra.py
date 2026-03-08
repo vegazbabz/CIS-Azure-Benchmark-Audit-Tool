@@ -60,10 +60,12 @@ class TestErr(unittest.TestCase):
         self.assertEqual(r.control_id, "7.3")
         self.assertEqual(r.title, "My Check")
 
-    def test_message_truncated_at_200(self) -> None:
+    def test_message_truncated_at_160(self) -> None:
+        # _err passes the message through _friendly_error, which truncates
+        # unrecognised plain-text messages at 160 characters.
         long_msg = "x" * 300
         r = _err("1.1", "T", 1, "S", long_msg)
-        self.assertEqual(len(r.details), 200)
+        self.assertEqual(len(r.details), 160)
 
     def test_short_message_not_truncated(self) -> None:
         r = _err("1.1", "T", 1, "S", "short")

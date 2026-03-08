@@ -66,9 +66,11 @@ def check_5_1_1() -> R:
                     )
                 else:
                     detail = (
-                        "Policy.Read.All cannot be acquired via the az CLI for user logins. "
-                        "Configure [graph_auth] in cis_audit.toml with an app registration "
-                        "that has Policy.Read.All permission — see README for setup steps."
+                        "The az CLI cannot request the Policy.Read.All scope — this is a "
+                        "Microsoft limitation on the built-in az CLI app, and applies to all login types. "
+                        "To automate this check, configure [graph_auth] in cis_audit.toml "
+                        "with a dedicated app registration that has Policy.Read.All delegated permission "
+                        "— see README for setup steps."
                     )
                 return R(_CTRL, _TITLE, 1, _SEC, ERROR, detail, "")
             return _err(_CTRL, _TITLE, 1, _SEC, str(data))
@@ -152,10 +154,7 @@ def check_5_1_2() -> R:
         msg = f"All {n} user(s) have MFA registered." if n else "No users found."
         return R(_CTRL, _TITLE, 1, _SEC, PASS, msg, "")
 
-    names = without_mfa[:10]
-    detail = f"{len(without_mfa)} user(s) without MFA: {', '.join(names)}"
-    if len(without_mfa) > 10:
-        detail += f" \u2026 and {len(without_mfa) - 10} more"
+    detail = f"{len(without_mfa)} user(s) without MFA registered."
     return R(
         _CTRL,
         _TITLE,

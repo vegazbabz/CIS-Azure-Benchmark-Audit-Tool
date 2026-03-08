@@ -306,8 +306,7 @@ class TestCheck512(unittest.TestCase):
         result = checks_s5.check_5_1_2()
         self.assertEqual(result.control_id, "5.1.2")
         self.assertEqual(result.status, FAIL)
-        self.assertIn("noMfa@t.com", result.details)
-        self.assertNotIn("hasMfa@t.com", result.details)
+        self.assertIn("1 user(s)", result.details)
 
     @patch("checks.s5.az_rest_paged")
     def test_api_error_returns_error(self, mock: Any) -> None:
@@ -323,14 +322,13 @@ class TestCheck512(unittest.TestCase):
         result = checks_s5.check_5_1_2()
         self.assertEqual(result.status, FAIL)
         self.assertIn("15 user(s)", result.details)
-        self.assertIn("more", result.details)
 
     @patch("checks.s5.az_rest_paged")
     def test_upn_fallback_to_id_when_upn_missing(self, mock: Any) -> None:
         mock.return_value = (0, [{"id": "guid-1234", "isMfaRegistered": False}])
         result = checks_s5.check_5_1_2()
         self.assertEqual(result.status, FAIL)
-        self.assertIn("guid-1234", result.details)
+        self.assertIn("1 user(s)", result.details)
 
 
 class TestCheck513(unittest.TestCase):

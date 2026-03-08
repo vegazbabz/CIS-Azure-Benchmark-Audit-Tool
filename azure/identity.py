@@ -29,7 +29,7 @@ def _upn_to_objectid(upn: str) -> str | None:
     if rc == 0 and isinstance(out, dict):
         oid = out.get("id") or out.get("objectId")
         if oid and isinstance(oid, str):
-            return oid.strip()
+            return str(oid.strip())
     logger.debug("unable to resolve UPN to objectId: %s (rc=%d out=%r)", upn, rc, out)
     return None
 
@@ -46,7 +46,7 @@ def get_signed_in_user_id() -> str | None:
     if rc == 0 and isinstance(out, dict):
         oid = out.get("id") or out.get("objectId")
         if oid and isinstance(oid, str):
-            return oid.strip()
+            return str(oid.strip())
     logger.debug("primary signed-in-user query failed (rc=%d), trying account show", rc)
     rc2, upn = az(["account", "show", "--query", "user.name"])
     if rc2 == 0 and isinstance(upn, str) and upn:

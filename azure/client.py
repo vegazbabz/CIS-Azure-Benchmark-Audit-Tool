@@ -85,6 +85,10 @@ _AUTHZ_TOKENS = frozenset(
         "does not have key get permission",
         # Key Vault data-plane errors from newer SDK / tenants with many groups
         "requires key vault data plane permissions",
+        # Microsoft Graph scope / consent errors (e.g. check_5_1_2 without
+        # UserAuthenticationMethod.Read.All or Reports.Read.All)
+        "required scopes are missing in the token",
+        "authorization_requestdenied",
     ]
 )
 

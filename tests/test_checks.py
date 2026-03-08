@@ -192,18 +192,41 @@ class TestCheck2111(unittest.TestCase):
 
 
 class TestCheck511(unittest.TestCase):
-    """5.1.1 — Security defaults enabled in Microsoft Entra ID.
+    """5.1.1 — Security defaults enabled in Microsoft Entra ID."""
 
-    The current implementation always returns INFO because the tool assumes
-    a CA-enabled (E3/E5) tenant. We verify the function is callable and
-    returns a single R with the expected control_id.
-    """
-
-    def test_returns_single_result(self) -> None:
+    @patch("checks.s5.az_rest")
+    def test_security_defaults_enabled_returns_pass(self, mock_az_rest: Any) -> None:
+        mock_az_rest.return_value = (0, {"isEnabled": True})
         result = checks_s5.check_5_1_1()
         self.assertEqual(result.control_id, "5.1.1")
-        # The function documents that it returns INFO for CA-enabled tenants
+        self.assertEqual(result.status, PASS)
+
+    @patch("checks.s5.az_rest")
+    def test_security_defaults_disabled_with_ca_returns_info(self, mock_az_rest: Any) -> None:
+        mock_az_rest.side_effect = [
+            (0, {"isEnabled": False}),
+            (0, {"value": [{"id": "policy-1"}]}),
+        ]
+        result = checks_s5.check_5_1_1()
+        self.assertEqual(result.control_id, "5.1.1")
         self.assertEqual(result.status, INFO)
+
+    @patch("checks.s5.az_rest")
+    def test_security_defaults_disabled_no_ca_returns_fail(self, mock_az_rest: Any) -> None:
+        mock_az_rest.side_effect = [
+            (0, {"isEnabled": False}),
+            (0, {"value": []}),
+        ]
+        result = checks_s5.check_5_1_1()
+        self.assertEqual(result.control_id, "5.1.1")
+        self.assertEqual(result.status, FAIL)
+
+    @patch("checks.s5.az_rest")
+    def test_api_error_returns_error(self, mock_az_rest: Any) -> None:
+        mock_az_rest.return_value = (1, "Access denied")
+        result = checks_s5.check_5_1_1()
+        self.assertEqual(result.control_id, "5.1.1")
+        self.assertEqual(result.status, ERROR)
 
 
 class TestCheck512(unittest.TestCase):

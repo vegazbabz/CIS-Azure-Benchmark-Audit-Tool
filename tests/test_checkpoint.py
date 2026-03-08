@@ -9,7 +9,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 import cis.checkpoint as cis_checkpoint
-from cis.checkpoint import load_checkpoints, results_from_checkpoint, save_checkpoint
+from cis.checkpoint import (
+    load_checkpoints,
+    load_tenant_checkpoint,
+    results_from_checkpoint,
+    save_checkpoint,
+    save_tenant_checkpoint,
+)
 from cis.config import BENCHMARK_VER, VERSION
 from cis.models import R
 
@@ -199,6 +205,107 @@ class TestSaveLoadRoundTrip(unittest.TestCase):
             self.assertEqual(orig.control_id, rest.control_id)
             self.assertEqual(orig.status, rest.status)
             self.assertEqual(orig.details, rest.details)
+
+
+# =============================================================================
+# TENANT CHECKPOINT
+# =============================================================================
+
+
+def _tenant_results() -> list[R]:
+    return [
+        R("5.1.1", "Security defaults", 1, "5 - Identity Services", "INFO", "CA in use", "", "", ""),
+        R("5.1.2", "MFA enabled", 1, "5 - Identity Services", "MANUAL", "Review required", "Check docs", "", ""),
+    ]
+
+
+class TestSaveTenantCheckpoint(unittest.TestCase):
+    """save_tenant_checkpoint writes the correct file; load_tenant_checkpoint reads it back."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self._dir = Path(self._tmp.name)
+        self._patch = patch.object(cis_checkpoint, "CHECKPOINT_DIR", self._dir)
+        self._patch.start()
+
+    def tearDown(self) -> None:
+        self._patch.stop()
+        self._tmp.cleanup()
+
+    def test_creates_tenant_json_file(self) -> None:
+        save_tenant_checkpoint(_tenant_results())
+        self.assertTrue((self._dir / "_tenant.json").exists())
+
+    def test_no_tmp_file_left_behind(self) -> None:
+        save_tenant_checkpoint(_tenant_results())
+        self.assertFalse((self._dir / "_tenant.json.tmp").exists())
+
+    def test_file_content_is_valid_json(self) -> None:
+        save_tenant_checkpoint(_tenant_results())
+        data = json.loads((self._dir / "_tenant.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["subscription_id"], "_tenant")
+        self.assertEqual(data["status"], "completed")
+        self.assertEqual(data["tool_version"], VERSION)
+        self.assertEqual(len(data["results"]), 2)
+
+    def test_round_trip(self) -> None:
+        originals = _tenant_results()
+        save_tenant_checkpoint(originals)
+        loaded = load_tenant_checkpoint()
+        self.assertIsNotNone(loaded)
+        assert loaded is not None
+        self.assertEqual(len(loaded), 2)
+        self.assertEqual(loaded[0].control_id, "5.1.1")
+        self.assertEqual(loaded[1].status, "MANUAL")
+
+    def test_empty_results_round_trip(self) -> None:
+        save_tenant_checkpoint([])
+        loaded = load_tenant_checkpoint()
+        self.assertIsNotNone(loaded)
+        assert loaded is not None
+        self.assertEqual(loaded, [])
+
+    def test_creates_directory_if_missing(self) -> None:
+        nested = self._dir / "nested" / "checkpoints"
+        with patch.object(cis_checkpoint, "CHECKPOINT_DIR", nested):
+            save_tenant_checkpoint(_tenant_results())
+        self.assertTrue((nested / "_tenant.json").exists())
+
+
+class TestLoadTenantCheckpoint(unittest.TestCase):
+    """load_tenant_checkpoint returns None on missing / corrupt / version-mismatched files."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self._dir = Path(self._tmp.name)
+        self._patch = patch.object(cis_checkpoint, "CHECKPOINT_DIR", self._dir)
+        self._patch.start()
+
+    def tearDown(self) -> None:
+        self._patch.stop()
+        self._tmp.cleanup()
+
+    def test_missing_file_returns_none(self) -> None:
+        self.assertIsNone(load_tenant_checkpoint())
+
+    def test_corrupt_json_returns_none(self) -> None:
+        (self._dir / "_tenant.json").write_text("not json", encoding="utf-8")
+        self.assertIsNone(load_tenant_checkpoint())
+
+    def test_version_mismatch_returns_none(self) -> None:
+        save_tenant_checkpoint(_tenant_results())
+        path = self._dir / "_tenant.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["tool_version"] = "0.0.0-old"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        self.assertIsNone(load_tenant_checkpoint())
+
+    def test_load_checkpoints_skips_tenant_file(self) -> None:
+        """load_checkpoints must not surface _tenant.json as a subscription entry."""
+        save_tenant_checkpoint(_tenant_results())
+        result = load_checkpoints()
+        self.assertNotIn("_tenant", result)
+        self.assertEqual(len(result), 0)
 
 
 if __name__ == "__main__":

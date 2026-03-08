@@ -263,6 +263,16 @@ def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str:
         LOGGER.info("%s", "━" * 60)
 
 
+# Section number → display label used in console progress output.
+_SECTION_LABELS: dict[str, str] = {
+    "2": "Databricks",
+    "5": "Identity",
+    "6": "Monitoring",
+    "7": "Networking",
+    "8": "Security",
+    "9": "Storage",
+}
+
 # ══════════════════════════════════════════════════════════════════════════════
 # RESOURCE GRAPH PREFETCH
 # All Kusto queries are defined here and run ONCE before the subscription loop.
@@ -624,14 +634,6 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("9.3.11", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.11")),
     ]
 
-    _SECTION_LABELS: dict[str, str] = {
-        "2": "Databricks",
-        "5": "Identity",
-        "6": "Monitoring",
-        "7": "Networking",
-        "8": "Security",
-        "9": "Storage",
-    }
     _cur_sec = ""
     for ctrl_id, fn in checks:
         new_sec = ctrl_id.split(".")[0]
@@ -828,7 +830,10 @@ def run_audit(
         except Exception as e:
             LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
 
-    save_tenant_checkpoint(tenant_results)
+    try:
+        save_tenant_checkpoint(tenant_results)
+    except Exception as _ckpt_err:
+        LOGGER.warning("⚠️  Could not save tenant checkpoint (audit will continue): %s", _ckpt_err)
 
     # ── Resource Graph prefetch ───────────────────────────────────────────────
     # Fetch all Resource Graph data ONCE before the parallel loop.
@@ -1161,6 +1166,9 @@ Examples:
     )
 
     args = parser.parse_args()
+
+    if args.fresh and args.report_only:
+        parser.error("--fresh and --report-only are mutually exclusive: --fresh deletes checkpoints while --report-only reads them.")
 
     setup_logging(
         args.log_level,

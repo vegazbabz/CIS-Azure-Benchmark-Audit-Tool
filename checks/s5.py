@@ -24,23 +24,54 @@ def check_5_1_1() -> R:
     cost. They are designed for tenants that do NOT have Microsoft Entra ID
     P1/P2 licences and cannot use Conditional Access.
 
-    For E3/E5 tenants (which use Conditional Access), security defaults are
-    intentionally disabled — a Conditional Access policy that enforces MFA
-    for all users is the equivalent (and superior) control. For those tenants
-    this control is returned as INFO rather than FAIL because the correct
-    state depends on the tenant's licensing tier.
+    Logic:
+      1. Query identitySecurityDefaultsEnforcementPolicy → PASS if isEnabled=true
+      2. If disabled, query conditionalAccessPolicies → INFO if at least one CA
+         policy exists (tenant relies on CA instead, which is the stronger control)
+      3. Neither enabled → FAIL (no baseline identity protection in place)
 
-    If your tenant uses Conditional Access, manually verify that policies
-    enforce MFA for all users to satisfy this control.
+    Graph APIs used:
+      GET /v1.0/policies/identitySecurityDefaultsEnforcementPolicy
+      GET /v1.0/policies/conditionalAccessPolicies?$top=1
     """
+    _CTRL = "5.1.1"
+    _TITLE = "Security defaults enabled in Microsoft Entra ID"
+    _SEC = "5 - Identity Services"
+
+    rc, data = az_rest("https://graph.microsoft.com/v1.0/policies/identitySecurityDefaultsEnforcementPolicy")
+    if rc != 0:
+        return _err(_CTRL, _TITLE, 1, _SEC, str(data))
+
+    is_enabled = data.get("isEnabled", False) if isinstance(data, dict) else False
+    if is_enabled:
+        return R(_CTRL, _TITLE, 1, _SEC, PASS, "Security defaults are enabled.", "")
+
+    # Security defaults are disabled — check whether Conditional Access is in use.
+    # A tenant with CA policies disables security defaults intentionally; the
+    # control goal (enforced sign-in security) is fulfilled by CA instead.
+    rc_ca, ca_data = az_rest(
+        "https://graph.microsoft.com/v1.0/policies/conditionalAccessPolicies?$top=1"
+    )
+    if rc_ca == 0 and isinstance(ca_data, dict) and ca_data.get("value"):
+        return R(
+            _CTRL,
+            _TITLE,
+            1,
+            _SEC,
+            INFO,
+            "Security defaults disabled — tenant uses Conditional Access. "
+            "Verify CA policies enforce MFA for all users.",
+            "Verify Conditional Access policies enforce MFA for all users.",
+        )
+
     return R(
-        "5.1.1",
-        "Security defaults enabled in Microsoft Entra ID",
+        _CTRL,
+        _TITLE,
         1,
-        "5 - Identity Services",
-        INFO,
-        "Not applicable — tenant uses Conditional Access (E3/E5 licensed).",
-        "Verify Conditional Access policies enforce MFA for all users.",
+        _SEC,
+        FAIL,
+        "Security defaults are disabled and no Conditional Access policies were found.",
+        "Entra ID > Properties > Manage security defaults, or configure Conditional Access to enforce MFA.",
     )
 
 

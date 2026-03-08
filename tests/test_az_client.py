@@ -81,6 +81,14 @@ class TestIsFirewallError(unittest.TestCase):
     def test_case_insensitive(self) -> None:
         self.assertTrue(az_client.is_firewall_error("FORBIDDENBYFIREWALL"))
 
+    def test_private_link_not_approved(self) -> None:
+        # Real error from storage accounts with PublicNetworkAccess=Disabled
+        msg = (
+            "ERROR: (Forbidden) Connection is not an approved private link and caller was ignored "
+            "because bypass is not set to 'AzureServices' and PublicNetworkAccess is set to 'Disabled'."
+        )
+        self.assertTrue(az_client.is_firewall_error(msg))
+
     def test_plain_permission_error_is_not_firewall(self) -> None:
         self.assertFalse(az_client.is_firewall_error("AuthorizationFailed"))
 

@@ -224,11 +224,16 @@ def _run_cmd_with_retries(
                     continue
                 is_authz = any(tok in low for tok in _AUTHZ_TOKENS)
                 is_notapplicable = any(tok in low for tok in _NOTAPPLICABLE_TOKENS)
+                is_fw = is_firewall_error(stderr)
                 summary = _first_error_line(stderr)
                 if is_authz:
                     logger.debug("command denied by permissions (rc=%d): %s", r_returncode, summary)
                 elif is_notapplicable:
                     logger.debug("command not applicable for account type (rc=%d): %s", r_returncode, summary)
+                elif is_fw:
+                    logger.debug(
+                        "command blocked by network firewall / private endpoint (rc=%d): %s", r_returncode, summary
+                    )
                 elif summary.strip() in ("^C", ""):
                     # az subprocess killed by Ctrl+C (Windows forwards SIGINT to
                     # all console processes); not a real error — suppress the noise.

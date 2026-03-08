@@ -270,7 +270,11 @@ def generate_html(
     if si.get("tenant"):
         scope_rows += f'<tr><th>Tenant</th><td>{html.escape(si["tenant"])}</td></tr>\n'
     if si.get("user"):
-        scope_rows += f'<tr><th>Audited by</th><td>{html.escape(si["user"])}</td></tr>\n'
+        caller_label = "service principal" if si.get("caller_type") == "servicePrincipal" else "user"
+        scope_rows += (
+            f'<tr><th>Audited by</th><td>{html.escape(si["user"])}'
+            f' <span style="color:#94a3b8;font-size:0.85em">({caller_label})</span></td></tr>\n'
+        )
     if si.get("scope_label"):
         scope_rows += f'<tr><th>Scope</th><td>{html.escape(si["scope_label"])}</td></tr>\n'
     if si.get("subscriptions"):

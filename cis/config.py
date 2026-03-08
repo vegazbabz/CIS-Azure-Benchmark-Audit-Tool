@@ -103,6 +103,11 @@ LOGGER = logging.getLogger("cis_audit")
 # endpoints whose required scopes are not available in the az CLI app token.
 GRAPH_AUTH: dict[str, str] = {}
 
+# ── Caller identity (set at startup from az account show) ────────────────────
+# Either "user" or "servicePrincipal".  Used by checks to tailor error messages
+# so remediation guidance matches the authentication method in use.
+CALLER_TYPE: str = "user"  # default to user; overwritten in main()
+
 # ── Azure built-in role definition GUIDs (stable, defined by Microsoft) ──────
 # These GUIDs are identical in every tenant — safe to hardcode.
 ROLE_OWNER = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635"  # Owner

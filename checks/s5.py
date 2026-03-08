@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, INFO, ERROR, MANUAL, TIMEOUTS, ROLE_OWNER, ROLE_UAA
+from cis.config import PASS, FAIL, INFO, ERROR, MANUAL, TIMEOUTS, ROLE_OWNER, ROLE_UAA, CALLER_TYPE
 from cis.models import R
 from cis.check_helpers import _err, _idx
 from azure.helpers import az, az_rest, az_rest_paged
@@ -58,17 +58,19 @@ def check_5_1_1() -> R:
         rc, data = az_rest(url)
         if rc != 0:
             if is_authz_error(str(data)):
-                return R(
-                    _CTRL,
-                    _TITLE,
-                    1,
-                    _SEC,
-                    ERROR,
-                    "Policy.Read.All scope is not available via the az CLI app. "
-                    "Configure [graph_auth] in cis_audit.toml with a registered Entra ID app "
-                    "to automate this check — see README for setup steps.",
-                    "",
-                )
+                if CALLER_TYPE == "servicePrincipal":
+                    detail = (
+                        "The service principal lacks the Policy.Read.All application permission. "
+                        "Grant it in Entra ID → App registrations → API permissions, "
+                        "or configure [graph_auth] in cis_audit.toml — see README."
+                    )
+                else:
+                    detail = (
+                        "Policy.Read.All cannot be acquired via the az CLI for user logins. "
+                        "Configure [graph_auth] in cis_audit.toml with an app registration "
+                        "that has Policy.Read.All permission — see README for setup steps."
+                    )
+                return R(_CTRL, _TITLE, 1, _SEC, ERROR, detail, "")
             return _err(_CTRL, _TITLE, 1, _SEC, str(data))
 
     is_enabled = data.get("isEnabled", False) if isinstance(data, dict) else False
@@ -130,15 +132,18 @@ def check_5_1_2() -> R:
     )
     rc, users = az_rest_paged(url, timeout=TIMEOUTS["graph"])
     if rc != 0:
-        return _err(
-            _CTRL,
-            _TITLE,
-            1,
-            _SEC,
-            "Unable to retrieve MFA registration details — ensure the service "
-            "principal has UserAuthenticationMethod.Read.All or "
-            "Reports.Read.All Graph permission.",
-        )
+        if CALLER_TYPE == "servicePrincipal":
+            detail = (
+                "Unable to retrieve MFA registration details — grant the service principal "
+                "UserAuthenticationMethod.Read.All or Reports.Read.All application permission "
+                "in Entra ID → App registrations → API permissions."
+            )
+        else:
+            detail = (
+                "Unable to retrieve MFA registration details — assign the signed-in account "
+                "the Reports Reader or Global Reader role in Entra ID."
+            )
+        return _err(_CTRL, _TITLE, 1, _SEC, detail)
 
     without_mfa = [u.get("userPrincipalName") or u.get("id", "?") for u in users if not u.get("isMfaRegistered")]
 

@@ -97,6 +97,12 @@ TRACE_LEVEL = 5  # Below DEBUG — very chatty execution traces
 # ── Module logger ─────────────────────────────────────────────────────────────
 LOGGER = logging.getLogger("cis_audit")
 
+# ── MSAL / Graph auth config ─────────────────────────────────────────────────
+# Populated by load_config_file() from [graph_auth] in cis_audit.toml and/or
+# CIS_GRAPH_* environment variables.  Used by azure/graph_auth.py for Graph
+# endpoints whose required scopes are not available in the az CLI app token.
+GRAPH_AUTH: dict[str, str] = {}
+
 # ── Azure built-in role definition GUIDs (stable, defined by Microsoft) ──────
 # These GUIDs are identical in every tenant — safe to hardcode.
 ROLE_OWNER = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635"  # Owner
@@ -138,7 +144,7 @@ def load_config_file(path: Path | None = None) -> None:
     """
     # TIMEOUTS is mutated in-place (dict item assignment) — no global declaration needed.
     # The other three are reassigned, so they require global.
-    global DEFAULT_PARALLEL, DEFAULT_EXECUTOR, CHECKPOINT_DIR  # noqa: PLW0603
+    global DEFAULT_PARALLEL, DEFAULT_EXECUTOR, CHECKPOINT_DIR, GRAPH_AUTH  # noqa: PLW0603
 
     # --- resolve config path ---
     if path is None:
@@ -202,3 +208,14 @@ def load_config_file(path: Path | None = None) -> None:
             CHECKPOINT_DIR = Path(val)
         else:
             LOGGER.warning("[audit].checkpoint_dir must be a non-empty string (got %r) — ignored", val)
+
+    # --- [graph_auth] section ---
+    _KNOWN_GRAPH_AUTH_KEYS = {"client_id", "tenant_id", "client_secret"}
+    for key, val in data.get("graph_auth", {}).items():
+        if key not in _KNOWN_GRAPH_AUTH_KEYS:
+            LOGGER.warning("Unknown [graph_auth] key in config: %r (ignored)", key)
+            continue
+        if not isinstance(val, str) or not val.strip():
+            LOGGER.warning("[graph_auth].%s must be a non-empty string (got %r) — ignored", key, val)
+            continue
+        GRAPH_AUTH[key] = val

@@ -1,0 +1,3 @@
+# Runtime dependencies for the CIS Azure Audit Tool
+# Install with: pip install -r requirements.txt
+msal>=1.20.0

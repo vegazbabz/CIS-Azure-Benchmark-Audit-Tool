@@ -46,7 +46,11 @@ def check_5_1_1() -> R:
         rc, data = msal_rest(url)
         if rc != 0:
             return R(
-                _CTRL, _TITLE, 1, _SEC, ERROR,
+                _CTRL,
+                _TITLE,
+                1,
+                _SEC,
+                ERROR,
                 f"Graph API call failed (MSAL): {str(data)[:200]}",
                 "Verify the app registration has Policy.Read.All delegated permission and admin consent.",
             )

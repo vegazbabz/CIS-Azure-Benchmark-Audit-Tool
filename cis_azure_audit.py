@@ -83,11 +83,11 @@ from pathlib import Path  # --output-dir path manipulation
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed  # Parallel workers
 
 # Configuration constants (version, timeouts, status codes, role GUIDs, etc.)
+import cis.config as _cfg
 from cis.config import (
     VERSION,
     VERSION_FULL,
     BENCHMARK_VER,
-    CHECKPOINT_DIR,
     DEFAULT_PARALLEL,
     DEFAULT_EXECUTOR,
     PASS,
@@ -789,6 +789,20 @@ def run_audit(
         LOGGER.info(
             "✅ All subscriptions were already audited — nothing new to scan. Use --fresh to re-audit from scratch."
         )
+        tenant_ckpt = load_tenant_checkpoint()
+        if tenant_ckpt is not None:
+            LOGGER.info("   💾 Loaded tenant checks from checkpoint (%d results).", len(tenant_ckpt))
+            all_results.extend(tenant_ckpt)
+        else:
+            LOGGER.info("   🔍 No tenant checkpoint found — re-running tenant checks (requires az login)...")
+            for fn in [check_5_1_1, check_5_1_2, check_5_4, check_5_14, check_5_15, check_5_16]:
+                try:
+                    r = fn()
+                    all_results.append(r)
+                    icon = _STATUS_STYLE.get(r.status, ("", "", "?"))[2]
+                    LOGGER.info("    %-10s %s %s", r.control_id, icon, r.status)
+                except Exception as e:
+                    LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
         return all_results
 
     requested_parallel = max(1, parallel)
@@ -1196,8 +1210,6 @@ Examples:
 
     # ── --output-dir: redirect report and checkpoints to a single directory ───
     if args.output_dir:
-        from cis import config as _cfg
-
         out_dir = Path(args.output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         new_ckpt_dir = out_dir / "cis_checkpoints"
@@ -1250,7 +1262,7 @@ Examples:
         mins, secs = divmod(int(elapsed), 60)
         elapsed_str = f"{mins}m {secs}s" if mins else f"{secs}s"
         _print_summary(counts, total, len(checkpoints), elapsed_str, score)
-        LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)
+        LOGGER.info("  Checkpoints: %s/", _cfg.CHECKPOINT_DIR)
         sub_timestamps = {cp["subscription_name"]: cp["timestamp"] for cp in checkpoints.values()}
         run_history = load_history(history_path_for(args.output))
         generate_html(all_results, args.output, history=run_history, sub_timestamps=sub_timestamps)
@@ -1329,8 +1341,8 @@ Examples:
             LOGGER.info("   ✅ Preflight completed successfully.")
 
     # ── Full audit ────────────────────────────────────────────────────────────
-    if args.fresh and CHECKPOINT_DIR.exists():
-        shutil.rmtree(CHECKPOINT_DIR)
+    if args.fresh and _cfg.CHECKPOINT_DIR.exists():
+        shutil.rmtree(_cfg.CHECKPOINT_DIR)
         LOGGER.info("\n🗑️  Cleared checkpoints.")
     all_results = run_audit(
         subs,
@@ -1360,7 +1372,7 @@ Examples:
     elapsed_str = f"{mins}m {secs}s" if mins else f"{secs}s"
 
     _print_summary(counts, total, len(subs), elapsed_str, score)
-    LOGGER.info("  Checkpoints: %s/", CHECKPOINT_DIR)
+    LOGGER.info("  Checkpoints: %s/", _cfg.CHECKPOINT_DIR)
 
     # ── Append to run history (full audit only — not --report-only) ───────────
     hist_path = history_path_for(args.output)

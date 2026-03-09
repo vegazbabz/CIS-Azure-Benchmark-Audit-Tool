@@ -788,7 +788,8 @@ at your own risk. See [LICENSE](LICENSE) for the full MIT disclaimer.
 
 This is an independent community implementation referencing the publicly available
 **[CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure)**.
-CIS Benchmarks are the property of the Center for Internet Security (<https://www.cisecurity.org>).
+CIS Benchmarks are the property of the Center for Internet Security (<https://www.cisecurity.org>),
+used under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 This tool is not affiliated with, endorsed by, or approved by CIS.
 
 **Version:** 1.0.0-beta3

@@ -151,6 +151,10 @@ graph        = 120   # Resource Graph bulk queries
 # client_secret = ""  # SP / CI only; omit for interactive user auth
 ```
 
+> **Security note:** Never store a real `client_secret` value in `cis_audit.toml` — it could be
+> accidentally committed to source control. Use the `CIS_GRAPH_CLIENT_SECRET` environment variable
+> instead, or a secrets manager such as Azure Key Vault or GitHub Actions secrets.
+
 CLI flags override `cis_audit.toml` values when both are set.
 
 ---
@@ -516,7 +520,7 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 
 1. In Entra ID, go to **App registrations** → **New registration** (any name, single-tenant).
 2. **API permissions** → Add → Microsoft Graph → **Delegated** → `Policy.Read.All` → **Grant admin consent**.
-3. For service principal / CI: also add the **Application** permission `Policy.Read.All` and consent it; set `client_secret` in `[graph_auth]` or the `CIS_GRAPH_CLIENT_SECRET` env var.
+3. For service principal / CI: also add the **Application** permission `Policy.Read.All` and consent it; set the secret via the `CIS_GRAPH_CLIENT_SECRET` **environment variable** (recommended — avoids storing credentials in `cis_audit.toml`), or set `client_secret` in `[graph_auth]` for local use only.
 4. Copy the **Application (client) ID** into `cis_audit.toml`:
    ```toml
    [graph_auth]

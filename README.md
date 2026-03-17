@@ -7,6 +7,8 @@
 
 > **[📊 View sample report](https://htmlpreview.github.io/?https://raw.githubusercontent.com/vegazbabz/CIS-Azure-Benchmark-Audit-Tool/main/docs/sample_report.html)** — synthetic data, no real tenant information.
 
+![Sample report dashboard](docs/sample_report_dashboard.png)
+
 **Version:** 1.0.0-beta3
 **Benchmark:** [CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure) (September 2025)
 **Coverage:** 94 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)

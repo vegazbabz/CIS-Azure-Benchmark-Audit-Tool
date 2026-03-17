@@ -9,6 +9,11 @@ with entirely fabricated tenant/subscription/resource data — no real Azure
 environment is accessed and no real credentials are needed.
 """
 
+# flake8: noqa: E402,E501
+# E402 — sys.path must be manipulated before repo imports in a standalone script
+# E501 — control titles and remediation strings are long data values; wrapping
+#         them would harm readability without improving correctness
+
 from __future__ import annotations
 
 import sys

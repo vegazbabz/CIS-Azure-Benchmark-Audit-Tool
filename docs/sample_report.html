@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CIS Azure Audit Report — 2026-03-17 10:31 UTC</title>
+<style>
+/* ── Reset and base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #f8fafc; color: #1e293b; line-height: 1.5; }
+
+/* ── Header ── */
+header { background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+          color: #fff; padding: 2rem; }
+header h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: .25rem; }
+header p  { opacity: .8; font-size: .9rem; }
+
+/* ── Score cards ── */
+.cards { display: flex; gap: 1rem; padding: 1.5rem 2rem; flex-wrap: wrap; }
+.card  { flex: 1; min-width: 120px; background: #fff; border-radius: 10px;
+          padding: 1.2rem; text-align: center;
+          box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.card .n { font-size: 2rem; font-weight: 800; line-height: 1; }
+.card .l { font-size: .78rem; color: #64748b; margin-top: .3rem; }
+.c-sc .n { font-size: 2.4rem; }
+.c-pa .n { color: #16a34a; }
+.c-fa .n { color: #dc2626; }
+.c-er .n { color: #ea580c; }
+.c-in .n { color: #2563eb; }
+.c-ma .n { color: #7c3aed; }
+.c-su .n { color: #64748b; }
+
+/* ── Trend box ── */
+.trend-box { margin: 0 2rem 1rem; border: 1px solid #e2e8f0; border-radius: 8px;
+    background: #fff; overflow: hidden; }
+.trend-box > summary { padding: .65rem 1rem; font-size: .85rem; font-weight: 600;
+    color: #475569; cursor: pointer; list-style: none; user-select: none; }
+.trend-box > summary::-webkit-details-marker { display: none; }
+.trend-box > summary:hover { background: #f8fafc; }
+.trend-inner { padding: .75rem 1rem 1rem; }
+.trend-inner canvas { width: 100%; display: block; }
+
+/* ── Filter bar ── */
+.filters { display: flex; align-items: center; gap: .75rem; padding: .8rem 2rem;
+             background: #fff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; }
+.filters label { font-weight: 600; font-size: .85rem; color: #475569; }
+.filters input, .filters select {
+    border: 1px solid #cbd5e1; border-radius: 6px; padding: .4rem .7rem;
+    font-size: .85rem; outline: none; }
+.filters input { min-width: 220px; }
+.filters input:focus { border-color: #2563eb; }
+.exp-btn { background: #1e3a5f; color: #fff; border-radius: 6px; padding: .4rem .8rem;
+    font-size: .85rem; text-decoration: none; white-space: nowrap;
+    border: none; cursor: pointer; font-family: inherit; }
+.exp-btn:hover { background: #2563eb; }
+
+/* ── Table wrapper ── */
+.wrap  { overflow-x: auto; padding: 0 2rem 2rem; }
+table  { width: 100%; border-collapse: collapse; font-size: .84rem;
+           background: #fff; border-radius: 10px; overflow: hidden;
+           box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+thead  { background: #1e3a5f; color: #fff; }
+th, td { padding: .55rem .8rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
+th     { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+
+/* ── Section header rows ── */
+tr.sh td { background: #f1f5f9; font-size: .8rem; color: #475569;
+             border-top: 2px solid #cbd5e1; padding: .5rem .8rem; }
+tr.sh  { cursor: pointer; user-select: none; }
+tr.sh:hover td { background: #e2e8f0; }
+.sec-arrow { display: inline-block; margin-right: .45rem; font-size: .8rem;
+              transition: transform .2s ease; }
+.sec-arrow.open { transform: rotate(0deg); }
+.sec-arrow.closed { transform: rotate(-90deg); }
+.row-hidden { display: none !important; }
+.ss    { float: right; color: #94a3b8; font-weight: normal; }
+
+/* ── Status badge ── */
+.badge { font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.lv    { font-size: .7rem; background: #e2e8f0; border-radius: 4px;
+           padding: 1px 5px; font-weight: 600; color: #475569; }
+
+/* ── Subscription / resource column ── */
+.sub-col  { min-width: 180px; max-width: 240px; vertical-align: top; }
+.sub-name { font-size: .78rem; color: #374151; font-weight: 600;
+              padding: 1px 0; margin-bottom: 2px; }
+.res-name { font-size: .76rem; color: #6b7280; margin-top: 3px; }
+.res-name code { background: rgba(0,0,0,.06); padding: 1px 4px; border-radius: 3px; }
+
+/* ── Remediation hint ── */
+.fix { margin-top: .4rem; font-size: .78rem; color: #64748b; font-style: italic; }
+
+/* ── Scope info table ── */
+.scope-info { margin-top: 1rem; }
+.scope-info table { border-collapse: collapse; font-size: .82rem; background: rgba(255,255,255,.12);
+    border-radius: 6px; overflow: hidden; }
+.scope-info th { color: rgba(255,255,255,.7); font-weight: 600; padding: .25rem .8rem;
+    text-align: right; white-space: nowrap; border-right: 1px solid rgba(255,255,255,.2); }
+.scope-info td { color: #fff; padding: .25rem .8rem; }
+
+/* ── Footer ── */
+footer { text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem; }
+
+/* ── Subscription summary ── */
+.sub-summary-wrap { padding: 0 2rem 1.5rem; }
+.sub-summary-wrap h2 { font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: .6rem; }
+.sub-summary-wrap h2 small { font-size: .75rem; color: #94a3b8; font-weight: normal; }
+.sub-summary { width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.sub-summary thead { background: #1e3a5f; color: #fff; }
+.sub-summary th, .sub-summary td { padding: .45rem .8rem; text-align: left;
+    border-bottom: 1px solid #e2e8f0; font-size: .83rem; }
+.sub-summary th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+.sub-row { cursor: pointer; }
+.sub-row:hover { background: #f1f5f9 !important; }
+.sub-row.active { background: #dbeafe !important; outline: 2px solid #2563eb; }
+.sbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden;
+    min-width: 120px; background: #e2e8f0; }
+.sbar span { display: block; height: 100%; }
+
+/* ── Back to top button ── */
+#back-top { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 2.5rem; height: 2.5rem;
+    background: #2563eb; color: #fff; border-radius: 50%; font-size: 1.1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2); text-decoration: none;
+    display: flex; align-items: center; justify-content: center; z-index: 999; }
+#back-top:hover { background: #1d4ed8; }
+
+/* ── Print / PDF stylesheet ── */
+@media print {
+    /* Hide interactive-only elements */
+    #back-top, .filters, .trend-box { display: none !important; }
+    .sub-summary-wrap h2 small { display: none; }
+    .sec-arrow { display: none; }
+    tr.sh { cursor: default; }
+
+    /* Clean page background */
+    body { background: #fff; font-size: .78rem; }
+    .wrap { overflow: visible; padding: 0 1rem 1rem; }
+
+    /* Keep dark header and coloured row backgrounds in print */
+    header, tr[style], tr.sh td, thead,
+    .cards .card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    /* Remove screen-only shadows and borders */
+    .cards .card { box-shadow: none; border: 1px solid #e2e8f0; }
+    table, .sub-summary { box-shadow: none; }
+
+    /* Repeat table header on each printed page */
+    thead { display: table-header-group; }
+
+    /* Page-break rules: keep a row together, keep section header with its rows */
+    tr            { page-break-inside: avoid; }
+    tr.sh         { page-break-after: avoid; }
+    .dashboard    { page-break-inside: avoid; }
+    .sub-summary-wrap { page-break-inside: avoid; }
+
+    /* Remove hover / active highlights that mean nothing on paper */
+    .sub-row:hover { background: inherit !important; }
+    .sub-row.active { outline: none; background: inherit !important; }
+
+    /* Slightly tighter column for print */
+    .sub-col { min-width: 100px; max-width: 160px; }
+    table { font-size: .78rem; }
+}
+
+/* ── Compliance dashboard ── */
+.dashboard { display: flex; gap: 2rem; padding: 1rem 2rem 1.5rem;
+    flex-wrap: wrap; align-items: flex-start; background: #fff;
+    border-bottom: 1px solid #e2e8f0; }
+.dash-donuts { display: flex; gap: 2rem; flex-wrap: wrap; align-items: flex-start; }
+.donut-group { display: flex; flex-direction: column; align-items: center; gap: .25rem; }
+.donut-label { font-size: .7rem; font-weight: 700; color: #475569;
+    text-transform: uppercase; letter-spacing: .05em; text-align: center; margin-bottom: .15rem; }
+.lv-badge { font-size: .62rem; font-weight: 700; color: #fff; border-radius: 3px;
+    padding: 0 4px; margin-left: 4px; vertical-align: middle; }
+.donut-pct { font-size: 1.45rem; font-weight: 800; line-height: 1; margin-top: .2rem; }
+.donut-cnt { font-size: .72rem; color: #94a3b8; margin-top: .1rem; }
+.donut-legend { display: flex; gap: .9rem; margin-top: .7rem; flex-wrap: wrap; }
+.donut-legend span { display: flex; align-items: center; gap: .35rem;
+    font-size: .74rem; color: #475569; }
+.donut-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.sec-breakdown { flex: 1; min-width: 260px; }
+.sb-title { font-size: .72rem; font-weight: 700; color: #475569;
+    text-transform: uppercase; letter-spacing: .05em; margin-bottom: .75rem; }
+.sb-subtitle { font-size: .67rem; font-weight: 400; color: #94a3b8;
+    text-transform: none; letter-spacing: 0; margin-left: .4rem; }
+.sb-row { display: flex; align-items: center; gap: .6rem; margin-bottom: .42rem; }
+.sb-name { font-size: .77rem; color: #1e293b; font-weight: 500; width: 200px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+.sb-bar { flex: 1; height: 9px; border-radius: 5px; background: #e2e8f0;
+    overflow: hidden; display: flex; min-width: 80px; }
+.sb-bar span { display: block; height: 100%; }
+.sb-pct { font-size: .77rem; font-weight: 700; width: 40px; text-align: right; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<a id="top"></a>
+<header>
+  <h1>🔒 CIS Azure Audit Report — 2026-03-17 10:31 UTC</h1>
+  <p>Audit Tool v1.0.0-beta3 &nbsp;·&nbsp; Generated: 2026-03-17 10:31 UTC</p>
+  <div class="scope-info"><table><tr><th>Tenant</th><td>Contoso Corp — contoso.example (sample-tenant-id)</td></tr>
+<tr><th>Audited by</th><td>audit-runner@contoso.example <span style="color:#94a3b8;font-size:0.85em">(service principal)</span></td></tr>
+<tr><th>Scope</th><td>All subscriptions (2 enabled)</td></tr>
+<tr><th>Subscriptions (2)</th><td>Contoso-Production, Contoso-Development</td></tr>
+</table></div>
+</header>
+<div class="cards">
+  <div class="card c-sc">
+    <div class="n">62.5%</div>
+    <div class="l">Compliance Score</div>
+  </div>
+  <div class="card c-pa"><div class="n">30</div><div class="l">✅ Passed</div></div>
+  <div class="card c-fa"><div class="n">17</div><div class="l">❌ Failed</div></div>
+  <div class="card c-er"><div class="n">1</div><div class="l">⚠️ Errors</div></div>
+  <div class="card c-in"><div class="n">2</div><div class="l">ℹ️ Info/N/A</div></div>
+  <div class="card c-ma"><div class="n">2</div><div class="l">📋 Manual</div></div>
+  <div class="card c-su"><div class="n">1</div><div class="l">🔇 Suppressed</div></div>
+</div>
+<div class="dashboard">
+  <div class="dash-donuts">
+    <div class="donut-group">
+      <div class="donut-label">Overall</div>
+      <canvas id="d-overall" width="110" height="110"></canvas>
+      <div id="pct-overall" class="donut-pct" style="color:#d97706">62.5%</div>
+      <div id="cnt-overall" class="donut-cnt">30 / 48 pass</div>
+    </div>
+    <div class="donut-group">
+      <div class="donut-label">Level 1<span class="lv-badge" style="background:#dc2626">L1</span></div>
+      <canvas id="d-l1" width="110" height="110"></canvas>
+      <div id="pct-l1" class="donut-pct" style="color:#d97706">64.5%</div>
+      <div id="cnt-l1" class="donut-cnt">20 / 31 pass</div>
+    </div>
+    <div class="donut-group">
+      <div class="donut-label">Level 2<span class="lv-badge" style="background:#7c3aed">L2</span></div>
+      <canvas id="d-l2" width="110" height="110"></canvas>
+      <div id="pct-l2" class="donut-pct" style="color:#dc2626">58.8%</div>
+      <div id="cnt-l2" class="donut-cnt">10 / 17 pass</div>
+    </div>
+    <div class="donut-legend">
+      <span><i style="background:#16a34a"></i>Pass</span>
+      <span><i style="background:#dc2626"></i>Fail</span>
+      <span><i style="background:#cbd5e1"></i>Error / N/A</span>
+    </div>
+  </div>
+  <div class="sec-breakdown" id="sec-breakdown"></div>
+</div>
+
+<details class="trend-box">
+  <summary>&#128200; Compliance Trend &#8212; last 6 run(s)</summary>
+  <div class="trend-inner">
+    <canvas id="trend-cv" height="130"></canvas>
+  </div>
+</details>
+<script>
+(function(){
+  var TREND = [{"ts": "2025-10-01", "score": 54.2}, {"ts": "2025-11-01", "score": 61.8}, {"ts": "2025-12-01", "score": 66.7}, {"ts": "2026-01-15", "score": 69.5}, {"ts": "2026-02-01", "score": 72.1}, {"ts": "2026-03-01", "score": 74.6}];
+  var cv = document.getElementById('trend-cv');
+  if (!cv || !TREND.length) return;
+  cv.width = cv.parentElement.offsetWidth || 700;
+  var W = cv.width, H = cv.height;
+  var PAD = {t:20, r:20, b:36, l:44};
+  var iW = W - PAD.l - PAD.r, iH = H - PAD.t - PAD.b;
+  var ctx = cv.getContext('2d');
+  var scores = TREND.map(function(d){return d.score;});
+  var minS = Math.max(0, Math.min.apply(null,scores) - 5);
+  var maxS = Math.min(100, Math.max.apply(null,scores) + 5);
+  function sx(i){ return PAD.l + (i / (TREND.length - 1)) * iW; }
+  function sy(v){ return PAD.t + iH - ((v - minS) / (maxS - minS)) * iH; }
+  // grid lines
+  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+  [0,25,50,75,100].forEach(function(v){
+    if (v < minS || v > maxS) return;
+    var y = sy(v);
+    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(PAD.l + iW, y); ctx.stroke();
+    ctx.fillStyle='#94a3b8'; ctx.font='11px sans-serif'; ctx.textAlign='right';
+    ctx.fillText(v+'%', PAD.l - 6, y + 4);
+  });
+  // filled area
+  ctx.beginPath();
+  ctx.moveTo(sx(0), sy(scores[0]));
+  scores.forEach(function(s,i){ if(i) ctx.lineTo(sx(i), sy(s)); });
+  ctx.lineTo(sx(scores.length-1), PAD.t+iH);
+  ctx.lineTo(sx(0), PAD.t+iH);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(37,99,235,0.08)'; ctx.fill();
+  // line
+  ctx.beginPath();
+  scores.forEach(function(s,i){ i ? ctx.lineTo(sx(i),sy(s)) : ctx.moveTo(sx(i),sy(s)); });
+  ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2; ctx.stroke();
+  // dots + labels
+  TREND.forEach(function(d,i){
+    var x=sx(i), y=sy(d.score);
+    var col = d.score>=80?'#16a34a':d.score>=60?'#d97706':'#dc2626';
+    ctx.beginPath(); ctx.arc(x,y,4,0,2*Math.PI);
+    ctx.fillStyle=col; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle=col; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(d.score+'%', x, y-9);
+    ctx.fillStyle='#64748b'; ctx.font='10px sans-serif';
+    ctx.fillText(d.ts, x, H-8);
+  });
+})();
+</script>
+<div class="sub-summary-wrap"><h2>Subscription Summary <small>(click a row to filter the table below)</small></h2><table class="sub-summary"><thead><tr><th>Subscription</th><th>Score</th><th>Breakdown</th><th>&#10003; Pass</th><th>&#10007; Fail</th><th>&#9888; Error</th><th>Info</th><th>Manual</th><th>&#128263; Suppressed</th><th>Audited</th></tr></thead><tbody><tr class="sub-row" data-sub="Contoso-Development"><td style="font-weight:600">Contoso-Development</td><td><span style="color:#dc2626;font-weight:700">54.5%</span></td><td><div class="sbar"><span style="width:55%;background:#16a34a"></span><span style="width:45%;background:#dc2626"></span><span style="width:0%;background:#ea580c"></span></div></td><td style="color:#16a34a;font-weight:600">6</td><td style="color:#dc2626;font-weight:600">5</td><td style="color:#ea580c">0</td><td style="color:#64748b">0</td><td style="color:#7c3aed">0</td><td style="color:#64748b">0</td><td style="color:#64748b;white-space:nowrap">Mar 17<br><small>today</small></td></tr>
+<tr class="sub-row" data-sub="Contoso-Production"><td style="font-weight:600">Contoso-Production</td><td><span style="color:#d97706;font-weight:700">69.0%</span></td><td><div class="sbar"><span style="width:69%;background:#16a34a"></span><span style="width:28%;background:#dc2626"></span><span style="width:3%;background:#ea580c"></span></div></td><td style="color:#16a34a;font-weight:600">20</td><td style="color:#dc2626;font-weight:600">8</td><td style="color:#ea580c">1</td><td style="color:#64748b">2</td><td style="color:#7c3aed">0</td><td style="color:#64748b">1</td><td style="color:#64748b;white-space:nowrap">Mar 17<br><small>today</small></td></tr>
+</tbody></table></div>
+<div class="filters">
+  <label>Filter:</label>
+  <input id="s" placeholder="Search control ID or title...">
+  <select id="st">
+    <option value="">All statuses</option>
+    <option>PASS</option><option>FAIL</option><option>ERROR</option>
+    <option>INFO</option><option>MANUAL</option><option>SUPPRESSED</option>
+  </select>
+  <select id="lv">
+    <option value="">All levels</option>
+    <option value="L1">Level 1</option><option value="L2">Level 2</option>
+  </select>
+  <a href="sample_report.json" class="exp-btn">&#8681; Export JSON</a>
+  <a href="data:text/csv;base64,Y29udHJvbCxsZXZlbCx0aXRsZSxzdWJzY3JpcHRpb24scmVzb3VyY2Usc3RhdHVzLGRldGFpbHMKMi4xLjIsMixFbnN1cmUgdGhhdCBNaWNyb3NvZnQgRGVmZW5kZXIgZm9yIEFwcCBTZXJ2aWNlIGlzIHNldCB0byAnT24nLENvbnRvc28tUHJvZHVjdGlvbiwsUEFTUyxEZWZlbmRlciBmb3IgQXBwIFNlcnZpY2UgaXMgZW5hYmxlZC4KMi4xLjIsMixFbnN1cmUgdGhhdCBNaWNyb3NvZnQgRGVmZW5kZXIgZm9yIEFwcCBTZXJ2aWNlIGlzIHNldCB0byAnT24nLENvbnRvc28tRGV2ZWxvcG1lbnQsLEZBSUwsRGVmZW5kZXIgZm9yIEFwcCBTZXJ2aWNlIGlzIG5vdCBlbmFibGVkLgoyLjEuNywyLEVuc3VyZSB0aGF0IE1pY3Jvc29mdCBEZWZlbmRlciBmb3IgQ29udGFpbmVycyBpcyBzZXQgdG8gJ09uJyxDb250b3NvLVByb2R1Y3Rpb24sLFBBU1MsRGVmZW5kZXIgZm9yIENvbnRhaW5lcnMgaXMgZW5hYmxlZC4KMi4xLjcsMixFbnN1cmUgdGhhdCBNaWNyb3NvZnQgRGVmZW5kZXIgZm9yIENvbnRhaW5lcnMgaXMgc2V0IHRvICdPbicsQ29udG9zby1EZXZlbG9wbWVudCwsRkFJTCxEZWZlbmRlciBmb3IgQ29udGFpbmVycyBpcyBub3QgZW5hYmxlZC4KMi4xLjksMixFbnN1cmUgdGhhdCBNaWNyb3NvZnQgRGVmZW5kZXIgZm9yIEtleSBWYXVsdCBpcyBzZXQgdG8gJ09uJyxDb250b3NvLVByb2R1Y3Rpb24sLFBBU1MsRGVmZW5kZXIgZm9yIEtleSBWYXVsdCBpcyBlbmFibGVkLgoyLjEuOSwyLEVuc3VyZSB0aGF0IE1pY3Jvc29mdCBEZWZlbmRlciBmb3IgS2V5IFZhdWx0IGlzIHNldCB0byAnT24nLENvbnRvc28tRGV2ZWxvcG1lbnQsLFBBU1MsRGVmZW5kZXIgZm9yIEtleSBWYXVsdCBpcyBlbmFibGVkLgoyLjEuMTAsMixFbnN1cmUgdGhhdCBNaWNyb3NvZnQgRGVmZW5kZXIgZm9yIEROUyBpcyBzZXQgdG8gJ09uJyxDb250b3NvLVByb2R1Y3Rpb24sLEZBSUwsRGVmZW5kZXIgZm9yIEROUyBpcyBub3QgZW5hYmxlZC4KMi4xLjEwLDIsRW5zdXJlIHRoYXQgTWljcm9zb2Z0IERlZmVuZGVyIGZvciBETlMgaXMgc2V0IHRvICdPbicsQ29udG9zby1EZXZlbG9wbWVudCwsUEFTUyxEZWZlbmRlciBmb3IgRE5TIGlzIGVuYWJsZWQuCjIuMS4xMSwyLEVuc3VyZSB0aGF0IE1pY3Jvc29mdCBEZWZlbmRlciBmb3Igb3Blbi1zb3VyY2UgcmVsYXRpb25hbCBkYXRhYmFzZXMgaXMgc2V0IHRvICdPbicsQ29udG9zby1Qcm9kdWN0aW9uLCxQQVNTLERlZmVuZGVyIGZvciBvcGVuLXNvdXJjZSByZWxhdGlvbmFsIGRhdGFiYXNlcyBpcyBlbmFibGVkLgoyLjEuMTEsMixFbnN1cmUgdGhhdCBNaWNyb3NvZnQgRGVmZW5kZXIgZm9yIG9wZW4tc291cmNlIHJlbGF0aW9uYWwgZGF0YWJhc2VzIGlzIHNldCB0byAnT24nLENvbnRvc28tRGV2ZWxvcG1lbnQsLFBBU1MsRGVmZW5kZXIgZm9yIG9wZW4tc291cmNlIHJlbGF0aW9uYWwgZGF0YWJhc2VzIGlzIGVuYWJsZWQuCjUuMS4xLDEsRW5zdXJlIFNlY3VyaXR5IERlZmF1bHRzIGFyZSBkaXNhYmxlZCBvbiBBenVyZSBBY3RpdmUgRGlyZWN0b3J5LCwsTUFOVUFMLFNlY3VyaXR5IERlZmF1bHRzIHN0YXR1cyByZXF1aXJlcyBQb2xpY3kuUmVhZC5BbGwgc2NvcGUuIENvbmZpZ3VyZSBbZ3JhcGhfYXV0aF0gaW4gY2lzX2F1ZGl0LnRvbWwgZm9yIGF1dG9tYXRlZCBldmFsdWF0aW9uLiBNYW51YWwgY2hlY2s6IEVudHJhIElEIOKGkiBQcm9wZXJ0aWVzIOKGkiBNYW5hZ2UgU2VjdXJpdHkgRGVmYXVsdHMuCjUuMS4yLDEsRW5zdXJlIHRoYXQgJ011bHRpLUZhY3RvciBBdXRoZW50aWNhdGlvbicgaXMgZW5hYmxlZCBmb3IgYWxsIG5vbi1zZXJ2aWNlIGFjY291bnRzLCwsRkFJTCwiMyB1c2VycyBhcmUgbm90IHJlZ2lzdGVyZWQgZm9yIE1GQTogYWxpY2VAY29udG9zby5leGFtcGxlLCBib2JAY29udG9zby5leGFtcGxlLCBjaGFybGllQGNvbnRvc28uZXhhbXBsZS4iCjUuMS4zLDEsRW5zdXJlIHRoYXQgJ0FsbG93IHVzZXJzIHRvIHJlbWVtYmVyIG11bHRpLWZhY3RvciBhdXRoZW50aWNhdGlvbiBvbiB0cnVzdGVkIGRldmljZXMnIGlzIGRpc2FibGVkLCwsTUFOVUFMLFRoaXMgc2V0dGluZyBsaXZlcyBpbiB0aGUgZGVwcmVjYXRlZCBwZXItdXNlciBNRkEgcG9ydGFsIGFuZCBoYXMgbm8gc3RhYmxlIEdyYXBoIEFQSSBzdXJmYWNlLiBNYW51YWwgY2hlY2s6IGFrYS5tcy9tZmFzZXR0aW5ncyDihpIgc2VydmljZSBzZXR0aW5ncyDihpIgdHJ1c3RlZCBkZXZpY2VzLgo1LjMuMywxLEVuc3VyZSB0aGF0ICdHdWVzdCB1c2VycyBhY2Nlc3MgcmVzdHJpY3Rpb25zJyBhcmUgc2V0IHRvICdHdWVzdCB1c2VyIGFjY2VzcyBpcyByZXN0cmljdGVkIHRvIHByb3BlcnRpZXMgYW5kIG1lbWJlcnNoaXBzIG9mIHRoZWlyIG93biBkaXJlY3Rvcnkgb2JqZWN0cycsLCxQQVNTLEd1ZXN0IGFjY2VzcyBpcyByZXN0cmljdGVkIHRvIG93biBvYmplY3RzIG9ubHkuCjUuNCwyLEVuc3VyZSB0aGF0ICdHdWVzdCBpbnZpdGUgcmVzdHJpY3Rpb25zJyBhcmUgc2V0IHRvICdPbmx5IHVzZXJzIGFzc2lnbmVkIHRvIHNwZWNpZmljIGFkbWluIHJvbGVzIGNhbiBpbnZpdGUgZ3Vlc3QgdXNlcnMnLCwsRkFJTCxBbGwgdXNlcnMgY2FuIGludml0ZSBndWVzdCB1c2Vycy4KNS4xNCwxLEVuc3VyZSB0aGF0ICdSZXN0cmljdCBhY2Nlc3MgdG8gdGhlIEF6dXJlIEFEIGFkbWluaXN0cmF0aW9uIHBvcnRhbCcgaXMgc2V0IHRvICdZZXMnLCwsUEFTUyxBY2Nlc3MgdG8gdGhlIEF6dXJlIEFEIGFkbWluaXN0cmF0aW9uIHBvcnRhbCBpcyByZXN0cmljdGVkIHRvIGFkbWlucy4KNS4xNSwxLEVuc3VyZSB0aGF0ICdVc2VycyBjYW4gcmVnaXN0ZXIgYXBwbGljYXRpb25zJyBpcyBzZXQgdG8gJ05vJywsLEZBSUwsQWxsIHVzZXJzIGNhbiByZWdpc3RlciBhcHBsaWNhdGlvbnMuCjUuMTYsMSxFbnN1cmUgdGhhdCAnR3Vlc3QgdXNlcnMgY2FuIHJlZ2lzdGVyIGFwcGxpY2F0aW9ucycgaXMgc2V0IHRvICdObycsLCxQQVNTLEd1ZXN0IHVzZXJzIGNhbm5vdCByZWdpc3RlciBhcHBsaWNhdGlvbnMuCjUuMjMsMSxFbnN1cmUgdGhhdCBubyBjdXN0b20gc3Vic2NyaXB0aW9uIG93bmVyIHJvbGVzIGFyZSBjcmVhdGVkLCwsUEFTUyxObyBjdXN0b20gcm9sZXMgd2l0aCBvd25lci1sZXZlbCBzdWJzY3JpcHRpb24gc2NvcGUgd2VyZSBmb3VuZCBhY3Jvc3MgMiBzdWJzY3JpcHRpb25zLgo1LjI3LDIsRW5zdXJlIHRoYXQgJ1N1YnNjcmlwdGlvbiBsZWF2aW5nIEVudHJhIElEIGRpcmVjdG9yeScgYW5kICdTdWJzY3JpcHRpb24gZW50ZXJpbmcgRW50cmEgSUQgZGlyZWN0b3J5JyBpcyBzZXQgdG8gJ1Blcm1pdCBubyBvbmUnLCwsRkFJTCxTdWJzY3JpcHRpb24gZGlyZWN0b3J5IHRyYW5zZmVyIGlzIG5vdCByZXN0cmljdGVkLgo2LjEuMS4xLDEsRW5zdXJlIHRoZSBzdG9yYWdlIGNvbnRhaW5lciBzdG9yaW5nIHRoZSBhY3Rpdml0eSBsb2dzIGlzIG5vdCBwdWJsaWNseSBhY2Nlc3NpYmxlLENvbnRvc28tUHJvZHVjdGlvbiwsUEFTUyxTdG9yYWdlIGNvbnRhaW5lciBmb3IgYWN0aXZpdHkgbG9ncyBpcyBub3QgcHVibGljbHkgYWNjZXNzaWJsZS4KNi4xLjEuMiwyLEVuc3VyZSB0aGUgc3RvcmFnZSBhY2NvdW50IGNvbnRhaW5pbmcgdGhlIGNvbnRhaW5lciB3aXRoIGFjdGl2aXR5IGxvZ3MgaXMgZW5jcnlwdGVkIHdpdGggQ3VzdG9tZXIgTWFuYWdlZCBLZXksQ29udG9zby1Qcm9kdWN0aW9uLGNvbnRvc29sb2dzc3RvcmFnZSxGQUlMLFN0b3JhZ2UgYWNjb3VudCAnY29udG9zb2xvZ3NzdG9yYWdlJyBpcyBub3QgZW5jcnlwdGVkIHdpdGggYSBDdXN0b21lciBNYW5hZ2VkIEtleS4KNi4xLjEuNCwxLEVuc3VyZSB0aGUgYWN0aXZpdHkgbG9nIHJldGVudGlvbiBwZXJpb2QgaXMgc2V0IHRvIGF0IGxlYXN0IG9uZSB5ZWFyLENvbnRvc28tUHJvZHVjdGlvbiwsUEFTUyxBY3Rpdml0eSBsb2cgcmV0ZW50aW9uIGlzIHNldCB0byAzNjUgZGF5cy4KNi4xLjEuNiwxLEVuc3VyZSB0aGF0IEFjdGl2aXR5IExvZyBBbGVydCBleGlzdHMgZm9yIENyZWF0ZSBvciBVcGRhdGUgTmV0d29yayBTZWN1cml0eSBHcm91cCxDb250b3NvLVByb2R1Y3Rpb24sLEZBSUwsTm8gYWN0aXZpdHkgbG9nIGFsZXJ0IGZvciAnQ3JlYXRlIG9yIFVwZGF0ZSBOZXR3b3JrIFNlY3VyaXR5IEdyb3VwJyB3YXMgZm91bmQuCjYuMS4xLjYsMSxFbnN1cmUgdGhhdCBBY3Rpdml0eSBMb2cgQWxlcnQgZXhpc3RzIGZvciBDcmVhdGUgb3IgVXBkYXRlIE5ldHdvcmsgU2VjdXJpdHkgR3JvdXAsQ29udG9zby1EZXZlbG9wbWVudCwsUEFTUyxBY3Rpdml0eSBsb2cgYWxlcnQgZm9yICdDcmVhdGUgb3IgVXBkYXRlIE5ldHdvcmsgU2VjdXJpdHkgR3JvdXAnIGlzIGNvbmZpZ3VyZWQuCjYuMS4yLDEsRW5zdXJlIHRoYXQgQWN0aXZpdHkgTG9nIEFsZXJ0IGV4aXN0cyBmb3IgRGVsZXRlIE5ldHdvcmsgU2VjdXJpdHkgR3JvdXAsQ29udG9zby1Qcm9kdWN0aW9uLCxGQUlMLE5vIGFjdGl2aXR5IGxvZyBhbGVydCBmb3IgJ0RlbGV0ZSBOZXR3b3JrIFNlY3VyaXR5IEdyb3VwJyB3YXMgZm91bmQuCjYuMS4zLjEsMSxFbnN1cmUgdGhhdCBsb2dnaW5nIGZvciBBenVyZSBLZXkgVmF1bHQgaXMgJ0VuYWJsZWQnLENvbnRvc28tUHJvZHVjdGlvbiwiY29udG9zby1wcm9kLWt2LCBjb250b3NvLXNoYXJlZC1rdiwgY29udG9zby1zZWNyZXRzLWt2IixQQVNTLERpYWdub3N0aWMgc2V0dGluZ3Mgd2l0aCBBdWRpdEV2ZW50IGxvZ2dpbmcgYXJlIGVuYWJsZWQgb24gYWxsIDMga2V5IHZhdWx0cy4KNy4xLDEsRW5zdXJlIHRoYXQgUkRQIGFjY2VzcyBmcm9tIHRoZSBJbnRlcm5ldCBpcyBldmFsdWF0ZWQgYW5kIHJlc3RyaWN0ZWQsQ29udG9zby1Qcm9kdWN0aW9uLHdlYnNlcnZlci1uc2csRkFJTCxOU0cgJ3dlYnNlcnZlci1uc2cnIGFsbG93cyBSRFAgKHBvcnQgMzM4OSkgZnJvbSAwLjAuMC4wLzAuCjcuMSwxLEVuc3VyZSB0aGF0IFJEUCBhY2Nlc3MgZnJvbSB0aGUgSW50ZXJuZXQgaXMgZXZhbHVhdGVkIGFuZCByZXN0cmljdGVkLENvbnRvc28tRGV2ZWxvcG1lbnQsLFBBU1MsTm8gTlNHcyBhbGxvdyB1bnJlc3RyaWN0ZWQgUkRQIGFjY2VzcyBmcm9tIHRoZSBpbnRlcm5ldC4KNy4yLDEsRW5zdXJlIHRoYXQgU1NIIGFjY2VzcyBmcm9tIHRoZSBJbnRlcm5ldCBpcyBldmFsdWF0ZWQgYW5kIHJlc3RyaWN0ZWQsQ29udG9zby1Qcm9kdWN0aW9uLCxQQVNTLE5vIE5TR3MgYWxsb3cgdW5yZXN0cmljdGVkIFNTSCBhY2Nlc3MgZnJvbSB0aGUgaW50ZXJuZXQuCjcuMiwxLEVuc3VyZSB0aGF0IFNTSCBhY2Nlc3MgZnJvbSB0aGUgSW50ZXJuZXQgaXMgZXZhbHVhdGVkIGFuZCByZXN0cmljdGVkLENvbnRvc28tRGV2ZWxvcG1lbnQsLFBBU1MsTm8gTlNHcyBhbGxvdyB1bnJlc3RyaWN0ZWQgU1NIIGFjY2VzcyBmcm9tIHRoZSBpbnRlcm5ldC4KNy4zLDEsRW5zdXJlIHRoYXQgVURQIGFjY2VzcyBmcm9tIHRoZSBJbnRlcm5ldCBpcyBldmFsdWF0ZWQgYW5kIHJlc3RyaWN0ZWQsQ29udG9zby1Qcm9kdWN0aW9uLCxQQVNTLE5vIE5TR3MgYWxsb3cgdW5yZXN0cmljdGVkIFVEUCBhY2Nlc3MgZnJvbSB0aGUgaW50ZXJuZXQuCjcuNCwxLEVuc3VyZSB0aGF0IEhUVFAgKHBvcnQgODApIGFjY2VzcyBmcm9tIHRoZSBJbnRlcm5ldCBpcyBldmFsdWF0ZWQgYW5kIHJlc3RyaWN0ZWQsQ29udG9zby1Qcm9kdWN0aW9uLGxiLW5zZyxTVVBQUkVTU0VELE5TRyAnbGItbnNnJyBhbGxvd3MgSFRUUCBmcm9tIDAuMC4wLjAvMCDigJQgYWNjZXB0ZWQgcmlzazogcHVibGljLWZhY2luZyBsb2FkIGJhbGFuY2VyLgo3LjUsMSxFbnN1cmUgdGhhdCBOZXR3b3JrIFdhdGNoZXIgaXMgJ0VuYWJsZWQnIGZvciBBenVyZSBSZWdpb25zLENvbnRvc28tUHJvZHVjdGlvbiwsUEFTUywiTmV0d29yayBXYXRjaGVyIGlzIGVuYWJsZWQgaW4gYWxsIHJlZ2lvbnMgd2hlcmUgcmVzb3VyY2VzIGFyZSBkZXBsb3llZCAoV2VzdCBFdXJvcGUsIE5vcnRoIEV1cm9wZSkuIgo3LjYsMixFbnN1cmUgdGhhdCB0aGUgRXhwaXJhdGlvbiBEYXRlIGlzIHNldCBmb3IgYWxsIEZpcmV3YWxsIFBvbGljeSBSdWxlIENvbGxlY3Rpb25zLENvbnRvc28tUHJvZHVjdGlvbiwsSU5GTyxObyBBenVyZSBGaXJld2FsbCBQb2xpY3kgUnVsZSBDb2xsZWN0aW9ucyBmb3VuZCBpbiB0aGlzIHN1YnNjcmlwdGlvbi4KOC4zLjEsMSxFbnN1cmUgdGhhdCB0aGUgRXhwaXJhdGlvbiBEYXRlIGlzIHNldCBmb3IgYWxsIEtleXMgaW4gTm9uLVJCQUMgS2V5IFZhdWx0cyxDb250b3NvLVByb2R1Y3Rpb24sY29udG9zby1wcm9kLWt2LFBBU1MsQWxsIDQga2V5cyBoYXZlIGV4cGlyYXRpb24gZGF0ZXMgc2V0Lgo4LjMuMSwxLEVuc3VyZSB0aGF0IHRoZSBFeHBpcmF0aW9uIERhdGUgaXMgc2V0IGZvciBhbGwgS2V5cyBpbiBOb24tUkJBQyBLZXkgVmF1bHRzLENvbnRvc28tUHJvZHVjdGlvbixjb250b3NvLXNlY3JldHMta3YsRVJST1IsRmlyZXdhbGwgYmxvY2tlZCDigJQgcmVzb3VyY2Ugbm90IHJlYWNoYWJsZSBmcm9tIHRoaXMgcnVubmVyLiBFbmFibGUgdHJ1c3RlZCBNaWNyb3NvZnQgc2VydmljZXMgb3IgYWRkIHRoZSBydW5uZXIgSVAgdG8gdGhlIGZpcmV3YWxsIGFsbG93bGlzdC4KOC4zLjIsMSxFbnN1cmUgdGhhdCB0aGUgRXhwaXJhdGlvbiBEYXRlIGlzIHNldCBmb3IgYWxsIEtleXMgaW4gUkJBQyBLZXkgVmF1bHRzLENvbnRvc28tUHJvZHVjdGlvbixjb250b3NvLXNoYXJlZC1rdixQQVNTLEFsbCAyIGtleXMgaGF2ZSBleHBpcmF0aW9uIGRhdGVzIHNldC4KOC4zLjQsMSxFbnN1cmUgdGhhdCB0aGUgRXhwaXJhdGlvbiBEYXRlIGlzIHNldCBmb3IgYWxsIFNlY3JldHMgaW4gTm9uLVJCQUMgS2V5IFZhdWx0cyxDb250b3NvLVByb2R1Y3Rpb24sY29udG9zby1wcm9kLWt2LEZBSUwsIjIgc2VjcmV0cyBoYXZlIG5vIGV4cGlyYXRpb24gZGF0ZTogJ2RiLWNvbm5lY3Rpb24tc3RyaW5nJywgJ2FwaS1rZXktZXh0ZXJuYWwnLiIKOC4zLjksMixFbnN1cmUgdGhlIGtleSB2YXVsdCBpcyByZWNvdmVyYWJsZSxDb250b3NvLVByb2R1Y3Rpb24sY29udG9zby1wcm9kLWt2LFBBU1MsU29mdCBkZWxldGUgYW5kIHB1cmdlIHByb3RlY3Rpb24gYXJlIGJvdGggZW5hYmxlZC4KOC4zLjksMixFbnN1cmUgdGhlIGtleSB2YXVsdCBpcyByZWNvdmVyYWJsZSxDb250b3NvLVByb2R1Y3Rpb24sY29udG9zby1zaGFyZWQta3YsUEFTUyxTb2Z0IGRlbGV0ZSBhbmQgcHVyZ2UgcHJvdGVjdGlvbiBhcmUgYm90aCBlbmFibGVkLgo4LjMuMTEsMixFbnN1cmUgdGhhdCBQcml2YXRlIEVuZHBvaW50cyBhcmUgdXNlZCBmb3IgQXp1cmUgS2V5IFZhdWx0LENvbnRvc28tUHJvZHVjdGlvbixjb250b3NvLXByb2Qta3YsRkFJTCxObyBwcml2YXRlIGVuZHBvaW50IGlzIGNvbmZpZ3VyZWQgZm9yIHRoaXMgS2V5IFZhdWx0Lgo5LjEuMSwxLEVuc3VyZSB0aGF0ICdTZWN1cmUgdHJhbnNmZXIgcmVxdWlyZWQnIGlzIHNldCB0byAnRW5hYmxlZCcsQ29udG9zby1Qcm9kdWN0aW9uLGNvbnRvc29wcm9kZGF0YSxQQVNTLFNlY3VyZSB0cmFuc2ZlciBpcyByZXF1aXJlZC4KOS4xLjEsMSxFbnN1cmUgdGhhdCAnU2VjdXJlIHRyYW5zZmVyIHJlcXVpcmVkJyBpcyBzZXQgdG8gJ0VuYWJsZWQnLENvbnRvc28tUHJvZHVjdGlvbixjb250b3NvcHJvZGxvZ3MsUEFTUyxTZWN1cmUgdHJhbnNmZXIgaXMgcmVxdWlyZWQuCjkuMS4xLDEsRW5zdXJlIHRoYXQgJ1NlY3VyZSB0cmFuc2ZlciByZXF1aXJlZCcgaXMgc2V0IHRvICdFbmFibGVkJyxDb250b3NvLURldmVsb3BtZW50LGNvbnRvc29kZXZ0ZXN0LEZBSUwsU2VjdXJlIHRyYW5zZmVyIGlzIG5vdCByZXF1aXJlZC4KOS4xLjIsMSxFbnN1cmUgdGhhdCBzdG9yYWdlIGFjY291bnQgYWNjZXNzIGtleXMgYXJlIHBlcmlvZGljYWxseSByZWdlbmVyYXRlZCxDb250b3NvLVByb2R1Y3Rpb24sY29udG9zb3Byb2RkYXRhLEZBSUwsQWNjZXNzIGtleSB3YXMgbGFzdCByb3RhdGVkIDE4NyBkYXlzIGFnbyAodGhyZXNob2xkOiA5MCBkYXlzKS4KOS4yLjEsMixFbnN1cmUgdGhhdCAnRW5hYmxlIEluZnJhc3RydWN0dXJlIEVuY3J5cHRpb24nIGZvciBlYWNoIFN0b3JhZ2UgQWNjb3VudCBpcyBzZXQgdG8gJ2NoZWNrZWQnLENvbnRvc28tUHJvZHVjdGlvbixjb250b3NvcHJvZGRhdGEsUEFTUyxJbmZyYXN0cnVjdHVyZSBlbmNyeXB0aW9uIGlzIGVuYWJsZWQuCjkuMi4yLDEsRW5zdXJlIHRoYXQgJ0VuYWJsZSBTb2Z0IERlbGV0ZSBmb3IgQmxvYnMnIGlzIHNldCB0byAnRW5hYmxlZCcsQ29udG9zby1Qcm9kdWN0aW9uLGNvbnRvc29wcm9kZGF0YSxQQVNTLEJsb2Igc29mdCBkZWxldGUgaXMgZW5hYmxlZCB3aXRoIGEgcmV0ZW50aW9uIG9mIDE0IGRheXMuCjkuMi4yLDEsRW5zdXJlIHRoYXQgJ0VuYWJsZSBTb2Z0IERlbGV0ZSBmb3IgQmxvYnMnIGlzIHNldCB0byAnRW5hYmxlZCcsQ29udG9zby1EZXZlbG9wbWVudCxjb250b3NvZGV2dGVzdCxGQUlMLEJsb2Igc29mdCBkZWxldGUgaXMgbm90IGVuYWJsZWQuCjkuMi4zLDEsRW5zdXJlIHRoYXQgJ0VuYWJsZSBTb2Z0IERlbGV0ZSBmb3IgQ29udGFpbmVycycgaXMgc2V0IHRvICdFbmFibGVkJyxDb250b3NvLVByb2R1Y3Rpb24sY29udG9zb3Byb2RkYXRhLFBBU1MsQ29udGFpbmVyIHNvZnQgZGVsZXRlIGlzIGVuYWJsZWQgd2l0aCBhIHJldGVudGlvbiBvZiAxNCBkYXlzLgo5LjMuMSwxLEVuc3VyZSB0aGF0IHRoZSBzdG9yYWdlIGFjY291bnQgcHVibGljIGFjY2VzcyBpcyBkaXNhYmxlZCxDb250b3NvLVByb2R1Y3Rpb24sY29udG9zb3Byb2RkYXRhLFBBU1MsUHVibGljIGJsb2IgYWNjZXNzIGlzIGRpc2FibGVkLgo5LjMuMSwxLEVuc3VyZSB0aGF0IHRoZSBzdG9yYWdlIGFjY291bnQgcHVibGljIGFjY2VzcyBpcyBkaXNhYmxlZCxDb250b3NvLURldmVsb3BtZW50LGNvbnRvc29kZXZ0ZXN0LEZBSUwsUHVibGljIGJsb2IgYWNjZXNzIGlzIGVuYWJsZWQuCjkuNCwyLCJFbnN1cmUgU3RvcmFnZSBMb2dnaW5nIGlzIEVuYWJsZWQgZm9yIFF1ZXVlIFNlcnZpY2UgZm9yIFJlYWQsIFdyaXRlLCBhbmQgRGVsZXRlIFJlcXVlc3RzIixDb250b3NvLVByb2R1Y3Rpb24sY29udG9zb3Byb2RkYXRhLElORk8sTm8gUXVldWUgc2VydmljZSBmb3VuZCBvbiB0aGlzIGFjY291bnQgKGJsb2Itb25seSBzdG9yYWdlKS4K" download="sample_report.csv" class="exp-btn">&#8681; Export CSV</a>
+</div>
+<div class="wrap"><table>
+<thead><tr>
+  <th>Control</th><th>Level</th><th>Title</th><th>Subscription / Resource</th><th>Status</th><th>Details</th>
+</tr></thead>
+<tbody id="tb"><tr class="sh" data-sec-id="sec-0"><td colspan="6"><span class="sec-arrow open">▼</span><b>2 - Microsoft Defender for Cloud</b><span class="ss">7 of 10 checks passed</span></td></tr>
+<tr style="background:#fef2f2" data-sec="sec-0" data-sec-name="2 - Microsoft Defender for Cloud" data-status="FAIL" data-level="L2" data-sub="Contoso-Development"><td><code>2.1.2</code></td><td><span class="lv">L2</span></td><td>Ensure that Microsoft Defender for App Service is set to &#x27;On&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Development</div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>Defender for App Service is not enabled.<div class="fix">💡 Azure Portal → Microsoft Defender for Cloud → Environment Settings → select subscription → Defender plans → App Service → On</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-0" data-sec-name="2 - Microsoft Defender for Cloud" data-status="PASS" data-level="L2" data-sub="Contoso-Production"><td><code>2.1.2</code></td><td><span class="lv">L2</span></td><td>Ensure that Microsoft Defender for App Service is set to &#x27;On&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Defender for App Service is enabled.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-0" data-sec-name="2 - Microsoft Defender for Cloud" data-status="FAIL" data-level="L2" data-sub="Contoso-Development"><td><code>2.1.7</code></td><td><span class="lv">L2</span></td><td>Ensure that Microsoft Defender for Containers is set to &#x27;On&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Development</div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>Defender for Containers is not enabled.<div class="fix">💡 Azure Portal → Microsoft Defender for Cloud → Environment Settings → select subscription → Defender plans → Containers → On</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-0" data-sec-name="2 - Microsoft Defender for Cloud" data-status="PASS" data-level="L2" data-sub="Contoso-Production"><td><code>2.1.7</code></td><td><span class="lv">L2</span></td><td>Ensure that Microsoft Defender for Containers is set to &#x27;On&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Defender for Containers is enabled.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-0" data-sec-name="2 - Microsoft Defender for Cloud" data-status="PASS" data-level="L2" data-sub="Contoso-Development"><td><code>2.1.9</code></td><td><span class="lv">L2</span></td><td>Ensure that Microsoft Defender for Key Vault is set to &#x27;On&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Development</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Defender for Key Vault is enabled.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-0" data-sec-name="2 - Microsoft Defender for Cloud" data-status="PASS" data-level="L2" data-sub="Contoso-Production"><td><code>2.1.9</code></td><td><span class="lv">L2</span></td><td>Ensure that Microsoft Defender for Key Vault is set to &#x27;On&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Defender for Key Vault is enabled.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-0" data-sec-name="2 - Microsoft Defender for Cloud" data-status="PASS" data-level="L2" data-sub="Contoso-Development"><td><code>2.1.10</code></td><td><span class="lv">L2</span></td><td>Ensure that Microsoft Defender for DNS is set to &#x27;On&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Development</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Defender for DNS is enabled.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-0" data-sec-name="2 - Microsoft Defender for Cloud" data-status="FAIL" data-level="L2" data-sub="Contoso-Production"><td><code>2.1.10</code></td><td><span class="lv">L2</span></td><td>Ensure that Microsoft Defender for DNS is set to &#x27;On&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>Defender for DNS is not enabled.<div class="fix">💡 Azure Portal → Microsoft Defender for Cloud → Environment Settings → select subscription → Defender plans → DNS → On</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-0" data-sec-name="2 - Microsoft Defender for Cloud" data-status="PASS" data-level="L2" data-sub="Contoso-Development"><td><code>2.1.11</code></td><td><span class="lv">L2</span></td><td>Ensure that Microsoft Defender for open-source relational databases is set to &#x27;On&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Development</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Defender for open-source relational databases is enabled.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-0" data-sec-name="2 - Microsoft Defender for Cloud" data-status="PASS" data-level="L2" data-sub="Contoso-Production"><td><code>2.1.11</code></td><td><span class="lv">L2</span></td><td>Ensure that Microsoft Defender for open-source relational databases is set to &#x27;On&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Defender for open-source relational databases is enabled.</td></tr>
+<tr class="sh" data-sec-id="sec-1"><td colspan="6"><span class="sec-arrow open">▼</span><b>5 - Identity and Access Management</b><span class="ss">4 of 10 checks passed</span></td></tr>
+<tr style="background:#f5f3ff" data-sec="sec-1" data-sec-name="5 - Identity and Access Management" data-status="MANUAL" data-level="L1" data-sub=""><td><code>5.1.1</code></td><td><span class="lv">L1</span></td><td>Ensure Security Defaults are disabled on Azure Active Directory</td><td class="sub-col"><div class="sub-name" style="color:#94a3b8">Tenant-wide</div></td><td><span class="badge" style="color:#7c3aed">📋 MANUAL</span></td><td>Security Defaults status requires Policy.Read.All scope. Configure [graph_auth] in cis_audit.toml for automated evaluation. Manual check: Entra ID → Properties → Manage Security Defaults.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-1" data-sec-name="5 - Identity and Access Management" data-status="FAIL" data-level="L1" data-sub=""><td><code>5.1.2</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Multi-Factor Authentication&#x27; is enabled for all non-service accounts</td><td class="sub-col"><div class="sub-name" style="color:#94a3b8">Tenant-wide</div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>3 users are not registered for MFA: alice@contoso.example, bob@contoso.example, charlie@contoso.example.<div class="fix">💡 Entra ID → Users → select user → Authentication methods → require MFA registration</div></td></tr>
+<tr style="background:#f5f3ff" data-sec="sec-1" data-sec-name="5 - Identity and Access Management" data-status="MANUAL" data-level="L1" data-sub=""><td><code>5.1.3</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Allow users to remember multi-factor authentication on trusted devices&#x27; is disabled</td><td class="sub-col"><div class="sub-name" style="color:#94a3b8">Tenant-wide</div></td><td><span class="badge" style="color:#7c3aed">📋 MANUAL</span></td><td>This setting lives in the deprecated per-user MFA portal and has no stable Graph API surface. Manual check: aka.ms/mfasettings → service settings → trusted devices.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-1" data-sec-name="5 - Identity and Access Management" data-status="PASS" data-level="L1" data-sub=""><td><code>5.3.3</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Guest users access restrictions&#x27; are set to &#x27;Guest user access is restricted to properties and memberships of their own directory objects&#x27;</td><td class="sub-col"><div class="sub-name" style="color:#94a3b8">Tenant-wide</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Guest access is restricted to own objects only.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-1" data-sec-name="5 - Identity and Access Management" data-status="FAIL" data-level="L2" data-sub=""><td><code>5.4</code></td><td><span class="lv">L2</span></td><td>Ensure that &#x27;Guest invite restrictions&#x27; are set to &#x27;Only users assigned to specific admin roles can invite guest users&#x27;</td><td class="sub-col"><div class="sub-name" style="color:#94a3b8">Tenant-wide</div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>All users can invite guest users.<div class="fix">💡 Entra ID → External Identities → External collaboration settings → Guest invite settings → Only users assigned to specific admin roles</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-1" data-sec-name="5 - Identity and Access Management" data-status="PASS" data-level="L1" data-sub=""><td><code>5.14</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Restrict access to the Azure AD administration portal&#x27; is set to &#x27;Yes&#x27;</td><td class="sub-col"><div class="sub-name" style="color:#94a3b8">Tenant-wide</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Access to the Azure AD administration portal is restricted to admins.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-1" data-sec-name="5 - Identity and Access Management" data-status="FAIL" data-level="L1" data-sub=""><td><code>5.15</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Users can register applications&#x27; is set to &#x27;No&#x27;</td><td class="sub-col"><div class="sub-name" style="color:#94a3b8">Tenant-wide</div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>All users can register applications.<div class="fix">💡 Entra ID → User settings → App registrations → Users can register applications → No</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-1" data-sec-name="5 - Identity and Access Management" data-status="PASS" data-level="L1" data-sub=""><td><code>5.16</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Guest users can register applications&#x27; is set to &#x27;No&#x27;</td><td class="sub-col"><div class="sub-name" style="color:#94a3b8">Tenant-wide</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Guest users cannot register applications.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-1" data-sec-name="5 - Identity and Access Management" data-status="PASS" data-level="L1" data-sub=""><td><code>5.23</code></td><td><span class="lv">L1</span></td><td>Ensure that no custom subscription owner roles are created</td><td class="sub-col"><div class="sub-name" style="color:#94a3b8">Tenant-wide</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>No custom roles with owner-level subscription scope were found across 2 subscriptions.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-1" data-sec-name="5 - Identity and Access Management" data-status="FAIL" data-level="L2" data-sub=""><td><code>5.27</code></td><td><span class="lv">L2</span></td><td>Ensure that &#x27;Subscription leaving Entra ID directory&#x27; and &#x27;Subscription entering Entra ID directory&#x27; is set to &#x27;Permit no one&#x27;</td><td class="sub-col"><div class="sub-name" style="color:#94a3b8">Tenant-wide</div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>Subscription directory transfer is not restricted.<div class="fix">💡 Entra ID → Properties → Access management for Azure resources → restrict subscription transfer</div></td></tr>
+<tr class="sh" data-sec-id="sec-2"><td colspan="6"><span class="sec-arrow open">▼</span><b>6 - Logging and Monitoring</b><span class="ss">4 of 7 checks passed</span></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-2" data-sec-name="6 - Logging and Monitoring" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>6.1.1.1</code></td><td><span class="lv">L1</span></td><td>Ensure the storage container storing the activity logs is not publicly accessible</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Storage container for activity logs is not publicly accessible.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-2" data-sec-name="6 - Logging and Monitoring" data-status="FAIL" data-level="L2" data-sub="Contoso-Production"><td><code>6.1.1.2</code></td><td><span class="lv">L2</span></td><td>Ensure the storage account containing the container with activity logs is encrypted with Customer Managed Key</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contosologsstorage</code></div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>Storage account &#x27;contosologsstorage&#x27; is not encrypted with a Customer Managed Key.<div class="fix">💡 Azure Portal → Storage accounts → contosologsstorage → Encryption → Customer-managed keys</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-2" data-sec-name="6 - Logging and Monitoring" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>6.1.1.4</code></td><td><span class="lv">L1</span></td><td>Ensure the activity log retention period is set to at least one year</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Activity log retention is set to 365 days.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-2" data-sec-name="6 - Logging and Monitoring" data-status="PASS" data-level="L1" data-sub="Contoso-Development"><td><code>6.1.1.6</code></td><td><span class="lv">L1</span></td><td>Ensure that Activity Log Alert exists for Create or Update Network Security Group</td><td class="sub-col"><div class="sub-name">📋 Contoso-Development</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Activity log alert for &#x27;Create or Update Network Security Group&#x27; is configured.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-2" data-sec-name="6 - Logging and Monitoring" data-status="FAIL" data-level="L1" data-sub="Contoso-Production"><td><code>6.1.1.6</code></td><td><span class="lv">L1</span></td><td>Ensure that Activity Log Alert exists for Create or Update Network Security Group</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>No activity log alert for &#x27;Create or Update Network Security Group&#x27; was found.<div class="fix">💡 Azure Monitor → Alerts → Create alert rule → signal: Create or Update Network Security Group</div></td></tr>
+<tr style="background:#fef2f2" data-sec="sec-2" data-sec-name="6 - Logging and Monitoring" data-status="FAIL" data-level="L1" data-sub="Contoso-Production"><td><code>6.1.2</code></td><td><span class="lv">L1</span></td><td>Ensure that Activity Log Alert exists for Delete Network Security Group</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>No activity log alert for &#x27;Delete Network Security Group&#x27; was found.<div class="fix">💡 Azure Monitor → Alerts → Create alert rule → signal: Delete Network Security Group</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-2" data-sec-name="6 - Logging and Monitoring" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>6.1.3.1</code></td><td><span class="lv">L1</span></td><td>Ensure that logging for Azure Key Vault is &#x27;Enabled&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contoso-prod-kv, contoso-shared-kv, contoso-secrets-kv</code></div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Diagnostic settings with AuditEvent logging are enabled on all 3 key vaults.</td></tr>
+<tr class="sh" data-sec-id="sec-3"><td colspan="6"><span class="sec-arrow open">▼</span><b>7 - Networking Services</b><span class="ss">5 of 8 checks passed</span></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-3" data-sec-name="7 - Networking Services" data-status="PASS" data-level="L1" data-sub="Contoso-Development"><td><code>7.1</code></td><td><span class="lv">L1</span></td><td>Ensure that RDP access from the Internet is evaluated and restricted</td><td class="sub-col"><div class="sub-name">📋 Contoso-Development</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>No NSGs allow unrestricted RDP access from the internet.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-3" data-sec-name="7 - Networking Services" data-status="FAIL" data-level="L1" data-sub="Contoso-Production"><td><code>7.1</code></td><td><span class="lv">L1</span></td><td>Ensure that RDP access from the Internet is evaluated and restricted</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>webserver-nsg</code></div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>NSG &#x27;webserver-nsg&#x27; allows RDP (port 3389) from 0.0.0.0/0.<div class="fix">💡 Azure Portal → Network security groups → webserver-nsg → Inbound rules → remove or restrict the RDP rule</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-3" data-sec-name="7 - Networking Services" data-status="PASS" data-level="L1" data-sub="Contoso-Development"><td><code>7.2</code></td><td><span class="lv">L1</span></td><td>Ensure that SSH access from the Internet is evaluated and restricted</td><td class="sub-col"><div class="sub-name">📋 Contoso-Development</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>No NSGs allow unrestricted SSH access from the internet.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-3" data-sec-name="7 - Networking Services" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>7.2</code></td><td><span class="lv">L1</span></td><td>Ensure that SSH access from the Internet is evaluated and restricted</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>No NSGs allow unrestricted SSH access from the internet.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-3" data-sec-name="7 - Networking Services" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>7.3</code></td><td><span class="lv">L1</span></td><td>Ensure that UDP access from the Internet is evaluated and restricted</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>No NSGs allow unrestricted UDP access from the internet.</td></tr>
+<tr style="background:#f1f5f9" data-sec="sec-3" data-sec-name="7 - Networking Services" data-status="SUPPRESSED" data-level="L1" data-sub="Contoso-Production"><td><code>7.4</code></td><td><span class="lv">L1</span></td><td>Ensure that HTTP (port 80) access from the Internet is evaluated and restricted</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>lb-nsg</code></div></td><td><span class="badge" style="color:#64748b">🔇 SUPPRESSED</span></td><td>NSG &#x27;lb-nsg&#x27; allows HTTP from 0.0.0.0/0 — accepted risk: public-facing load balancer.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-3" data-sec-name="7 - Networking Services" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>7.5</code></td><td><span class="lv">L1</span></td><td>Ensure that Network Watcher is &#x27;Enabled&#x27; for Azure Regions</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Network Watcher is enabled in all regions where resources are deployed (West Europe, North Europe).</td></tr>
+<tr style="background:#eff6ff" data-sec="sec-3" data-sec-name="7 - Networking Services" data-status="INFO" data-level="L2" data-sub="Contoso-Production"><td><code>7.6</code></td><td><span class="lv">L2</span></td><td>Ensure that the Expiration Date is set for all Firewall Policy Rule Collections</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div></td><td><span class="badge" style="color:#2563eb">ℹ️ INFO</span></td><td>No Azure Firewall Policy Rule Collections found in this subscription.</td></tr>
+<tr class="sh" data-sec-id="sec-4"><td colspan="6"><span class="sec-arrow open">▼</span><b>8 - Key Vault</b><span class="ss">4 of 7 checks passed</span></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-4" data-sec-name="8 - Key Vault" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>8.3.1</code></td><td><span class="lv">L1</span></td><td>Ensure that the Expiration Date is set for all Keys in Non-RBAC Key Vaults</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contoso-prod-kv</code></div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>All 4 keys have expiration dates set.</td></tr>
+<tr style="background:#fff7ed" data-sec="sec-4" data-sec-name="8 - Key Vault" data-status="ERROR" data-level="L1" data-sub="Contoso-Production"><td><code>8.3.1</code></td><td><span class="lv">L1</span></td><td>Ensure that the Expiration Date is set for all Keys in Non-RBAC Key Vaults</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contoso-secrets-kv</code></div></td><td><span class="badge" style="color:#ea580c">⚠️ ERROR</span></td><td>Firewall blocked — resource not reachable from this runner. Enable trusted Microsoft services or add the runner IP to the firewall allowlist.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-4" data-sec-name="8 - Key Vault" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>8.3.2</code></td><td><span class="lv">L1</span></td><td>Ensure that the Expiration Date is set for all Keys in RBAC Key Vaults</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contoso-shared-kv</code></div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>All 2 keys have expiration dates set.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-4" data-sec-name="8 - Key Vault" data-status="FAIL" data-level="L1" data-sub="Contoso-Production"><td><code>8.3.4</code></td><td><span class="lv">L1</span></td><td>Ensure that the Expiration Date is set for all Secrets in Non-RBAC Key Vaults</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contoso-prod-kv</code></div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>2 secrets have no expiration date: &#x27;db-connection-string&#x27;, &#x27;api-key-external&#x27;.<div class="fix">💡 Azure Portal → Key vaults → contoso-prod-kv → Secrets → select secret → Set expiration date</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-4" data-sec-name="8 - Key Vault" data-status="PASS" data-level="L2" data-sub="Contoso-Production"><td><code>8.3.9</code></td><td><span class="lv">L2</span></td><td>Ensure the key vault is recoverable</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contoso-prod-kv</code></div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Soft delete and purge protection are both enabled.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-4" data-sec-name="8 - Key Vault" data-status="PASS" data-level="L2" data-sub="Contoso-Production"><td><code>8.3.9</code></td><td><span class="lv">L2</span></td><td>Ensure the key vault is recoverable</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contoso-shared-kv</code></div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Soft delete and purge protection are both enabled.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-4" data-sec-name="8 - Key Vault" data-status="FAIL" data-level="L2" data-sub="Contoso-Production"><td><code>8.3.11</code></td><td><span class="lv">L2</span></td><td>Ensure that Private Endpoints are used for Azure Key Vault</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contoso-prod-kv</code></div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>No private endpoint is configured for this Key Vault.<div class="fix">💡 Azure Portal → Key vaults → contoso-prod-kv → Networking → Private endpoint connections → Add</div></td></tr>
+<tr class="sh" data-sec-id="sec-5"><td colspan="6"><span class="sec-arrow open">▼</span><b>9 - Storage</b><span class="ss">6 of 11 checks passed</span></td></tr>
+<tr style="background:#fef2f2" data-sec="sec-5" data-sec-name="9 - Storage" data-status="FAIL" data-level="L1" data-sub="Contoso-Development"><td><code>9.1.1</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Secure transfer required&#x27; is set to &#x27;Enabled&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Development</div><div class="res-name">🔹 <code>contosodevtest</code></div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>Secure transfer is not required.<div class="fix">💡 Azure Portal → Storage accounts → contosodevtest → Configuration → Secure transfer required → Enabled</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-5" data-sec-name="9 - Storage" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>9.1.1</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Secure transfer required&#x27; is set to &#x27;Enabled&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contosoproddata</code></div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Secure transfer is required.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-5" data-sec-name="9 - Storage" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>9.1.1</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Secure transfer required&#x27; is set to &#x27;Enabled&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contosoprodlogs</code></div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Secure transfer is required.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-5" data-sec-name="9 - Storage" data-status="FAIL" data-level="L1" data-sub="Contoso-Production"><td><code>9.1.2</code></td><td><span class="lv">L1</span></td><td>Ensure that storage account access keys are periodically regenerated</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contosoproddata</code></div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>Access key was last rotated 187 days ago (threshold: 90 days).<div class="fix">💡 Azure Portal → Storage accounts → contosoproddata → Access keys → Rotate key</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-5" data-sec-name="9 - Storage" data-status="PASS" data-level="L2" data-sub="Contoso-Production"><td><code>9.2.1</code></td><td><span class="lv">L2</span></td><td>Ensure that &#x27;Enable Infrastructure Encryption&#x27; for each Storage Account is set to &#x27;checked&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contosoproddata</code></div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Infrastructure encryption is enabled.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-5" data-sec-name="9 - Storage" data-status="FAIL" data-level="L1" data-sub="Contoso-Development"><td><code>9.2.2</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Enable Soft Delete for Blobs&#x27; is set to &#x27;Enabled&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Development</div><div class="res-name">🔹 <code>contosodevtest</code></div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>Blob soft delete is not enabled.<div class="fix">💡 Azure Portal → Storage accounts → contosodevtest → Data protection → Enable soft delete for blobs</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-5" data-sec-name="9 - Storage" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>9.2.2</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Enable Soft Delete for Blobs&#x27; is set to &#x27;Enabled&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contosoproddata</code></div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Blob soft delete is enabled with a retention of 14 days.</td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-5" data-sec-name="9 - Storage" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>9.2.3</code></td><td><span class="lv">L1</span></td><td>Ensure that &#x27;Enable Soft Delete for Containers&#x27; is set to &#x27;Enabled&#x27;</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contosoproddata</code></div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Container soft delete is enabled with a retention of 14 days.</td></tr>
+<tr style="background:#fef2f2" data-sec="sec-5" data-sec-name="9 - Storage" data-status="FAIL" data-level="L1" data-sub="Contoso-Development"><td><code>9.3.1</code></td><td><span class="lv">L1</span></td><td>Ensure that the storage account public access is disabled</td><td class="sub-col"><div class="sub-name">📋 Contoso-Development</div><div class="res-name">🔹 <code>contosodevtest</code></div></td><td><span class="badge" style="color:#dc2626">❌ FAIL</span></td><td>Public blob access is enabled.<div class="fix">💡 Azure Portal → Storage accounts → contosodevtest → Configuration → Allow Blob public access → Disabled</div></td></tr>
+<tr style="background:#f0fdf4" data-sec="sec-5" data-sec-name="9 - Storage" data-status="PASS" data-level="L1" data-sub="Contoso-Production"><td><code>9.3.1</code></td><td><span class="lv">L1</span></td><td>Ensure that the storage account public access is disabled</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contosoproddata</code></div></td><td><span class="badge" style="color:#16a34a">✅ PASS</span></td><td>Public blob access is disabled.</td></tr>
+<tr style="background:#eff6ff" data-sec="sec-5" data-sec-name="9 - Storage" data-status="INFO" data-level="L2" data-sub="Contoso-Production"><td><code>9.4</code></td><td><span class="lv">L2</span></td><td>Ensure Storage Logging is Enabled for Queue Service for Read, Write, and Delete Requests</td><td class="sub-col"><div class="sub-name">📋 Contoso-Production</div><div class="res-name">🔹 <code>contosoproddata</code></div></td><td><span class="badge" style="color:#2563eb">ℹ️ INFO</span></td><td>No Queue service found on this account (blob-only storage).</td></tr>
+</tbody>
+</table></div>
+<a href="#top" id="back-top" title="Back to top">&#8679;</a>
+<footer>
+  CIS Microsoft Azure Foundations Benchmark v5.0.0 (Sep 2025) &nbsp;·&nbsp;
+  Tool v1.0.0-beta3 &nbsp;·&nbsp;
+  Compliance score excludes INFO, MANUAL, and SUPPRESSED checks.
+  Manual controls require separate review per the CIS PDF.
+</footer>
+<script>
+/* ── Live filter ────────────────────────────────────────────────────────────
+   Filters table rows in real-time as the user types or changes dropdowns.
+   Section header rows (class "sh") are hidden when all their data rows are
+   hidden, preventing empty section headers in the filtered view.
+────────────────────────────────────────────────────────────────────────── */
+(function(){
+  var s  = document.getElementById('s');    // Search text input
+  var st = document.getElementById('st');   // Status dropdown
+  var lv = document.getElementById('lv');   // Level dropdown
+
+  /* Data for charts — passed from Python */
+  var JS_COUNTS   = {PASS: 30, FAIL: 17, ERROR: 1};
+  var JS_L1       = {pass: 20, fail: 10, error: 1};
+  var JS_L2       = {pass: 10, fail: 7, error: 0};
+  var JS_SECTIONS = {"2 - Microsoft Defender for Cloud": {"pass": 7, "fail": 3, "error": 0, "score": 70.0}, "5 - Identity and Access Management": {"pass": 4, "fail": 4, "error": 0, "score": 50.0}, "6 - Logging and Monitoring": {"pass": 4, "fail": 3, "error": 0, "score": 57.1}, "7 - Networking Services": {"pass": 5, "fail": 1, "error": 0, "score": 83.3}, "8 - Key Vault": {"pass": 4, "fail": 2, "error": 1, "score": 57.1}, "9 - Storage": {"pass": 6, "fail": 4, "error": 0, "score": 60.0}};
+
+  /* Active subscription filter — empty string means "show all" */
+  var subF = '';
+
+  /* Tracks which section IDs are collapsed (true = collapsed) */
+  var _collapsed = {};
+
+  /* Section collapse — event delegation (onclick attr can't reach IIFE-scoped functions) */
+  document.querySelectorAll('#tb tr.sh').forEach(function(hdr) {
+    hdr.addEventListener('click', function() {
+      var id = hdr.dataset.secId;
+      _collapsed[id] = !_collapsed[id];
+      var arrow = hdr.querySelector('.sec-arrow');
+      arrow.classList.toggle('closed', _collapsed[id]);
+      arrow.classList.toggle('open', !_collapsed[id]);
+      filter();
+    });
+  });
+
+  function filter(){
+    var sv  = s.value.toLowerCase();    // Search value (lowercase for case-insensitive match)
+    var stv = st.value;                 // Selected status ("PASS", "FAIL", etc. or "")
+    var lvv = lv.value;                 // Selected level ("L1", "L2", or "")
+    var filtering = !!(sv || stv || lvv || subF); // Any filter active?
+
+    /* Show/hide data rows — collapse state is overridden when a filter is active */
+    document.querySelectorAll('#tb tr:not(.sh)').forEach(function(r){
+      var badge = r.querySelector('.badge');  // Status badge element
+      var lb    = r.querySelector('.lv');     // Level badge element
+
+      var ok = (!sv  || r.textContent.toLowerCase().includes(sv))    // Text search
+              && (!stv || (badge && badge.textContent.includes(stv))) // Status filter
+              && (!lvv || (lb    && lb.textContent === lvv))          // Level filter
+              && (!subF || r.dataset.sub === subF);                   // Subscription filter
+
+      /* Store filter match for section-header visibility logic below */
+      r.dataset.filterMatch = ok ? '1' : '0';
+
+      /* When filtering, show all matching rows regardless of collapse state */
+      r.classList.toggle('row-hidden', !(ok && (!_collapsed[r.dataset.sec] || filtering)));
+    });
+
+    /* Hide section header rows only when no children match the current filter */
+    document.querySelectorAll('#tb tr.sh').forEach(function(h){
+      var sib = h.nextElementSibling;
+      var anyMatch = false;
+      /* Walk siblings until the next section header (or end of tbody) */
+      while (sib && !sib.classList.contains('sh')) {
+        if (sib.dataset.filterMatch === '1') anyMatch = true;
+        sib = sib.nextElementSibling;
+      }
+      h.classList.toggle('row-hidden', !anyMatch);
+    });
+  }
+
+  /* Attach event listeners to all three filter controls */
+  s.addEventListener('input', filter);
+  st.addEventListener('change', filter);
+  lv.addEventListener('change', filter);
+
+  /* Subscription summary row click — click to filter, click again to deselect */
+  document.querySelectorAll('.sub-row').forEach(function(row) {
+    row.addEventListener('click', function() {
+      if (subF === row.dataset.sub) {
+        subF = '';
+        row.classList.remove('active');
+      } else {
+        subF = row.dataset.sub;
+        document.querySelectorAll('.sub-row').forEach(function(r) { r.classList.remove('active'); });
+        row.classList.add('active');
+      }
+      filter();
+      updateCharts();
+    });
+  });
+
+  /* Recompute and redraw donuts + section breakdown for the selected subscription.
+     When no subscription is selected, restore the full-audit data. */
+  function updateCharts() {
+    var counts, l1, l2, secs;
+    if (!subF) {
+      counts = JS_COUNTS;
+      l1     = JS_L1;
+      l2     = JS_L2;
+      secs   = JS_SECTIONS;
+    } else {
+      counts = {PASS: 0, FAIL: 0, ERROR: 0};
+      l1     = {pass: 0, fail: 0, error: 0};
+      l2     = {pass: 0, fail: 0, error: 0};
+      secs   = {};
+      document.querySelectorAll('#tb tr:not(.sh)').forEach(function(r) {
+        if (r.dataset.sub !== subF) return;
+        var st  = r.dataset.status;
+        var lvl = r.dataset.level;
+        var sn  = r.dataset.secName;
+        if (!secs[sn]) secs[sn] = {pass: 0, fail: 0, error: 0, score: 0};
+        if (st === 'PASS')  { counts.PASS++;  secs[sn].pass++;  (lvl === 'L1' ? l1 : l2).pass++;  }
+        else if (st === 'FAIL')  { counts.FAIL++;  secs[sn].fail++;  (lvl === 'L1' ? l1 : l2).fail++;  }
+        else if (st === 'ERROR') { counts.ERROR++; secs[sn].error++; (lvl === 'L1' ? l1 : l2).error++; }
+      });
+      Object.keys(secs).forEach(function(sn) {
+        var d = secs[sn];
+        d.score = Math.round(d.pass / Math.max(d.pass + d.fail + d.error, 1) * 1000) / 10;
+      });
+    }
+    ['d-overall', 'd-l1', 'd-l2'].forEach(function(id) {
+      var cv = document.getElementById(id);
+      if (cv) cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+    });
+    drawDonut('d-overall', counts.PASS, counts.FAIL, counts.ERROR);
+    drawDonut('d-l1',      l1.pass,     l1.fail,     l1.error);
+    drawDonut('d-l2',      l2.pass,     l2.fail,     l2.error);
+    renderSectionBreakdown(secs);
+
+    /* Update percentage text below each donut */
+    function scoreColor(s) { return s >= 80 ? '#16a34a' : s >= 60 ? '#d97706' : '#dc2626'; }
+    function pct(p, f, e) { return Math.round(p / Math.max(p + f + e, 1) * 1000) / 10; }
+    var sc  = pct(counts.PASS, counts.FAIL, counts.ERROR);
+    var l1s = pct(l1.pass, l1.fail, l1.error);
+    var l2s = pct(l2.pass, l2.fail, l2.error);
+    [['pct-overall', sc], ['pct-l1', l1s], ['pct-l2', l2s]].forEach(function(pair) {
+      var el = document.getElementById(pair[0]);
+      if (el) { el.textContent = pair[1] + '%'; el.style.color = scoreColor(pair[1]); }
+    });
+    var ot = counts.PASS + counts.FAIL + counts.ERROR;
+    var l1t = l1.pass + l1.fail + l1.error;
+    var l2t = l2.pass + l2.fail + l2.error;
+    [['cnt-overall', counts.PASS, ot], ['cnt-l1', l1.pass, l1t], ['cnt-l2', l2.pass, l2t]].forEach(function(t) {
+      var el = document.getElementById(t[0]);
+      if (el) el.textContent = t[1] + ' / ' + t[2] + ' pass';
+    });
+  }
+
+  /* Draw three compliance donut charts and section breakdown */
+  updateCharts();
+
+  /* Donut ring chart: pass (green) / fail (red) / error (neutral gray — not a compliance failure) */
+  function drawDonut(id, pass, fail, error) {
+    var cv = document.getElementById(id);
+    if (!cv) return;
+    var ctx = cv.getContext('2d');
+    var cx = 55, cy = 55, r = 44, ri = 28;
+    var total = pass + fail + error;
+    if (total === 0) return;
+    var segs = [[pass,'#16a34a'],[fail,'#dc2626'],[error,'#cbd5e1']];
+    var start = -Math.PI / 2;
+    segs.forEach(function(seg) {
+      if (!seg[0]) return;
+      var arc = (seg[0] / total) * 2 * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(cx + r * Math.cos(start), cy + r * Math.sin(start));
+      ctx.arc(cx, cy, r, start, start + arc);
+      ctx.arc(cx, cy, ri, start + arc, start, true);
+      ctx.closePath();
+      ctx.fillStyle = seg[1];
+      ctx.fill();
+      start += arc;
+    });
+    /* punch center hole white */
+    ctx.beginPath();
+    ctx.arc(cx, cy, ri - 1, 0, 2 * Math.PI);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  }
+
+  /* Section breakdown: horizontal stacked bars sorted worst → best */
+  function renderSectionBreakdown(data) {
+    data = data || JS_SECTIONS;
+    var el = document.getElementById('sec-breakdown');
+    if (!el) return;
+    var secs = Object.keys(data)
+      .filter(function(a) { return data[a].pass + data[a].fail > 0; })
+      .sort(function(a,b) {
+      return data[a].score - data[b].score;
+    });
+    var h = '<div class="sb-title">Section Breakdown'
+          + '<span class="sb-subtitle">worst → best</span></div>';
+    secs.forEach(function(sec) {
+      var d = data[sec];
+      var scored = d.pass + d.fail + d.error;
+      var col = d.score >= 80 ? '#16a34a' : d.score >= 60 ? '#d97706' : '#dc2626';
+      var pw = scored ? Math.round(d.pass  / scored * 100) : 0;
+      var fw = scored ? Math.round(d.fail  / scored * 100) : 0;
+      var ew = Math.max(0, 100 - pw - fw);
+      h += '<div class="sb-row">'
+         + '<div class="sb-name" title="' + sec + '">' + sec + '</div>'
+         + '<div class="sb-bar">'
+         + '<span style="width:' + pw + '%;background:#16a34a"></span>'
+         + '<span style="width:' + fw + '%;background:#dc2626"></span>'
+         + '<span style="width:' + ew + '%;background:#cbd5e1"></span>'
+         + '</div>'
+         + '<span class="sb-pct" style="color:' + col + '">' + d.score + '%</span>'
+         + '</div>';
+    });
+    el.innerHTML = h;
+  }
+
+})();
+</script>
+</body>
+</html>

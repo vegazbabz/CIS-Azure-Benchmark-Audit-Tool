@@ -1,0 +1,479 @@
+[
+  {
+    "control": "2.1.2",
+    "level": 2,
+    "title": "Ensure that Microsoft Defender for App Service is set to 'On'",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "PASS",
+    "details": "Defender for App Service is enabled."
+  },
+  {
+    "control": "2.1.2",
+    "level": 2,
+    "title": "Ensure that Microsoft Defender for App Service is set to 'On'",
+    "subscription": "Contoso-Development",
+    "resource": "",
+    "status": "FAIL",
+    "details": "Defender for App Service is not enabled."
+  },
+  {
+    "control": "2.1.7",
+    "level": 2,
+    "title": "Ensure that Microsoft Defender for Containers is set to 'On'",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "PASS",
+    "details": "Defender for Containers is enabled."
+  },
+  {
+    "control": "2.1.7",
+    "level": 2,
+    "title": "Ensure that Microsoft Defender for Containers is set to 'On'",
+    "subscription": "Contoso-Development",
+    "resource": "",
+    "status": "FAIL",
+    "details": "Defender for Containers is not enabled."
+  },
+  {
+    "control": "2.1.9",
+    "level": 2,
+    "title": "Ensure that Microsoft Defender for Key Vault is set to 'On'",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "PASS",
+    "details": "Defender for Key Vault is enabled."
+  },
+  {
+    "control": "2.1.9",
+    "level": 2,
+    "title": "Ensure that Microsoft Defender for Key Vault is set to 'On'",
+    "subscription": "Contoso-Development",
+    "resource": "",
+    "status": "PASS",
+    "details": "Defender for Key Vault is enabled."
+  },
+  {
+    "control": "2.1.10",
+    "level": 2,
+    "title": "Ensure that Microsoft Defender for DNS is set to 'On'",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "FAIL",
+    "details": "Defender for DNS is not enabled."
+  },
+  {
+    "control": "2.1.10",
+    "level": 2,
+    "title": "Ensure that Microsoft Defender for DNS is set to 'On'",
+    "subscription": "Contoso-Development",
+    "resource": "",
+    "status": "PASS",
+    "details": "Defender for DNS is enabled."
+  },
+  {
+    "control": "2.1.11",
+    "level": 2,
+    "title": "Ensure that Microsoft Defender for open-source relational databases is set to 'On'",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "PASS",
+    "details": "Defender for open-source relational databases is enabled."
+  },
+  {
+    "control": "2.1.11",
+    "level": 2,
+    "title": "Ensure that Microsoft Defender for open-source relational databases is set to 'On'",
+    "subscription": "Contoso-Development",
+    "resource": "",
+    "status": "PASS",
+    "details": "Defender for open-source relational databases is enabled."
+  },
+  {
+    "control": "5.1.1",
+    "level": 1,
+    "title": "Ensure Security Defaults are disabled on Azure Active Directory",
+    "subscription": "",
+    "resource": "",
+    "status": "MANUAL",
+    "details": "Security Defaults status requires Policy.Read.All scope. Configure [graph_auth] in cis_audit.toml for automated evaluation. Manual check: Entra ID → Properties → Manage Security Defaults."
+  },
+  {
+    "control": "5.1.2",
+    "level": 1,
+    "title": "Ensure that 'Multi-Factor Authentication' is enabled for all non-service accounts",
+    "subscription": "",
+    "resource": "",
+    "status": "FAIL",
+    "details": "3 users are not registered for MFA: alice@contoso.example, bob@contoso.example, charlie@contoso.example."
+  },
+  {
+    "control": "5.1.3",
+    "level": 1,
+    "title": "Ensure that 'Allow users to remember multi-factor authentication on trusted devices' is disabled",
+    "subscription": "",
+    "resource": "",
+    "status": "MANUAL",
+    "details": "This setting lives in the deprecated per-user MFA portal and has no stable Graph API surface. Manual check: aka.ms/mfasettings → service settings → trusted devices."
+  },
+  {
+    "control": "5.3.3",
+    "level": 1,
+    "title": "Ensure that 'Guest users access restrictions' are set to 'Guest user access is restricted to properties and memberships of their own directory objects'",
+    "subscription": "",
+    "resource": "",
+    "status": "PASS",
+    "details": "Guest access is restricted to own objects only."
+  },
+  {
+    "control": "5.4",
+    "level": 2,
+    "title": "Ensure that 'Guest invite restrictions' are set to 'Only users assigned to specific admin roles can invite guest users'",
+    "subscription": "",
+    "resource": "",
+    "status": "FAIL",
+    "details": "All users can invite guest users."
+  },
+  {
+    "control": "5.14",
+    "level": 1,
+    "title": "Ensure that 'Restrict access to the Azure AD administration portal' is set to 'Yes'",
+    "subscription": "",
+    "resource": "",
+    "status": "PASS",
+    "details": "Access to the Azure AD administration portal is restricted to admins."
+  },
+  {
+    "control": "5.15",
+    "level": 1,
+    "title": "Ensure that 'Users can register applications' is set to 'No'",
+    "subscription": "",
+    "resource": "",
+    "status": "FAIL",
+    "details": "All users can register applications."
+  },
+  {
+    "control": "5.16",
+    "level": 1,
+    "title": "Ensure that 'Guest users can register applications' is set to 'No'",
+    "subscription": "",
+    "resource": "",
+    "status": "PASS",
+    "details": "Guest users cannot register applications."
+  },
+  {
+    "control": "5.23",
+    "level": 1,
+    "title": "Ensure that no custom subscription owner roles are created",
+    "subscription": "",
+    "resource": "",
+    "status": "PASS",
+    "details": "No custom roles with owner-level subscription scope were found across 2 subscriptions."
+  },
+  {
+    "control": "5.27",
+    "level": 2,
+    "title": "Ensure that 'Subscription leaving Entra ID directory' and 'Subscription entering Entra ID directory' is set to 'Permit no one'",
+    "subscription": "",
+    "resource": "",
+    "status": "FAIL",
+    "details": "Subscription directory transfer is not restricted."
+  },
+  {
+    "control": "6.1.1.1",
+    "level": 1,
+    "title": "Ensure the storage container storing the activity logs is not publicly accessible",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "PASS",
+    "details": "Storage container for activity logs is not publicly accessible."
+  },
+  {
+    "control": "6.1.1.2",
+    "level": 2,
+    "title": "Ensure the storage account containing the container with activity logs is encrypted with Customer Managed Key",
+    "subscription": "Contoso-Production",
+    "resource": "contosologsstorage",
+    "status": "FAIL",
+    "details": "Storage account 'contosologsstorage' is not encrypted with a Customer Managed Key."
+  },
+  {
+    "control": "6.1.1.4",
+    "level": 1,
+    "title": "Ensure the activity log retention period is set to at least one year",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "PASS",
+    "details": "Activity log retention is set to 365 days."
+  },
+  {
+    "control": "6.1.1.6",
+    "level": 1,
+    "title": "Ensure that Activity Log Alert exists for Create or Update Network Security Group",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "FAIL",
+    "details": "No activity log alert for 'Create or Update Network Security Group' was found."
+  },
+  {
+    "control": "6.1.1.6",
+    "level": 1,
+    "title": "Ensure that Activity Log Alert exists for Create or Update Network Security Group",
+    "subscription": "Contoso-Development",
+    "resource": "",
+    "status": "PASS",
+    "details": "Activity log alert for 'Create or Update Network Security Group' is configured."
+  },
+  {
+    "control": "6.1.2",
+    "level": 1,
+    "title": "Ensure that Activity Log Alert exists for Delete Network Security Group",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "FAIL",
+    "details": "No activity log alert for 'Delete Network Security Group' was found."
+  },
+  {
+    "control": "6.1.3.1",
+    "level": 1,
+    "title": "Ensure that logging for Azure Key Vault is 'Enabled'",
+    "subscription": "Contoso-Production",
+    "resource": "contoso-prod-kv, contoso-shared-kv, contoso-secrets-kv",
+    "status": "PASS",
+    "details": "Diagnostic settings with AuditEvent logging are enabled on all 3 key vaults."
+  },
+  {
+    "control": "7.1",
+    "level": 1,
+    "title": "Ensure that RDP access from the Internet is evaluated and restricted",
+    "subscription": "Contoso-Production",
+    "resource": "webserver-nsg",
+    "status": "FAIL",
+    "details": "NSG 'webserver-nsg' allows RDP (port 3389) from 0.0.0.0/0."
+  },
+  {
+    "control": "7.1",
+    "level": 1,
+    "title": "Ensure that RDP access from the Internet is evaluated and restricted",
+    "subscription": "Contoso-Development",
+    "resource": "",
+    "status": "PASS",
+    "details": "No NSGs allow unrestricted RDP access from the internet."
+  },
+  {
+    "control": "7.2",
+    "level": 1,
+    "title": "Ensure that SSH access from the Internet is evaluated and restricted",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "PASS",
+    "details": "No NSGs allow unrestricted SSH access from the internet."
+  },
+  {
+    "control": "7.2",
+    "level": 1,
+    "title": "Ensure that SSH access from the Internet is evaluated and restricted",
+    "subscription": "Contoso-Development",
+    "resource": "",
+    "status": "PASS",
+    "details": "No NSGs allow unrestricted SSH access from the internet."
+  },
+  {
+    "control": "7.3",
+    "level": 1,
+    "title": "Ensure that UDP access from the Internet is evaluated and restricted",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "PASS",
+    "details": "No NSGs allow unrestricted UDP access from the internet."
+  },
+  {
+    "control": "7.4",
+    "level": 1,
+    "title": "Ensure that HTTP (port 80) access from the Internet is evaluated and restricted",
+    "subscription": "Contoso-Production",
+    "resource": "lb-nsg",
+    "status": "SUPPRESSED",
+    "details": "NSG 'lb-nsg' allows HTTP from 0.0.0.0/0 — accepted risk: public-facing load balancer."
+  },
+  {
+    "control": "7.5",
+    "level": 1,
+    "title": "Ensure that Network Watcher is 'Enabled' for Azure Regions",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "PASS",
+    "details": "Network Watcher is enabled in all regions where resources are deployed (West Europe, North Europe)."
+  },
+  {
+    "control": "7.6",
+    "level": 2,
+    "title": "Ensure that the Expiration Date is set for all Firewall Policy Rule Collections",
+    "subscription": "Contoso-Production",
+    "resource": "",
+    "status": "INFO",
+    "details": "No Azure Firewall Policy Rule Collections found in this subscription."
+  },
+  {
+    "control": "8.3.1",
+    "level": 1,
+    "title": "Ensure that the Expiration Date is set for all Keys in Non-RBAC Key Vaults",
+    "subscription": "Contoso-Production",
+    "resource": "contoso-prod-kv",
+    "status": "PASS",
+    "details": "All 4 keys have expiration dates set."
+  },
+  {
+    "control": "8.3.1",
+    "level": 1,
+    "title": "Ensure that the Expiration Date is set for all Keys in Non-RBAC Key Vaults",
+    "subscription": "Contoso-Production",
+    "resource": "contoso-secrets-kv",
+    "status": "ERROR",
+    "details": "Firewall blocked — resource not reachable from this runner. Enable trusted Microsoft services or add the runner IP to the firewall allowlist."
+  },
+  {
+    "control": "8.3.2",
+    "level": 1,
+    "title": "Ensure that the Expiration Date is set for all Keys in RBAC Key Vaults",
+    "subscription": "Contoso-Production",
+    "resource": "contoso-shared-kv",
+    "status": "PASS",
+    "details": "All 2 keys have expiration dates set."
+  },
+  {
+    "control": "8.3.4",
+    "level": 1,
+    "title": "Ensure that the Expiration Date is set for all Secrets in Non-RBAC Key Vaults",
+    "subscription": "Contoso-Production",
+    "resource": "contoso-prod-kv",
+    "status": "FAIL",
+    "details": "2 secrets have no expiration date: 'db-connection-string', 'api-key-external'."
+  },
+  {
+    "control": "8.3.9",
+    "level": 2,
+    "title": "Ensure the key vault is recoverable",
+    "subscription": "Contoso-Production",
+    "resource": "contoso-prod-kv",
+    "status": "PASS",
+    "details": "Soft delete and purge protection are both enabled."
+  },
+  {
+    "control": "8.3.9",
+    "level": 2,
+    "title": "Ensure the key vault is recoverable",
+    "subscription": "Contoso-Production",
+    "resource": "contoso-shared-kv",
+    "status": "PASS",
+    "details": "Soft delete and purge protection are both enabled."
+  },
+  {
+    "control": "8.3.11",
+    "level": 2,
+    "title": "Ensure that Private Endpoints are used for Azure Key Vault",
+    "subscription": "Contoso-Production",
+    "resource": "contoso-prod-kv",
+    "status": "FAIL",
+    "details": "No private endpoint is configured for this Key Vault."
+  },
+  {
+    "control": "9.1.1",
+    "level": 1,
+    "title": "Ensure that 'Secure transfer required' is set to 'Enabled'",
+    "subscription": "Contoso-Production",
+    "resource": "contosoproddata",
+    "status": "PASS",
+    "details": "Secure transfer is required."
+  },
+  {
+    "control": "9.1.1",
+    "level": 1,
+    "title": "Ensure that 'Secure transfer required' is set to 'Enabled'",
+    "subscription": "Contoso-Production",
+    "resource": "contosoprodlogs",
+    "status": "PASS",
+    "details": "Secure transfer is required."
+  },
+  {
+    "control": "9.1.1",
+    "level": 1,
+    "title": "Ensure that 'Secure transfer required' is set to 'Enabled'",
+    "subscription": "Contoso-Development",
+    "resource": "contosodevtest",
+    "status": "FAIL",
+    "details": "Secure transfer is not required."
+  },
+  {
+    "control": "9.1.2",
+    "level": 1,
+    "title": "Ensure that storage account access keys are periodically regenerated",
+    "subscription": "Contoso-Production",
+    "resource": "contosoproddata",
+    "status": "FAIL",
+    "details": "Access key was last rotated 187 days ago (threshold: 90 days)."
+  },
+  {
+    "control": "9.2.1",
+    "level": 2,
+    "title": "Ensure that 'Enable Infrastructure Encryption' for each Storage Account is set to 'checked'",
+    "subscription": "Contoso-Production",
+    "resource": "contosoproddata",
+    "status": "PASS",
+    "details": "Infrastructure encryption is enabled."
+  },
+  {
+    "control": "9.2.2",
+    "level": 1,
+    "title": "Ensure that 'Enable Soft Delete for Blobs' is set to 'Enabled'",
+    "subscription": "Contoso-Production",
+    "resource": "contosoproddata",
+    "status": "PASS",
+    "details": "Blob soft delete is enabled with a retention of 14 days."
+  },
+  {
+    "control": "9.2.2",
+    "level": 1,
+    "title": "Ensure that 'Enable Soft Delete for Blobs' is set to 'Enabled'",
+    "subscription": "Contoso-Development",
+    "resource": "contosodevtest",
+    "status": "FAIL",
+    "details": "Blob soft delete is not enabled."
+  },
+  {
+    "control": "9.2.3",
+    "level": 1,
+    "title": "Ensure that 'Enable Soft Delete for Containers' is set to 'Enabled'",
+    "subscription": "Contoso-Production",
+    "resource": "contosoproddata",
+    "status": "PASS",
+    "details": "Container soft delete is enabled with a retention of 14 days."
+  },
+  {
+    "control": "9.3.1",
+    "level": 1,
+    "title": "Ensure that the storage account public access is disabled",
+    "subscription": "Contoso-Production",
+    "resource": "contosoproddata",
+    "status": "PASS",
+    "details": "Public blob access is disabled."
+  },
+  {
+    "control": "9.3.1",
+    "level": 1,
+    "title": "Ensure that the storage account public access is disabled",
+    "subscription": "Contoso-Development",
+    "resource": "contosodevtest",
+    "status": "FAIL",
+    "details": "Public blob access is enabled."
+  },
+  {
+    "control": "9.4",
+    "level": 2,
+    "title": "Ensure Storage Logging is Enabled for Queue Service for Read, Write, and Delete Requests",
+    "subscription": "Contoso-Production",
+    "resource": "contosoproddata",
+    "status": "INFO",
+    "details": "No Queue service found on this account (blob-only storage)."
+  }
+]

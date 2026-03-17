@@ -17,6 +17,11 @@ reports/
 cis_checkpoints/
 run
 
+# ── Sample report (synthetic data only — safe to commit) ─────────────────────
+!docs/sample_report.html
+!docs/sample_report.json
+!docs/sample_report.csv
+
 # ── Local notes / AI session files ────────────────────────────────────────────
 .claude/
 Claude improvements.txt

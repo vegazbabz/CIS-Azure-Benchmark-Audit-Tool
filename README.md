@@ -32,7 +32,7 @@ are generated alongside the HTML automatically.
 
 | Requirement | Details |
 | --- | --- |
-| Python | 3.10 or higher |
+| Python | [3.10 or higher](https://www.python.org/downloads/) |
 | Azure CLI | Any recent version — <https://aka.ms/install-azure-cli> |
 | resource-graph extension | Installed automatically on first run |
 | Azure login | `az login` completed before running |
@@ -87,6 +87,73 @@ python cis_azure_audit.py
 The report opens automatically in your browser when the audit finishes. The script will also
 automatically install the `resource-graph` extension if missing, enumerate all enabled
 subscriptions, run all checks, and save the report files to a `reports/` subdirectory.
+
+---
+
+## Getting Started (step-by-step)
+
+New to Python or the Azure CLI? Follow these steps to get the tool running on your machine.
+
+### Step 1 — Install Python
+
+1. Go to [https://www.python.org/downloads/](https://www.python.org/downloads/) and download the
+   latest **Python 3.10+** installer for your OS.
+2. Run the installer. On Windows, check **"Add Python to PATH"** before clicking Install.
+3. Verify the installation:
+   ```powershell
+   python --version
+   ```
+
+### Step 2 — Install the Azure CLI
+
+1. Follow the official instructions at <https://aka.ms/install-azure-cli> for your OS.
+2. Verify:
+   ```powershell
+   az --version
+   ```
+
+### Step 3 — Get the tool
+
+**Option A — Clone with Git** (recommended — makes updating easy):
+```powershell
+git clone https://github.com/vegazbabz/CIS-Azure-Benchmark-Audit-Tool.git
+cd CIS-Azure-Benchmark-Audit-Tool
+```
+
+**Option B — Download as ZIP** (no Git required):
+1. On the [GitHub repository page](https://github.com/vegazbabz/CIS-Azure-Benchmark-Audit-Tool),
+   click the green **Code** button → **Download ZIP**.
+2. Extract the ZIP and open a terminal in the extracted folder.
+
+### Step 4 — Install the Python dependency
+
+The only runtime dependency is `msal` (used for one optional check). Install it with:
+```powershell
+pip install -r requirements.txt
+```
+
+### Step 5 — Log in to Azure
+
+```powershell
+az login
+```
+
+A browser window will open for you to sign in. The account you use needs at minimum **Reader**
+and **Security Reader** on the subscriptions you want to audit.
+
+### Step 6 — Run the audit
+
+```powershell
+python cis_azure_audit.py
+```
+
+The tool will enumerate all your enabled subscriptions, run all checks, and open the HTML report
+in your browser automatically when done. Reports are saved to a `reports/` subfolder.
+
+> **Tip:** To audit a single subscription instead of the whole tenant, use the `-s` flag:
+> ```powershell
+> python cis_azure_audit.py -s "My Subscription Name"
+> ```
 
 ---
 

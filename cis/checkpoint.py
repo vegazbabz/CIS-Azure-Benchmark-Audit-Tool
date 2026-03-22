@@ -207,8 +207,8 @@ def results_from_checkpoint(cp: dict[str, Any]) -> list[R]:
         filtered = {k: v for k, v in r.items() if k in valid_fields}
         try:
             results.append(_reclassify(R(**filtered)))
-        except TypeError:
-            pass  # Skip records that cannot be reconstructed
+        except TypeError as exc:
+            LOGGER.warning("   \u26a0\ufe0f  Skipping unrecognisable checkpoint record (control=%s): %s", r.get("control_id", "?"), exc)
 
     return results
 

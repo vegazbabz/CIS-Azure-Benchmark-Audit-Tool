@@ -1193,6 +1193,17 @@ Examples:
         default=True,
         help="Do not automatically open the HTML report in the browser when the audit is complete",
     )
+    parser.add_argument(
+        "--exit-code",
+        action="store_true",
+        default=False,
+        help=(
+            "Exit with code 2 when the audit finds any FAIL or ERROR results. "
+            "Useful for CI/CD pipelines: the build fails when compliance regressions are detected. "
+            "Exit code 0 means all controls passed; exit code 1 means a tool/setup error; "
+            "exit code 2 means compliance failures were found."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -1293,6 +1304,8 @@ Examples:
                     webbrowser.open(_html_path.as_uri())
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("Could not open report automatically: %s", exc)
+        if args.exit_code and (counts[FAIL] + counts[ERROR]) > 0:
+            sys.exit(2)
         return
 
     # ── Prerequisite: az CLI available ────────────────────────────────────────
@@ -1452,6 +1465,9 @@ Examples:
                 webbrowser.open(_html_path.as_uri())
         except Exception as exc:  # noqa: BLE001
             LOGGER.warning("Could not open report automatically: %s", exc)
+
+    if args.exit_code and (counts[FAIL] + counts[ERROR]) > 0:
+        sys.exit(2)
 
 
 if __name__ == "__main__":

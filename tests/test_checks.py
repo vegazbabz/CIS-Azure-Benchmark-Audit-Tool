@@ -340,6 +340,126 @@ class TestCheck513(unittest.TestCase):
         self.assertEqual(result.status, MANUAL)
 
 
+class TestCheck523(unittest.TestCase):
+    """5.23 — No custom subscription administrator roles with wildcard actions."""
+
+    def test_az_fails_returns_error(self) -> None:
+        with patch("checks.s5.az", return_value=(1, "cli error")):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, ERROR)
+        self.assertEqual(result.control_id, "5.23")
+
+    def test_no_custom_roles_returns_pass(self) -> None:
+        with patch("checks.s5.az", return_value=(0, [])):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, PASS)
+        self.assertEqual(result.control_id, "5.23")
+
+    def test_custom_role_without_wildcard_returns_pass(self) -> None:
+        roles = [{"roleName": "MyReadRole", "permissions": [{"actions": ["Microsoft.Compute/*/read"]}]}]
+        with patch("checks.s5.az", return_value=(0, roles)):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, PASS)
+
+    def test_custom_role_with_wildcard_returns_fail(self) -> None:
+        roles = [{"roleName": "DangerRole", "permissions": [{"actions": ["*"]}]}]
+        with patch("checks.s5.az", return_value=(0, roles)):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("DangerRole", result.details)
+
+    def test_multiple_roles_only_wildcard_flagged(self) -> None:
+        roles = [
+            {"roleName": "SafeRole", "permissions": [{"actions": ["Microsoft.Storage/*/read"]}]},
+            {"roleName": "BadRole", "permissions": [{"actions": ["*"]}]},
+        ]
+        with patch("checks.s5.az", return_value=(0, roles)):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("BadRole", result.details)
+        self.assertNotIn("SafeRole", result.details)
+
+    def test_role_with_multiple_permission_blocks_any_wildcard_fails(self) -> None:
+        # Multiple permission blocks — wildcard in any one block should trigger FAIL
+        roles = [{"roleName": "PartialBad", "permissions": [
+            {"actions": ["Microsoft.Network/*/read"]}, {"actions": ["*"]}
+        ]}]
+        with patch("checks.s5.az", return_value=(0, roles)):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, FAIL)
+
+
+class TestCheck527(unittest.TestCase):
+    """5.27 — Between 2 and 3 subscription owners."""
+
+    def _owner(self, name: str, ptype: str = "User") -> dict[str, Any]:
+        from cis.config import ROLE_OWNER
+        return {
+            "roleDefinitionId": f"/subscriptions/{SID}/providers/Microsoft.Authorization/roleDefinitions/{ROLE_OWNER}",
+            "scope": f"/subscriptions/{SID}",
+            "principalName": name,
+            "principalType": ptype,
+            "principalId": f"id-{name}",
+        }
+
+    def test_zero_owners_returns_fail(self) -> None:
+        result = checks_s5.check_5_27(SID, SNAME, _td("roles", []))
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("0", result.details)
+        self.assertIn("management-group", result.details)
+
+    def test_one_owner_returns_fail(self) -> None:
+        td = _td("roles", [self._owner("alice")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, FAIL)
+
+    def test_two_owners_returns_pass(self) -> None:
+        td = _td("roles", [self._owner("alice"), self._owner("bob")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, PASS)
+        self.assertIn("2", result.details)
+
+    def test_three_owners_returns_pass(self) -> None:
+        td = _td("roles", [self._owner("alice"), self._owner("bob"), self._owner("carol")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, PASS)
+
+    def test_four_owners_returns_fail(self) -> None:
+        td = _td("roles", [self._owner("a"), self._owner("b"), self._owner("c"), self._owner("d")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, FAIL)
+
+    def test_group_assignment_counted_as_one_with_note(self) -> None:
+        td = _td("roles", [self._owner("Owners-Group", "Group"), self._owner("alice")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, PASS)
+        self.assertIn("Group:", result.details)
+        self.assertIn("group assignments detected", result.details)
+
+    def test_management_group_scope_not_counted(self) -> None:
+        # An Owner at management group scope should NOT count towards subscription owners
+        from cis.config import ROLE_OWNER
+        mg_owner = {
+            "roleDefinitionId": f"/providers/Microsoft.Authorization/roleDefinitions/{ROLE_OWNER}",
+            "scope": "/providers/Microsoft.Management/managementGroups/mg-root",
+            "principalName": "mg-admin",
+            "principalType": "User",
+            "principalId": "id-mg-admin",
+        }
+        td = _td("roles", [mg_owner])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        # Management-group-scoped Owner must NOT count — subscription still has 0 direct owners
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("0", result.details)
+
+    def test_correct_subscription_scoped_owner_counted(self) -> None:
+        # Owner scoped directly to subscription IS counted
+        td = _td("roles", [self._owner("alice"), self._owner("bob")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, PASS)
+        self.assertIn("alice", result.details)
+
+
 class TestCheck533(unittest.TestCase):
     """5.3.3 — User Access Administrator role is restricted."""
 

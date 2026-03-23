@@ -13,8 +13,6 @@
 **Benchmark:** [CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure) (September 2025)
 **Coverage:** 94 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)
 
-> **Note:** Sections 3 (App Service) and 4 (Virtual Machines) are not yet implemented.
-
 ---
 
 ## Overview

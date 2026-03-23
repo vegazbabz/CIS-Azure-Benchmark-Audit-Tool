@@ -489,6 +489,7 @@ def prefetch(sub_ids: list[str]) -> dict[str, dict[str, list[Any]]]:
             idx.setdefault(sid, []).append(r)
         indexed[key] = idx
 
+    LOGGER.info("Prefetch complete. %d resource type(s) cached.\n", len(indexed))
     return indexed
 
 

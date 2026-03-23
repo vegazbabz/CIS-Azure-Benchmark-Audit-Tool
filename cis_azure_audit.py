@@ -1345,7 +1345,8 @@ Examples:
         LOGGER.error("❌ Not logged in.\n   Run: az login")
         sys.exit(1)
     _cfg.CALLER_TYPE = acc.get("caller_type", "user") or "user"
-    LOGGER.info("✅ Authenticated as: %s (%s)  |  Tenant: %s", acc.get("user"), _cfg.CALLER_TYPE, acc.get("tenant"))
+    LOGGER.info("✅ Authenticated as: %s (%s)", acc.get("user"), _cfg.CALLER_TYPE)
+    LOGGER.info("✅ Tenant: %s", acc.get("tenant"))
 
     # ── Resolve subscriptions ─────────────────────────────────────────────────
     subs = get_subscriptions(args.subscription)

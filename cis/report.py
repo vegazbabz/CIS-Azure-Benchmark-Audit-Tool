@@ -129,7 +129,9 @@ def generate_html(
 
             # Remediation hint only appears on FAIL rows
             fix = (
-                f'<div class="fix">&#x1F4A1; {html.escape(r.remediation)}</div>' if r.remediation and r.status == FAIL else ""
+                f'<div class="fix">&#x1F4A1; {html.escape(r.remediation)}</div>'
+                if r.remediation and r.status == FAIL
+                else ""
             )
 
             # data-* attributes are used by the JavaScript filter function
@@ -623,7 +625,8 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
   <button class="exp-btn" onclick="exportJson()">&#8681; Export JSON</button>
 </div>
 <div class="wrap"><table>
-<colgroup><col style="width:6%"><col style="width:7%"><col style="width:25%"><col style="width:17%"><col style="width:8%"><col style="width:37%"></colgroup>
+<colgroup><col style="width:6%"><col style="width:7%"><col style="width:25%">
+<col style="width:17%"><col style="width:8%"><col style="width:37%"></colgroup>
 <thead><tr>
   <th>Control</th><th>Level</th><th>Title</th><th>Subscription / Resource</th><th>Status</th><th>Details</th>
 </tr></thead>
@@ -680,9 +683,9 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
         control: cells[0]?cells[0].textContent.trim():'',
         level:   cells[1]?cells[1].textContent.trim():'',
         title:   cells[2]?cells[2].textContent.trim():'',
-        sub_resource: cells[3]?cells[3].textContent.trim().replace(/\s+/g,' '):'',
+        sub_resource: cells[3]?cells[3].textContent.trim().replace(/\\s+/g,' '):'',
         status:  r.dataset.status||'',
-        details: cells[5]?cells[5].textContent.trim().replace(/\s+/g,' '):''
+        details: cells[5]?cells[5].textContent.trim().replace(/\\s+/g,' '):''
       }});
     }});
     return rows;

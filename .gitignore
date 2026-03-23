@@ -27,8 +27,7 @@ _*.py
 _*.js
 
 # ── Local notes / AI session files ────────────────────────────────────────────
-.claude/
-Claude improvements.txt
+*improvements.txt
 GitHub Copilot improvements.txt
 
 # ── Editor / OS ───────────────────────────────────────────────────────────────

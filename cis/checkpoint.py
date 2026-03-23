@@ -208,7 +208,11 @@ def results_from_checkpoint(cp: dict[str, Any]) -> list[R]:
         try:
             results.append(_reclassify(R(**filtered)))
         except TypeError as exc:
-            LOGGER.warning("   \u26a0\ufe0f  Skipping unrecognisable checkpoint record (control=%s): %s", r.get("control_id", "?"), exc)
+            LOGGER.warning(
+                "   \u26a0\ufe0f  Skipping unrecognisable checkpoint record (control=%s): %s",
+                r.get("control_id", "?"),
+                exc,
+            )
 
     return results
 

@@ -259,7 +259,9 @@ def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str:
         LOGGER.info("  COMPLETE — %d checks  |  %d subscription(s)  |  ⏱ %s", total, n_subs, elapsed_str)
         LOGGER.info(
             "  Compliance Score : %s%%  (%d of %d assessed controls, excludes INFO/MANUAL/SUPPRESSED)",
-            score, counts[PASS], assessed,
+            score,
+            counts[PASS],
+            assessed,
         )
         LOGGER.info("  ✅ PASS         %4d", counts[PASS])
         LOGGER.info("  ❌ FAIL         %4d", counts[FAIL])

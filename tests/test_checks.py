@@ -381,9 +381,9 @@ class TestCheck523(unittest.TestCase):
 
     def test_role_with_multiple_permission_blocks_any_wildcard_fails(self) -> None:
         # Multiple permission blocks — wildcard in any one block should trigger FAIL
-        roles = [{"roleName": "PartialBad", "permissions": [
-            {"actions": ["Microsoft.Network/*/read"]}, {"actions": ["*"]}
-        ]}]
+        roles = [
+            {"roleName": "PartialBad", "permissions": [{"actions": ["Microsoft.Network/*/read"]}, {"actions": ["*"]}]}
+        ]
         with patch("checks.s5.az", return_value=(0, roles)):
             result = checks_s5.check_5_23(SID, SNAME)
         self.assertEqual(result.status, FAIL)
@@ -394,6 +394,7 @@ class TestCheck527(unittest.TestCase):
 
     def _owner(self, name: str, ptype: str = "User") -> dict[str, Any]:
         from cis.config import ROLE_OWNER
+
         return {
             "roleDefinitionId": f"/subscriptions/{SID}/providers/Microsoft.Authorization/roleDefinitions/{ROLE_OWNER}",
             "scope": f"/subscriptions/{SID}",
@@ -439,6 +440,7 @@ class TestCheck527(unittest.TestCase):
     def test_management_group_scope_not_counted(self) -> None:
         # An Owner at management group scope should NOT count towards subscription owners
         from cis.config import ROLE_OWNER
+
         mg_owner = {
             "roleDefinitionId": f"/providers/Microsoft.Authorization/roleDefinitions/{ROLE_OWNER}",
             "scope": "/providers/Microsoft.Management/managementGroups/mg-root",
@@ -1216,7 +1218,6 @@ class TestCheck9Storage(unittest.TestCase):
                 self.assertEqual(r.status, ERROR, f"{r.control_id} expected ERROR for auth failure")
                 self.assertNotIn("Key Vault", r.details)
                 self.assertIn("Reader", r.remediation)
-
 
     def test_blob_logging_disabled_returns_fail_for_924_925_926(self) -> None:
         """Data-plane blob logging not enabled — 9.2.4/5/6 should FAIL."""

@@ -100,11 +100,27 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "9.3.11",
             ]
             _STORAGE_LEVELS: dict[str, int] = {
-                "9.2.3": 2, "9.2.4": 2, "9.2.5": 2, "9.2.6": 2,
-                "9.3.1.3": 2, "9.3.2.1": 2, "9.3.3.1": 2, "9.3.5": 2, "9.3.10": 2, "9.3.11": 2,
+                "9.2.3": 2,
+                "9.2.4": 2,
+                "9.2.5": 2,
+                "9.2.6": 2,
+                "9.3.1.3": 2,
+                "9.3.2.1": 2,
+                "9.3.3.1": 2,
+                "9.3.5": 2,
+                "9.3.10": 2,
+                "9.3.11": 2,
             }
             return [
-                _info(cid, f"Storage check {cid}", _STORAGE_LEVELS.get(cid, 1), "9 - Storage Services", "No storage accounts found.", sid, sname)
+                _info(
+                    cid,
+                    f"Storage check {cid}",
+                    _STORAGE_LEVELS.get(cid, 1),
+                    "9 - Storage Services",
+                    "No storage accounts found.",
+                    sid,
+                    sname,
+                )
                 for cid in storage_ctrls
             ]
 
@@ -438,9 +454,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             "9 - Storage Services",
                             PASS if flag else FAIL,
                             f"Account '{aname}': blob logging {cid.split('.')[-1]} = {flag}",
-                            f"Storage Account > Monitoring > Diagnostic settings > Enable logging"
-                            if not flag
-                            else "",
+                            "Storage Account > Monitoring > Diagnostic settings > Enable logging" if not flag else "",
                             sid,
                             sname,
                             aname if not flag else "",

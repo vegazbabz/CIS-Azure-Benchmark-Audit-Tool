@@ -6,7 +6,6 @@ import datetime
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from cis.config import ERROR, FAIL, INFO, MANUAL, PASS, SUPPRESSED
 from cis.models import R
@@ -41,7 +40,7 @@ def _past(days: int = 30) -> str:
     return (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
 
 
-def _toml_file(content: str) -> tuple[tempfile.TemporaryDirectory, Path]:  # type: ignore[type-arg]
+def _toml_file(content: str) -> tuple[tempfile.TemporaryDirectory, Path]:
     tmp = tempfile.TemporaryDirectory()
     path = Path(tmp.name) / "suppressions.toml"
     path.write_text(content, encoding="utf-8")

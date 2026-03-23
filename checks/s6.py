@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, INFO, TIMEOUTS
+from cis.config import PASS, FAIL, TIMEOUTS
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az, az_rest
@@ -127,9 +127,7 @@ def check_6_1_1_3(sid: str, sname: str) -> R:
     (or 0, which means infinite retention).  If retention is disabled entirely
     or no log profile exists at all, the check fails.
     """
-    rc, data = az(
-        ["monitor", "log-profiles", "list", "--subscription", sid], timeout=TIMEOUTS["default"]
-    )
+    rc, data = az(["monitor", "log-profiles", "list", "--subscription", sid], timeout=TIMEOUTS["default"])
     if rc != 0:
         return _err(
             "6.1.1.3",

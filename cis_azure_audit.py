@@ -236,13 +236,15 @@ def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str:
       PASS  → green        FAIL → bold red
       ERROR → yellow       score → green ≥ 80 %, yellow ≥ 50 %, red < 50 %
     """
+    assessed = counts[PASS] + counts[FAIL] + counts[ERROR]
+    sep = "━" * 60
     if HAS_RICH and _rcon is not None:
         score_color = "green" if score >= 80 else ("yellow" if score >= 50 else "red")
-        sep = "━" * 60
         _rcon.print(f"\n{sep}")
         _rcon.print(f"  COMPLETE — {total} checks  |  {n_subs} subscription(s)  |  ⏱ {elapsed_str}")
         _rcon.print(
-            f"  Compliance Score : [{score_color}]{score}%[/{score_color}]" "  (excludes INFO/MANUAL/SUPPRESSED)"
+            f"  Compliance Score : [{score_color}]{score}%[/{score_color}]"
+            f"  ({counts[PASS]} of {assessed} assessed controls, excludes INFO/MANUAL/SUPPRESSED)"
         )
         _rcon.print(
             f"  ✅ [green]PASS {counts[PASS]:4d}[/green]"
@@ -254,9 +256,12 @@ def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str:
         )
         _rcon.print(sep)
     else:
-        LOGGER.info("\n%s", "━" * 60)
+        LOGGER.info("\n%s", sep)
         LOGGER.info("  COMPLETE — %d checks  |  %d subscription(s)  |  ⏱ %s", total, n_subs, elapsed_str)
-        LOGGER.info("  Compliance Score : %s%%  (excludes INFO/MANUAL/SUPPRESSED)", score)
+        LOGGER.info(
+            "  Compliance Score : %s%%  (%d of %d assessed controls, excludes INFO/MANUAL/SUPPRESSED)",
+            score, counts[PASS], assessed,
+        )
         LOGGER.info(
             "  ✅ PASS %4d  ❌ FAIL %4d  ⚠️ ERROR %4d  ℹ️ INFO %4d  📋 MANUAL %4d  🔇 SUPPRESSED %4d",
             counts[PASS],
@@ -266,7 +271,7 @@ def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str:
             counts[MANUAL],
             counts[SUPPRESSED],
         )
-        LOGGER.info("%s", "━" * 60)
+        LOGGER.info("%s", sep)
 
 
 # Section number → display label used in console progress output.

@@ -22,6 +22,10 @@ run
 !docs/sample_report.json
 !docs/sample_report.csv
 
+# ── Debug / scratch scripts ───────────────────────────────────────────────────
+_*.py
+_*.js
+
 # ── Local notes / AI session files ────────────────────────────────────────────
 .claude/
 Claude improvements.txt

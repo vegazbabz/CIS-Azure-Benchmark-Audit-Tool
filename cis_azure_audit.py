@@ -1302,8 +1302,19 @@ Examples:
         _print_summary(counts, total, len(checkpoints), elapsed_str, score)
         LOGGER.info("  Checkpoints: %s/", _cfg.CHECKPOINT_DIR)
         sub_timestamps = {cp["subscription_name"]: cp["timestamp"] for cp in checkpoints.values()}
+        sub_names = [cp["subscription_name"] for cp in checkpoints.values()]
+        # Build scope_info from az account show (best-effort, may fail if not logged in)
+        _rc, _acc = az(["account", "show", "--query", "{user:user.name, tenant:tenantId, caller_type:user.type}"])
+        scope_info = {
+            "tenant": _acc.get("tenant", "") if isinstance(_acc, dict) else "",
+            "user": _acc.get("user", "") if isinstance(_acc, dict) else "",
+            "caller_type": _acc.get("caller_type", "") if isinstance(_acc, dict) else "",
+            "scope_label": "All subscriptions (from checkpoint data)",
+            "subscriptions": sub_names,
+            "level_filter": args.level,
+        }
         run_history = load_history(history_path_for(args.output))
-        generate_html(all_results, args.output, history=run_history, sub_timestamps=sub_timestamps)
+        generate_html(all_results, args.output, scope_info, run_history, sub_timestamps)
         if args.open:
             _html_path = Path(args.output).resolve()
             try:

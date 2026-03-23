@@ -423,8 +423,7 @@ _QUERIES = {
     # settings cannot be queried via Resource Graph and require per-app az calls.
     "app_services": """
         resources | where type =~ 'microsoft.web/sites'
-        | project id, name, resourceGroup, subscriptionId,
-            kind = tostring(kind)
+        | project id, name, resourceGroup, subscriptionId, kind
     """,
     # ── WAF policies ──────────────────────────────────────────────────────────
     # Standalone WAF policy resources (used by check_7_15 for bot protection).

@@ -840,6 +840,12 @@ def run_audit(
             "⚠️  Process executor on Windows may be slower due to process spawn and data serialization overhead."
         )
 
+    # ── Resource Graph prefetch ───────────────────────────────────────────────
+    # Fetch all Resource Graph data ONCE before the parallel loop.
+    # The results are shared read-only across all workers (no locking needed
+    # because the dict is only written during prefetch, never during audit_subscription).
+    td = prefetch([s["id"] for s in todo])
+
     # ── Tenant-level identity checks ─────────────────────────────────────────
     # These checks target the Entra ID tenant, not any individual subscription.
     # Run them ONCE here rather than inside the per-subscription loop to avoid
@@ -865,11 +871,6 @@ def run_audit(
         except Exception as _ckpt_err:
             LOGGER.warning("⚠️  Could not save tenant checkpoint (audit will continue): %s", _ckpt_err)
 
-    # ── Resource Graph prefetch ───────────────────────────────────────────────
-    # Fetch all Resource Graph data ONCE before the parallel loop.
-    # The results are shared read-only across all workers (no locking needed
-    # because the dict is only written during prefetch, never during audit_subscription).
-    td = prefetch([s["id"] for s in todo])
     current_parallel = min(requested_parallel, len(todo))
     LOGGER.info(
         "\n  Auditing %d subscription(s) [mode=%s, workers=%d]...\n",

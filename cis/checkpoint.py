@@ -131,8 +131,8 @@ def save_checkpoint(sid: str, sname: str, results: list[R], status: str = "compl
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
-    # Atomic rename — replaces the target file in a single OS operation
-    tmp.rename(target)
+    # Atomic replace — works on both POSIX and Windows (unlike rename)
+    tmp.replace(target)
 
 
 def load_checkpoints() -> dict[str, Any]:
@@ -243,7 +243,7 @@ def save_tenant_checkpoint(results: list[R]) -> None:
     tmp = _config.CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
-    tmp.rename(target)
+    tmp.replace(target)
 
 
 def load_tenant_checkpoint() -> list[R] | None:

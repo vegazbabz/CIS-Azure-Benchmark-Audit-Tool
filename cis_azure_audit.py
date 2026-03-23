@@ -839,21 +839,26 @@ def run_audit(
     # These checks target the Entra ID tenant, not any individual subscription.
     # Run them ONCE here rather than inside the per-subscription loop to avoid
     # duplicate results when auditing multiple subscriptions.
-    LOGGER.info("\n  [Tenant] Running tenant-level identity checks...")
-    tenant_results = []
-    for fn in [check_5_1_1, check_5_1_2, check_5_1_3, check_5_4, check_5_14, check_5_15, check_5_16]:
-        try:
-            r = fn()
-            tenant_results.append(r)
-            icon = _STATUS_STYLE.get(r.status, ("", "", "?"))[2]
-            LOGGER.info("    %-10s %s %s", r.control_id, icon, r.status)
-        except Exception as e:
-            LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
+    tenant_ckpt = load_tenant_checkpoint() if resume else None
+    if tenant_ckpt is not None:
+        LOGGER.info("\n  💾 Loaded tenant checks from checkpoint (%d results).", len(tenant_ckpt))
+        tenant_results = tenant_ckpt
+    else:
+        LOGGER.info("\n  [Tenant] Running tenant-level identity checks...")
+        tenant_results = []
+        for fn in [check_5_1_1, check_5_1_2, check_5_1_3, check_5_4, check_5_14, check_5_15, check_5_16]:
+            try:
+                r = fn()
+                tenant_results.append(r)
+                icon = _STATUS_STYLE.get(r.status, ("", "", "?"))[2]
+                LOGGER.info("    %-10s %s %s", r.control_id, icon, r.status)
+            except Exception as e:
+                LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
 
-    try:
-        save_tenant_checkpoint(tenant_results)
-    except Exception as _ckpt_err:
-        LOGGER.warning("⚠️  Could not save tenant checkpoint (audit will continue): %s", _ckpt_err)
+        try:
+            save_tenant_checkpoint(tenant_results)
+        except Exception as _ckpt_err:
+            LOGGER.warning("⚠️  Could not save tenant checkpoint (audit will continue): %s", _ckpt_err)
 
     # ── Resource Graph prefetch ───────────────────────────────────────────────
     # Fetch all Resource Graph data ONCE before the parallel loop.

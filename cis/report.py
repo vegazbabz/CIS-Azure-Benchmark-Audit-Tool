@@ -216,16 +216,16 @@ def generate_html(
             f"</tr>\n"
         )
     sub_table = (
-        '<div class="sub-summary-wrap">'
-        "<h2>Subscription Summary "
-        "<small>(click a row to filter the table below)</small></h2>"
+        '<details class="sub-summary-wrap" open>'
+        "<summary><h2 style='display:inline'>Subscription Summary "
+        "<small>(click a row to filter the table below)</small></h2></summary>"
         '<table class="sub-summary">'
         "<thead><tr>"
         "<th>Subscription</th><th>Score</th><th>Breakdown</th>"
         "<th>&#10003; Pass</th><th>&#10007; Fail</th>"
         "<th>&#9888; Error</th><th>Info</th><th>Manual</th><th>&#128263; Suppressed</th>"
         "<th>Audited</th>"
-        f"</tr></thead><tbody>{sub_rows_html}</tbody></table></div>"
+        f"</tr></thead><tbody>{sub_rows_html}</tbody></table></details>"
         if sub_rows_html
         else ""
     )
@@ -561,7 +561,7 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 <a id="top"></a>
 <header>
   <h1>🔒 CIS Azure Audit Report — {ts}</h1>
-  <p>Audit Tool v{VERSION} &nbsp;·&nbsp; Generated: {ts}</p>
+  <p>Audit Tool v{VERSION} &nbsp;·&nbsp; CIS Microsoft Azure Foundations Benchmark v{BENCHMARK_VER}</p>
   {scope_block}
 </header>
 <div class="cards">

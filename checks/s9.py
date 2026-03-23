@@ -99,8 +99,12 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "9.3.10",
                 "9.3.11",
             ]
+            _STORAGE_LEVELS: dict[str, int] = {
+                "9.2.3": 2, "9.2.4": 2, "9.2.5": 2, "9.2.6": 2,
+                "9.3.1.3": 2, "9.3.2.1": 2, "9.3.3.1": 2, "9.3.5": 2, "9.3.10": 2, "9.3.11": 2,
+            }
             return [
-                _info(cid, f"Storage check {cid}", 1, "9 - Storage Services", "No storage accounts found.", sid, sname)
+                _info(cid, f"Storage check {cid}", _STORAGE_LEVELS.get(cid, 1), "9 - Storage Services", "No storage accounts found.", sid, sname)
                 for cid in storage_ctrls
             ]
 
@@ -229,7 +233,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             (
                 "9.3.1.3",
                 "Storage account key access disabled",
-                1,
+                2,
                 acct.get("keyAccess") is False,
                 f"allowSharedKeyAccess = {acct.get('keyAccess')}",
                 "Storage Account > Configuration > Allow storage account key access: Disabled",
@@ -239,7 +243,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             (
                 "9.3.3.1",
                 "Default to Microsoft Entra authorization in Azure portal",
-                1,
+                2,
                 acct.get("oauthDefault") is True,
                 f"defaultToOAuthAuthentication = {acct.get('oauthDefault')}",
                 "Storage Account > Configuration > Default to Microsoft Entra authorization: Enabled",

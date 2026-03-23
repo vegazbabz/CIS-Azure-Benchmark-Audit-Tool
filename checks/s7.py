@@ -630,7 +630,7 @@ def check_7_12(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
 def check_7_13(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     """
-    7.13 — HTTP/2 is enabled on Application Gateway (Level 1)
+    7.13 — HTTP/2 is enabled on Application Gateway (Level 2)
 
     HTTP/2 provides multiplexing, header compression, and server push —
     improving performance and reducing latency. More importantly from a
@@ -644,7 +644,7 @@ def check_7_13(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             _info(
                 "7.13",
                 "HTTP2 enabled on Azure Application Gateway",
-                1,
+                2,
                 "7 - Networking Services",
                 "No Application Gateways found.",
                 sid,
@@ -656,7 +656,7 @@ def check_7_13(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         R(
             "7.13",
             "HTTP2 enabled on Azure Application Gateway",
-            1,
+            2,
             "7 - Networking Services",
             PASS if gw.get("enableHttp2") else FAIL,
             f"Gateway '{gw.get('name')}': enableHttp2 = {gw.get('enableHttp2')}",

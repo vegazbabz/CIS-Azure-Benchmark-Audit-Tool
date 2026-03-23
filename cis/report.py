@@ -7,7 +7,6 @@ report with embedded CSS, JavaScript, live filters, and export buttons.
 
 from __future__ import annotations
 
-import base64
 import csv
 import datetime
 import html
@@ -23,12 +22,12 @@ from cis.models import R
 # Visual style for each status type used in table rows and badges.
 # Format: (text_hex_colour, background_hex_colour, emoji)
 _STATUS_STYLE = {
-    PASS: ("#16a34a", "#f0fdf4", "✅"),  # Green
-    FAIL: ("#dc2626", "#fef2f2", "❌"),  # Red
-    ERROR: ("#ea580c", "#fff7ed", "⚠️"),  # Orange
-    INFO: ("#2563eb", "#eff6ff", "ℹ️"),  # Blue
-    MANUAL: ("#7c3aed", "#f5f3ff", "📋"),  # Purple
-    SUPPRESSED: ("#64748b", "#f1f5f9", "🔇"),  # Muted grey
+    PASS: ("#16a34a", "#f0fdf4", "&#x2705;"),  # Green
+    FAIL: ("#dc2626", "#fef2f2", "&#x274C;"),  # Red
+    ERROR: ("#ea580c", "#fff7ed", "&#x26A0;&#xFE0F;"),  # Orange
+    INFO: ("#2563eb", "#eff6ff", "&#x2139;&#xFE0F;"),  # Blue
+    MANUAL: ("#7c3aed", "#f5f3ff", "&#x1F4CB;"),  # Purple
+    SUPPRESSED: ("#64748b", "#f1f5f9", "&#x1F507;"),  # Muted grey
 }
 
 
@@ -108,7 +107,7 @@ def generate_html(
         rows += (
             f'<tr class="sh" data-sec-id="{sec_id}">'
             f'<td colspan="6">'
-            f'<span class="sec-arrow open">▼</span>'
+            f'<span class="sec-arrow open">&#x25BC;</span>'
             f"<b>{html.escape(sec)}</b>"
             f'<span class="ss">{sp} of {len(grp)} checks passed</span>'
             f"</td></tr>\n"
@@ -122,15 +121,17 @@ def generate_html(
             # Tenant-wide checks have no subscription_name
             sub_cell = ""
             if r.subscription_name:
-                sub_cell += f'<div class="sub-name">📋 {html.escape(r.subscription_name)}</div>'
+                sub_cell += f'<div class="sub-name">&#x1F4CB; {html.escape(r.subscription_name)}</div>'
             else:
                 sub_cell += '<div class="sub-name" style="color:#94a3b8">Tenant-wide</div>'
             if r.resource:
-                sub_cell += f'<div class="res-name">' f"🔹 <code>{html.escape(r.resource)}</code></div>"
+                sub_cell += f'<div class="res-name">' f"&#x1F539; <code>{html.escape(r.resource)}</code></div>"
 
             # Remediation hint only appears on FAIL rows
             fix = (
-                f'<div class="fix">💡 {html.escape(r.remediation)}</div>' if r.remediation and r.status == FAIL else ""
+                f'<div class="fix">&#x1F4A1; {html.escape(r.remediation)}</div>'
+                if r.remediation and r.status == FAIL
+                else ""
             )
 
             # data-* attributes are used by the JavaScript filter function
@@ -217,23 +218,24 @@ def generate_html(
         )
     sub_table = (
         '<div class="sub-summary-wrap">'
-        "<h2>Subscription Summary "
+        '<h2 id="sub-summary-toggle" style="cursor:pointer;user-select:none">'
+        '<span class="sec-arrow open" id="sub-summary-arrow">&#x25BC;</span> '
+        "Subscription Summary "
         "<small>(click a row to filter the table below)</small></h2>"
+        '<div id="sub-summary-body">'
         '<table class="sub-summary">'
         "<thead><tr>"
         "<th>Subscription</th><th>Score</th><th>Breakdown</th>"
         "<th>&#10003; Pass</th><th>&#10007; Fail</th>"
         "<th>&#9888; Error</th><th>Info</th><th>Manual</th><th>&#128263; Suppressed</th>"
         "<th>Audited</th>"
-        f"</tr></thead><tbody>{sub_rows_html}</tbody></table></div>"
+        f"</tr></thead><tbody>{sub_rows_html}</tbody></table></div></div>"
         if sub_rows_html
         else ""
     )
 
     # ── Generate JSON and CSV export files alongside the HTML ─────────────────
     base = Path(output).with_suffix("")
-    json_name = Path(output).stem + ".json"
-    csv_name = Path(output).stem + ".csv"
 
     json_data = [
         {
@@ -259,7 +261,6 @@ def generate_html(
     writer.writerows(json_data)
     csv_text = csv_buf.getvalue()
     base.with_suffix(".csv").write_text(csv_text, encoding="utf-8")
-    csv_data_uri = "data:text/csv;base64," + base64.b64encode(csv_text.encode("utf-8")).decode("ascii")
 
     # ── Report timestamp ──────────────────────────────────────────────────────
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -421,11 +422,13 @@ header p  {{ opacity: .8; font-size: .9rem; }}
 /* ── Table wrapper ── */
 .wrap  {{ overflow-x: auto; padding: 0 2rem 2rem; }}
 table  {{ width: 100%; border-collapse: collapse; font-size: .84rem;
+           table-layout: fixed;
            background: #fff; border-radius: 10px; overflow: hidden;
            box-shadow: 0 1px 4px rgba(0,0,0,.08); }}
 thead  {{ background: #1e3a5f; color: #fff; }}
 th, td {{ padding: .55rem .8rem; text-align: left; border-bottom: 1px solid #e2e8f0; }}
-th     {{ font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }}
+td     {{ overflow-wrap: break-word; word-wrap: break-word; }}
+th     {{ font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }}
 
 /* ── Section header rows ── */
 tr.sh td {{ background: #f1f5f9; font-size: .8rem; color: #475569;
@@ -560,21 +563,21 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 <body>
 <a id="top"></a>
 <header>
-  <h1>🔒 CIS Azure Audit Report — {ts}</h1>
-  <p>Audit Tool v{VERSION} &nbsp;·&nbsp; Generated: {ts}</p>
+  <h1>&#x1F512; CIS Azure Audit Report &#8212; {ts}</h1>
+  <p>Audit Tool v{VERSION} &nbsp;·&nbsp; CIS Microsoft Azure Foundations Benchmark v{BENCHMARK_VER}</p>
   {scope_block}
 </header>
 <div class="cards">
   <div class="card c-sc">
-    <div class="n">{score}%</div>
+    <div class="n" style="color:{score_col}">{score}%</div>
     <div class="l">Compliance Score</div>
   </div>
-  <div class="card c-pa"><div class="n">{counts[PASS]}</div><div class="l">✅ Passed</div></div>
-  <div class="card c-fa"><div class="n">{counts[FAIL]}</div><div class="l">❌ Failed</div></div>
-  <div class="card c-er"><div class="n">{counts[ERROR]}</div><div class="l">⚠️ Errors</div></div>
-  <div class="card c-in"><div class="n">{counts[INFO]}</div><div class="l">ℹ️ Info/N/A</div></div>
-  <div class="card c-ma"><div class="n">{counts[MANUAL]}</div><div class="l">📋 Manual</div></div>
-  <div class="card c-su"><div class="n">{counts[SUPPRESSED]}</div><div class="l">🔇 Suppressed</div></div>
+  <div class="card c-pa"><div class="n">{counts[PASS]}</div><div class="l">&#x2705; Passed</div></div>
+  <div class="card c-fa"><div class="n">{counts[FAIL]}</div><div class="l">&#x274C; Failed</div></div>
+  <div class="card c-er"><div class="n">{counts[ERROR]}</div><div class="l">&#x26A0;&#xFE0F; Errors</div></div>
+  <div class="card c-in"><div class="n">{counts[INFO]}</div><div class="l">&#x2139;&#xFE0F; Info/N/A</div></div>
+  <div class="card c-ma"><div class="n">{counts[MANUAL]}</div><div class="l">&#x1F4CB; Manual</div></div>
+  <div class="card c-su"><div class="n">{counts[SUPPRESSED]}</div><div class="l">&#x1F507; Suppressed</div></div>
 </div>
 <div class="dashboard">
   <div class="dash-donuts">
@@ -618,10 +621,12 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     <option value="">All levels</option>
     <option value="L1">Level 1</option><option value="L2">Level 2</option>
   </select>
-  <a href="{json_name}" class="exp-btn">&#8681; Export JSON</a>
-  <a href="{csv_data_uri}" download="{csv_name}" class="exp-btn">&#8681; Export CSV</a>
+  <button class="exp-btn" onclick="exportCsv()">&#8681; Export CSV</button>
+  <button class="exp-btn" onclick="exportJson()">&#8681; Export JSON</button>
 </div>
 <div class="wrap"><table>
+<colgroup><col style="width:6%"><col style="width:7%"><col style="width:25%">
+<col style="width:17%"><col style="width:8%"><col style="width:37%"></colgroup>
 <thead><tr>
   <th>Control</th><th>Level</th><th>Title</th><th>Subscription / Resource</th><th>Status</th><th>Details</th>
 </tr></thead>
@@ -629,10 +634,10 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 </table></div>
 <a href="#top" id="back-top" title="Back to top">&#8679;</a>
 <footer>
-  CIS Microsoft Azure Foundations Benchmark v{BENCHMARK_VER} (Sep 2025) &nbsp;·&nbsp;
-  Tool v{VERSION} &nbsp;·&nbsp;
-  Compliance score excludes INFO, MANUAL, and SUPPRESSED checks.
-  Manual controls require separate review per the CIS PDF.
+  CIS Microsoft Azure Foundations Benchmark v{BENCHMARK_VER} &nbsp;&middot;&nbsp;
+  Tool v{VERSION} &nbsp;&middot;&nbsp;
+  Compliance score excludes INFO, MANUAL and SUPPRESSED checks.
+  Manual controls require separate review per the CIS benchmark document.
 </footer>
 <script>
 /* ── Live filter ────────────────────────────────────────────────────────────
@@ -656,6 +661,51 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 
   /* Tracks which section IDs are collapsed (true = collapsed) */
   var _collapsed = {{}};
+
+  /* Subscription summary collapse/expand toggle */
+  var subToggle = document.getElementById('sub-summary-toggle');
+  var subBody   = document.getElementById('sub-summary-body');
+  var subArrow  = document.getElementById('sub-summary-arrow');
+  if (subToggle && subBody) {{
+    subToggle.addEventListener('click', function(){{
+      var hidden = subBody.style.display === 'none';
+      subBody.style.display = hidden ? '' : 'none';
+      if (subArrow) {{ subArrow.classList.toggle('closed', !hidden); subArrow.classList.toggle('open', hidden); }}
+    }});
+  }}
+
+  /* Export helpers */
+  function allRows(){{
+    var rows=[];
+    document.querySelectorAll('#tb tr:not(.sh)').forEach(function(r){{
+      var cells=r.querySelectorAll('td');
+      rows.push({{
+        control: cells[0]?cells[0].textContent.trim():'',
+        level:   cells[1]?cells[1].textContent.trim():'',
+        title:   cells[2]?cells[2].textContent.trim():'',
+        sub_resource: cells[3]?cells[3].textContent.trim().replace(/\\s+/g,' '):'',
+        status:  r.dataset.status||'',
+        details: cells[5]?cells[5].textContent.trim().replace(/\\s+/g,' '):''
+      }});
+    }});
+    return rows;
+  }}
+  window.exportCsv = function(){{
+    var rows=allRows();
+    var hdr='Control,Level,Title,Subscription/Resource,Status,Details\\n';
+    var body=rows.map(function(r){{
+      return [r.control,r.level,r.title,r.sub_resource,r.status,r.details]
+        .map(function(v){{ return '"'+v.replace(/"/g,'""')+'"'; }}).join(',');
+    }}).join('\\n');
+    var a=document.createElement('a');
+    a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(hdr+body);
+    a.download='cis_audit_export.csv'; a.click();
+  }};
+  window.exportJson = function(){{
+    var a=document.createElement('a');
+    a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(allRows(),null,2));
+    a.download='cis_audit_export.json'; a.click();
+  }};
 
   /* Section collapse — event delegation (onclick attr can't reach IIFE-scoped functions) */
   document.querySelectorAll('#tb tr.sh').forEach(function(hdr) {{
@@ -821,12 +871,12 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
     var el = document.getElementById('sec-breakdown');
     if (!el) return;
     var secs = Object.keys(data)
-      .filter(function(a) {{ return data[a].pass + data[a].fail > 0; }})
+      .filter(function(a) {{ return data[a].pass + data[a].fail + data[a].error > 0; }})
       .sort(function(a,b) {{
       return data[a].score - data[b].score;
     }});
     var h = '<div class="sb-title">Section Breakdown'
-          + '<span class="sb-subtitle">worst \u2192 best</span></div>';
+          + '<span class="sb-subtitle">worst &rarr; best</span></div>';
     secs.forEach(function(sec) {{
       var d = data[sec];
       var scored = d.pass + d.fail + d.error;

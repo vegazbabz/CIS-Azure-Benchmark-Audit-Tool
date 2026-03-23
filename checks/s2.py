@@ -124,7 +124,7 @@ def check_2_1_2(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
 def check_2_1_7(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     """
-    2.1.7 — Diagnostic logging configured for Azure Databricks (Level 1)
+    2.1.7 — Diagnostic logging configured for Azure Databricks (Level 2)
 
     Checks that at least one diagnostic setting exists for each workspace.
     Diagnostic settings forward logs to a Log Analytics workspace, storage
@@ -139,7 +139,7 @@ def check_2_1_7(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             _info(
                 "2.1.7",
                 "Diagnostic logging configured for Azure Databricks",
-                1,
+                2,
                 "2 - Databricks",
                 "No Databricks workspaces found.",
                 sid,
@@ -156,7 +156,7 @@ def check_2_1_7(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 _err(
                     "2.1.7",
                     "Diagnostic logging configured for Azure Databricks",
-                    1,
+                    2,
                     "2 - Databricks",
                     str(diag),
                     sid,
@@ -174,7 +174,7 @@ def check_2_1_7(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             R(
                 "2.1.7",
                 "Diagnostic logging configured for Azure Databricks",
-                1,
+                2,
                 "2 - Databricks",
                 PASS if enabled else FAIL,
                 f"Workspace '{wname}': diagnostic settings {'found' if enabled else 'NOT configured'}.",
@@ -190,7 +190,7 @@ def check_2_1_7(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
 def check_2_1_9(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     """
-    2.1.9 — Databricks 'No Public IP' is Enabled (Level 1)
+    2.1.9 — Databricks 'No Public IP' is Enabled (Level 2)
 
     When enableNoPublicIp is true, cluster nodes do not get public IP addresses.
     All cluster traffic flows through the private subnet, reducing attack surface.
@@ -204,7 +204,7 @@ def check_2_1_9(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             _info(
                 "2.1.9",
                 "Databricks 'No Public IP' is Enabled",
-                1,
+                2,
                 "2 - Databricks",
                 "No Databricks workspaces found.",
                 sid,
@@ -217,7 +217,7 @@ def check_2_1_9(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         R(
             "2.1.9",
             "Databricks 'No Public IP' is Enabled",
-            1,
+            2,
             "2 - Databricks",
             PASS if ws.get("noPublicIp") else FAIL,
             f"Workspace '{ws.get('name')}': enableNoPublicIp = {ws.get('noPublicIp')}",
@@ -232,7 +232,7 @@ def check_2_1_9(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
 def check_2_1_10(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     """
-    2.1.10 — Databricks 'Allow Public Network Access' is Disabled (Level 1)
+    2.1.10 — Databricks 'Allow Public Network Access' is Disabled (Level 2)
 
     publicNetworkAccess controls whether the Databricks workspace web UI
     and REST API are accessible from the public internet. Disabling it
@@ -247,7 +247,7 @@ def check_2_1_10(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             _info(
                 "2.1.10",
                 "Databricks 'Allow Public Network Access' is Disabled",
-                1,
+                2,
                 "2 - Databricks",
                 "No Databricks workspaces found.",
                 sid,
@@ -259,7 +259,7 @@ def check_2_1_10(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         R(
             "2.1.10",
             "Databricks 'Allow Public Network Access' is Disabled",
-            1,
+            2,
             "2 - Databricks",
             PASS if str(ws.get("publicAccess", "Enabled")).lower() == "disabled" else FAIL,
             f"Workspace '{ws.get('name')}': publicNetworkAccess = {ws.get('publicAccess')}",

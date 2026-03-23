@@ -86,7 +86,7 @@ def _load_cache() -> Any:
         try:
             cache.deserialize(_TOKEN_CACHE_PATH.read_text(encoding="utf-8"))
         except Exception:
-            pass  # Corrupted cache — start fresh
+            logger.debug("Corrupted MSAL token cache at %s — starting fresh.", _TOKEN_CACHE_PATH)
     return cache
 
 

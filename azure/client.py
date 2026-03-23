@@ -358,12 +358,17 @@ def graph_query(query: str, sub_ids: list[str]) -> tuple[int, Any]:
     in groups of 10 (Resource Graph limit).
     """
     all_data = []
+    # Collapse the Kusto query to a single line.  On Windows, az.cmd is a batch
+    # file executed through cmd.exe which interprets embedded newlines as command
+    # separators — causing multi-line queries to be truncated after the first
+    # line, silently returning unprojected / unfiltered results.
+    q = " ".join(query.split())
 
     for batch in [sub_ids[i : i + 10] for i in range(0, len(sub_ids), 10)]:
         skip = None
         while True:
             cmd = (
-                [AZ, "graph", "query", "-q", query.strip(), "--first", "1000", "--output", "json"]
+                [AZ, "graph", "query", "-q", q, "--first", "1000", "--output", "json"]
                 + ["--subscriptions"]
                 + batch
                 + (["--skip-token", skip] if skip else [])

@@ -70,7 +70,7 @@ def setup_logging(
         try:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
         except Exception:
-            pass
+            pass  # Not all stream wrappers support reconfigure
 
     if rich_console is not None:
         try:

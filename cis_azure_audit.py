@@ -146,6 +146,7 @@ from checks.s5 import (
 from checks.s6 import (
     check_6_1_1_1,
     check_6_1_1_2,
+    check_6_1_1_3,
     check_6_1_1_4,
     check_6_1_1_6,
     check_6_1_2_alerts,
@@ -236,37 +237,39 @@ def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str:
       PASS  → green        FAIL → bold red
       ERROR → yellow       score → green ≥ 80 %, yellow ≥ 50 %, red < 50 %
     """
+    assessed = counts[PASS] + counts[FAIL] + counts[ERROR]
+    sep = "━" * 60
     if HAS_RICH and _rcon is not None:
         score_color = "green" if score >= 80 else ("yellow" if score >= 50 else "red")
-        sep = "━" * 60
         _rcon.print(f"\n{sep}")
         _rcon.print(f"  COMPLETE — {total} checks  |  {n_subs} subscription(s)  |  ⏱ {elapsed_str}")
         _rcon.print(
-            f"  Compliance Score : [{score_color}]{score}%[/{score_color}]" "  (excludes INFO/MANUAL/SUPPRESSED)"
+            f"  Compliance Score : [{score_color}]{score}%[/{score_color}]"
+            f"  ({counts[PASS]} of {assessed} assessed controls, excludes INFO/MANUAL/SUPPRESSED)"
         )
-        _rcon.print(
-            f"  ✅ [green]PASS {counts[PASS]:4d}[/green]"
-            f"  ❌ [bold red]FAIL {counts[FAIL]:4d}[/bold red]"
-            f"  ⚠️ [yellow]ERROR {counts[ERROR]:4d}[/yellow]"
-            f"  ℹ️ INFO {counts[INFO]:4d}"
-            f"  📋 MANUAL {counts[MANUAL]:4d}"
-            f"  🔇 SUPPRESSED {counts[SUPPRESSED]:4d}"
-        )
+        _rcon.print(f"  ✅ [green]PASS         {counts[PASS]:4d}[/green]")
+        _rcon.print(f"  ❌ [bold red]FAIL         {counts[FAIL]:4d}[/bold red]")
+        _rcon.print(f"  ⚠️  [yellow]ERROR        {counts[ERROR]:4d}[/yellow]")
+        _rcon.print(f"  ℹ️  INFO         {counts[INFO]:4d}")
+        _rcon.print(f"  📋 MANUAL       {counts[MANUAL]:4d}")
+        _rcon.print(f"  🔇 SUPPRESSED   {counts[SUPPRESSED]:4d}")
         _rcon.print(sep)
     else:
-        LOGGER.info("\n%s", "━" * 60)
+        LOGGER.info("\n%s", sep)
         LOGGER.info("  COMPLETE — %d checks  |  %d subscription(s)  |  ⏱ %s", total, n_subs, elapsed_str)
-        LOGGER.info("  Compliance Score : %s%%  (excludes INFO/MANUAL/SUPPRESSED)", score)
         LOGGER.info(
-            "  ✅ PASS %4d  ❌ FAIL %4d  ⚠️ ERROR %4d  ℹ️ INFO %4d  📋 MANUAL %4d  🔇 SUPPRESSED %4d",
+            "  Compliance Score : %s%%  (%d of %d assessed controls, excludes INFO/MANUAL/SUPPRESSED)",
+            score,
             counts[PASS],
-            counts[FAIL],
-            counts[ERROR],
-            counts[INFO],
-            counts[MANUAL],
-            counts[SUPPRESSED],
+            assessed,
         )
-        LOGGER.info("%s", "━" * 60)
+        LOGGER.info("  ✅ PASS         %4d", counts[PASS])
+        LOGGER.info("  ❌ FAIL         %4d", counts[FAIL])
+        LOGGER.info("  ⚠️  ERROR        %4d", counts[ERROR])
+        LOGGER.info("  ℹ️  INFO         %4d", counts[INFO])
+        LOGGER.info("  📋 MANUAL       %4d", counts[MANUAL])
+        LOGGER.info("  🔇 SUPPRESSED   %4d", counts[SUPPRESSED])
+        LOGGER.info("%s", sep)
 
 
 # Section number → display label used in console progress output.
@@ -422,8 +425,7 @@ _QUERIES = {
     # settings cannot be queried via Resource Graph and require per-app az calls.
     "app_services": """
         resources | where type =~ 'microsoft.web/sites'
-        | project id, name, resourceGroup, subscriptionId,
-            kind = tostring(kind)
+        | project id, name, resourceGroup, subscriptionId, kind
     """,
     # ── WAF policies ──────────────────────────────────────────────────────────
     # Standalone WAF policy resources (used by check_7_15 for bot protection).
@@ -489,6 +491,7 @@ def prefetch(sub_ids: list[str]) -> dict[str, dict[str, list[Any]]]:
             idx.setdefault(sid, []).append(r)
         indexed[key] = idx
 
+    LOGGER.info("Prefetch complete. %d resource type(s) cached.\n", len(indexed))
     return indexed
 
 
@@ -557,6 +560,7 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         # ── Section 6 — Monitoring ─────────────────────────────────────────
         ("6.1.1.1", lambda: [check_6_1_1_1(sid, sname)]),
         ("6.1.1.2", lambda: [check_6_1_1_2(sid, sname)]),
+        ("6.1.1.3", lambda: [check_6_1_1_3(sid, sname)]),
         ("6.1.1.4", lambda: check_6_1_1_4(sid, sname, td)),
         ("6.1.1.6", lambda: check_6_1_1_6(sid, sname, td)),
         ("6.1.2.1", lambda: _from_batch("6.1.2", lambda: check_6_1_2_alerts(sid, sname), "6.1.2.1")),
@@ -623,6 +627,9 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("9.2.1", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.1")),
         ("9.2.2", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.2")),
         ("9.2.3", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.3")),
+        ("9.2.4", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.4")),
+        ("9.2.5", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.5")),
+        ("9.2.6", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.6")),
         ("9.3.1.1", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.1.1")),
         ("9.3.1.2", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.1.2")),
         ("9.3.1.3", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.1.3")),
@@ -806,7 +813,7 @@ def run_audit(
                     r = fn()
                     all_results.append(r)
                     icon = _STATUS_STYLE.get(r.status, ("", "", "?"))[2]
-                    LOGGER.info("    %-10s %s %s", r.control_id, icon, r.status)
+                    LOGGER.info("    %-10s %s  %s", r.control_id, icon, r.status)
                 except Exception as e:
                     LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
         return all_results
@@ -835,31 +842,37 @@ def run_audit(
             "⚠️  Process executor on Windows may be slower due to process spawn and data serialization overhead."
         )
 
-    # ── Tenant-level identity checks ─────────────────────────────────────────
-    # These checks target the Entra ID tenant, not any individual subscription.
-    # Run them ONCE here rather than inside the per-subscription loop to avoid
-    # duplicate results when auditing multiple subscriptions.
-    LOGGER.info("\n  [Tenant] Running tenant-level identity checks...")
-    tenant_results = []
-    for fn in [check_5_1_1, check_5_1_2, check_5_1_3, check_5_4, check_5_14, check_5_15, check_5_16]:
-        try:
-            r = fn()
-            tenant_results.append(r)
-            icon = _STATUS_STYLE.get(r.status, ("", "", "?"))[2]
-            LOGGER.info("    %-10s %s %s", r.control_id, icon, r.status)
-        except Exception as e:
-            LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
-
-    try:
-        save_tenant_checkpoint(tenant_results)
-    except Exception as _ckpt_err:
-        LOGGER.warning("⚠️  Could not save tenant checkpoint (audit will continue): %s", _ckpt_err)
-
     # ── Resource Graph prefetch ───────────────────────────────────────────────
     # Fetch all Resource Graph data ONCE before the parallel loop.
     # The results are shared read-only across all workers (no locking needed
     # because the dict is only written during prefetch, never during audit_subscription).
     td = prefetch([s["id"] for s in todo])
+
+    # ── Tenant-level identity checks ─────────────────────────────────────────
+    # These checks target the Entra ID tenant, not any individual subscription.
+    # Run them ONCE here rather than inside the per-subscription loop to avoid
+    # duplicate results when auditing multiple subscriptions.
+    tenant_ckpt = load_tenant_checkpoint() if resume else None
+    if tenant_ckpt is not None:
+        LOGGER.info("\n  💾 Loaded tenant checks from checkpoint (%d results).", len(tenant_ckpt))
+        tenant_results = tenant_ckpt
+    else:
+        LOGGER.info("\n  [Tenant] Running tenant-level identity checks...")
+        tenant_results = []
+        for fn in [check_5_1_1, check_5_1_2, check_5_1_3, check_5_4, check_5_14, check_5_15, check_5_16]:
+            try:
+                r = fn()
+                tenant_results.append(r)
+                icon = _STATUS_STYLE.get(r.status, ("", "", "?"))[2]
+                LOGGER.info("    %-10s %s  %s", r.control_id, icon, r.status)
+            except Exception as e:
+                LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
+
+        try:
+            save_tenant_checkpoint(tenant_results)
+        except Exception as _ckpt_err:
+            LOGGER.warning("⚠️  Could not save tenant checkpoint (audit will continue): %s", _ckpt_err)
+
     current_parallel = min(requested_parallel, len(todo))
     LOGGER.info(
         "\n  Auditing %d subscription(s) [mode=%s, workers=%d]...\n",
@@ -1193,6 +1206,17 @@ Examples:
         default=True,
         help="Do not automatically open the HTML report in the browser when the audit is complete",
     )
+    parser.add_argument(
+        "--exit-code",
+        action="store_true",
+        default=False,
+        help=(
+            "Exit with code 2 when the audit finds any FAIL or ERROR results. "
+            "Useful for CI/CD pipelines: the build fails when compliance regressions are detected. "
+            "Exit code 0 means all controls passed; exit code 1 means a tool/setup error; "
+            "exit code 2 means compliance failures were found."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -1280,8 +1304,19 @@ Examples:
         _print_summary(counts, total, len(checkpoints), elapsed_str, score)
         LOGGER.info("  Checkpoints: %s/", _cfg.CHECKPOINT_DIR)
         sub_timestamps = {cp["subscription_name"]: cp["timestamp"] for cp in checkpoints.values()}
+        sub_names = [cp["subscription_name"] for cp in checkpoints.values()]
+        # Build scope_info from az account show (best-effort, may fail if not logged in)
+        _rc, _acc = az(["account", "show", "--query", "{user:user.name, tenant:tenantId, caller_type:user.type}"])
+        scope_info = {
+            "tenant": _acc.get("tenant", "") if isinstance(_acc, dict) else "",
+            "user": _acc.get("user", "") if isinstance(_acc, dict) else "",
+            "caller_type": _acc.get("caller_type", "") if isinstance(_acc, dict) else "",
+            "scope_label": "All subscriptions (from checkpoint data)",
+            "subscriptions": sub_names,
+            "level_filter": args.level,
+        }
         run_history = load_history(history_path_for(args.output))
-        generate_html(all_results, args.output, history=run_history, sub_timestamps=sub_timestamps)
+        generate_html(all_results, args.output, scope_info, run_history, sub_timestamps)
         if args.open:
             _html_path = Path(args.output).resolve()
             try:
@@ -1293,6 +1328,8 @@ Examples:
                     webbrowser.open(_html_path.as_uri())
             except Exception as exc:  # noqa: BLE001
                 LOGGER.warning("Could not open report automatically: %s", exc)
+        if args.exit_code and (counts[FAIL] + counts[ERROR]) > 0:
+            sys.exit(2)
         return
 
     # ── Prerequisite: az CLI available ────────────────────────────────────────
@@ -1322,7 +1359,8 @@ Examples:
         LOGGER.error("❌ Not logged in.\n   Run: az login")
         sys.exit(1)
     _cfg.CALLER_TYPE = acc.get("caller_type", "user") or "user"
-    LOGGER.info("✅ Authenticated as: %s (%s)  |  Tenant: %s", acc.get("user"), _cfg.CALLER_TYPE, acc.get("tenant"))
+    LOGGER.info("✅ Authenticated as: %s (%s)", acc.get("user"), _cfg.CALLER_TYPE)
+    LOGGER.info("✅ Tenant: %s", acc.get("tenant"))
 
     # ── Resolve subscriptions ─────────────────────────────────────────────────
     subs = get_subscriptions(args.subscription)
@@ -1452,6 +1490,9 @@ Examples:
                 webbrowser.open(_html_path.as_uri())
         except Exception as exc:  # noqa: BLE001
             LOGGER.warning("Could not open report automatically: %s", exc)
+
+    if args.exit_code and (counts[FAIL] + counts[ERROR]) > 0:
+        sys.exit(2)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ History file format (JSON array, oldest first, max MAX_HISTORY entries):
     [
       {
         "timestamp": "2026-03-05T14:30:00Z",
-        "version":   "1.0.0-beta3",
+        "version":   "1.0.0",
         "score":     72.3,
         "pass":      850,
         "fail":      120,
@@ -58,6 +58,14 @@ def append_history(path: Path, entry: dict[str, Any]) -> None:
     to avoid a truncated history file if the process crashes mid-write.
     """
     history = load_history(path)
+
+    # Skip duplicate: same calendar day + same compliance score → no new information.
+    entry_date = entry.get("timestamp", "")[:10]
+    entry_score = entry.get("score")
+    if history and history[-1].get("timestamp", "")[:10] == entry_date and history[-1].get("score") == entry_score:
+        LOGGER.info("ℹ️  Skipping history entry — same day (%s) and same score (%.1f%%).", entry_date, entry_score)
+        return
+
     history.append(entry)
     if len(history) > MAX_HISTORY:
         history = history[-MAX_HISTORY:]

@@ -310,7 +310,33 @@ def check_7_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     locations = _idx(td, "locations", sid)
 
     # Set of all regions where this subscription has at least one resource
-    used_locs = {r.get("location", "").lower() for r in locations}
+    # Filter pseudo-locations (global, europe, etc.) that are not real Azure
+    # regions where Network Watcher can be deployed.
+    _PSEUDO = frozenset(
+        {
+            "global",
+            "europe",
+            "asia",
+            "northamerica",
+            "southamerica",
+            "australia",
+            "us",
+            "uk",
+            "france",
+            "germany",
+            "japan",
+            "korea",
+            "norway",
+            "southafrica",
+            "switzerland",
+            "uae",
+            "brazil",
+            "india",
+            "canada",
+            "china",
+        }
+    )
+    used_locs = {r.get("location", "").lower() for r in locations} - _PSEUDO
 
     # Set of regions where a Network Watcher is successfully provisioned
     # "Succeeded" state means the watcher is active (not creating/failed/deleting)
@@ -451,12 +477,18 @@ def check_7_10(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "WAF enabled on Azure Application Gateway",
             2,
             "7 - Networking Services",
-            PASS if gw.get("wafEnabled") else FAIL,
-            f"Gateway '{gw.get('name')}': WAF enabled = {gw.get('wafEnabled')}, " f"mode = {gw.get('wafMode', 'N/A')}",
-            "Application Gateway > Web application firewall > Enable WAF" if not gw.get("wafEnabled") else "",
+            PASS if gw.get("wafEnabled") or gw.get("wafPolicyId") else FAIL,
+            f"Gateway '{gw.get('name')}': WAF enabled = {gw.get('wafEnabled')}, "
+            f"mode = {gw.get('wafMode', 'N/A')}"
+            + (f", wafPolicy = {gw.get('wafPolicyId')}" if gw.get("wafPolicyId") else ""),
+            (
+                "Application Gateway > Web application firewall > Enable WAF"
+                if not (gw.get("wafEnabled") or gw.get("wafPolicyId"))
+                else ""
+            ),
             sid,
             sname,
-            gw.get("name", "") if not gw.get("wafEnabled") else "",
+            gw.get("name", "") if not (gw.get("wafEnabled") or gw.get("wafPolicyId")) else "",
         )
         for gw in gws
     ]
@@ -618,7 +650,7 @@ def check_7_12(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
 def check_7_13(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     """
-    7.13 — HTTP/2 is enabled on Application Gateway (Level 1)
+    7.13 — HTTP/2 is enabled on Application Gateway (Level 2)
 
     HTTP/2 provides multiplexing, header compression, and server push —
     improving performance and reducing latency. More importantly from a
@@ -632,7 +664,7 @@ def check_7_13(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             _info(
                 "7.13",
                 "HTTP2 enabled on Azure Application Gateway",
-                1,
+                2,
                 "7 - Networking Services",
                 "No Application Gateways found.",
                 sid,
@@ -644,7 +676,7 @@ def check_7_13(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         R(
             "7.13",
             "HTTP2 enabled on Azure Application Gateway",
-            1,
+            2,
             "7 - Networking Services",
             PASS if gw.get("enableHttp2") else FAIL,
             f"Gateway '{gw.get('name')}': enableHttp2 = {gw.get('enableHttp2')}",

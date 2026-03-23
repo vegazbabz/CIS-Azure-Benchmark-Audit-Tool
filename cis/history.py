@@ -9,7 +9,7 @@ History file format (JSON array, oldest first, max MAX_HISTORY entries):
     [
       {
         "timestamp": "2026-03-05T14:30:00Z",
-        "version":   "1.0.0-beta3",
+        "version":   "1.0.0",
         "score":     72.3,
         "pass":      850,
         "fail":      120,

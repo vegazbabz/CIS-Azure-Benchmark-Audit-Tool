@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, TIMEOUTS
+from cis.config import PASS, FAIL, INFO, TIMEOUTS
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az, az_rest
@@ -109,6 +109,68 @@ def check_6_1_1_2(sid: str, sname: str) -> R:
             else "All required categories enabled (Security/Administrative/Alert/Policy)."
         ),
         "Enable missing categories in subscription diagnostic settings." if missing else "",
+        sid,
+        sname,
+    )
+
+
+def check_6_1_1_3(sid: str, sname: str) -> R:
+    """
+    6.1.1.3 — Activity log retention >= 365 days (Level 1)
+
+    Classic log profiles are the legacy mechanism for controlling activity log
+    retention.  Modern Azure deployments use diagnostic settings instead, but
+    the CIS benchmark still checks log profiles for backwards compatibility.
+
+    Data source: az monitor log-profiles list --subscription <sid>
+    A log profile with retentionPolicy.enabled == true must have days >= 365
+    (or 0, which means infinite retention).  If retention is disabled entirely
+    or no log profile exists at all, the check fails.
+    """
+    rc, data = az(
+        ["monitor", "log-profiles", "list", "--subscription", sid], timeout=TIMEOUTS["default"]
+    )
+    if rc != 0:
+        return _err(
+            "6.1.1.3",
+            "Activity log retention >= 365 days",
+            1,
+            "6 - Management & Governance",
+            str(data),
+            sid,
+            sname,
+        )
+
+    profiles = data if isinstance(data, list) else []
+
+    if not profiles:
+        return R(
+            "6.1.1.3",
+            "Activity log retention >= 365 days",
+            1,
+            "6 - Management & Governance",
+            FAIL,
+            "No activity log profile found. Retention not configured.",
+            "Monitor > Activity Log > Export Activity Log > Add diagnostic setting with retention >= 365 days",
+            sid,
+            sname,
+        )
+
+    profile = profiles[0]
+    ret_policy = profile.get("retentionPolicy") or {}
+    enabled = ret_policy.get("enabled", False)
+    days = int(ret_policy.get("days", 0))
+    # Compliant if retention is disabled (infinite) or days >= 365
+    compliant = not enabled or days >= 365
+
+    return R(
+        "6.1.1.3",
+        "Activity log retention >= 365 days",
+        1,
+        "6 - Management & Governance",
+        PASS if compliant else FAIL,
+        f"Retention: {days} days (enabled: {enabled}).",
+        "Monitor > Activity Log > Export > Retention >= 365 days" if not compliant else "",
         sid,
         sname,
     )

@@ -576,6 +576,40 @@ class TestCheck6112(unittest.TestCase):
         self.assertEqual(result.status, FAIL)
 
 
+class TestCheck6113(unittest.TestCase):
+    """6.1.1.3 — Activity log retention >= 365 days."""
+
+    def test_az_fails_returns_error(self) -> None:
+        with patch("checks.s6.az", return_value=(1, "cli error")):
+            result = checks_s6.check_6_1_1_3(SID, SNAME)
+        self.assertEqual(result.status, ERROR)
+        self.assertEqual(result.control_id, "6.1.1.3")
+
+    def test_no_profile_returns_fail(self) -> None:
+        with patch("checks.s6.az", return_value=(0, [])):
+            result = checks_s6.check_6_1_1_3(SID, SNAME)
+        self.assertEqual(result.status, FAIL)
+
+    def test_retention_disabled_returns_pass(self) -> None:
+        """Retention disabled means infinite retention — compliant."""
+        profiles = [{"retentionPolicy": {"enabled": False, "days": 0}}]
+        with patch("checks.s6.az", return_value=(0, profiles)):
+            result = checks_s6.check_6_1_1_3(SID, SNAME)
+        self.assertEqual(result.status, PASS)
+
+    def test_retention_365_days_returns_pass(self) -> None:
+        profiles = [{"retentionPolicy": {"enabled": True, "days": 365}}]
+        with patch("checks.s6.az", return_value=(0, profiles)):
+            result = checks_s6.check_6_1_1_3(SID, SNAME)
+        self.assertEqual(result.status, PASS)
+
+    def test_retention_less_than_365_returns_fail(self) -> None:
+        profiles = [{"retentionPolicy": {"enabled": True, "days": 90}}]
+        with patch("checks.s6.az", return_value=(0, profiles)):
+            result = checks_s6.check_6_1_1_3(SID, SNAME)
+        self.assertEqual(result.status, FAIL)
+
+
 class TestCheck612Alerts(unittest.TestCase):
     """6.1.2.1–6.1.2.11 — Activity Log Alerts for critical operations."""
 
@@ -1083,12 +1117,17 @@ class TestCheck9Storage(unittest.TestCase):
                 }
             },
         }
+        blob_log_svc = {
+            "logging": {"read": True, "write": True, "delete": True},
+        }
 
         def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
             if "blob-service-properties" in args:
                 return (0, blob_svc)
             if "file-service-properties" in args:
                 return (0, file_svc)
+            if "blob" in args and "service-properties" in args:
+                return (0, blob_log_svc)
             return (0, [])
 
         with patch("checks.s9.az", side_effect=_az_side_effect):
@@ -1132,7 +1171,7 @@ class TestCheck9Storage(unittest.TestCase):
         with patch("checks.s9.az", side_effect=_az_fw):
             results = checks_s9.check_9_storage(SID, SNAME, td)
 
-        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3"}
+        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3", "9.2.4", "9.2.5", "9.2.6"}
         file_ctrl_ids = {"9.1.1", "9.1.2", "9.1.3"}
         for r in results:
             if r.control_id in blob_ctrl_ids or r.control_id in file_ctrl_ids:
@@ -1170,13 +1209,98 @@ class TestCheck9Storage(unittest.TestCase):
         with patch("checks.s9.az", side_effect=_az_auth):
             results = checks_s9.check_9_storage(SID, SNAME, td)
 
-        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3"}
+        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3", "9.2.4", "9.2.5", "9.2.6"}
         file_ctrl_ids = {"9.1.1", "9.1.2", "9.1.3"}
         for r in results:
             if r.control_id in blob_ctrl_ids or r.control_id in file_ctrl_ids:
                 self.assertEqual(r.status, ERROR, f"{r.control_id} expected ERROR for auth failure")
                 self.assertNotIn("Key Vault", r.details)
                 self.assertIn("Reader", r.remediation)
+
+
+    def test_blob_logging_disabled_returns_fail_for_924_925_926(self) -> None:
+        """Data-plane blob logging not enabled — 9.2.4/5/6 should FAIL."""
+        account = {
+            "name": "nolog",
+            "resourceGroup": "rg",
+            "subscriptionId": SID,
+            "httpsOnly": True,
+            "publicAccess": "Disabled",
+            "crossTenant": False,
+            "blobAnon": False,
+            "defaultAction": "Deny",
+            "bypass": "AzureServices",
+            "minTls": "TLS1_2",
+            "keyAccess": False,
+            "oauthDefault": True,
+            "sku": "Standard_GRS",
+            "privateEps": 1,
+        }
+        td = _td("storage", [account])
+        blob_svc = {
+            "deleteRetentionPolicy": {"enabled": True, "days": 7},
+            "containerDeleteRetentionPolicy": {"enabled": True, "days": 7},
+            "isVersioningEnabled": True,
+        }
+        blob_log_off = {
+            "logging": {"read": False, "write": False, "delete": False},
+        }
+
+        def _az_side(args: list, *a: Any, **kw: Any) -> tuple:
+            if "blob-service-properties" in args:
+                return (0, blob_svc)
+            if "blob" in args and "service-properties" in args:
+                return (0, blob_log_off)
+            return (0, [])
+
+        with patch("checks.s9.az", side_effect=_az_side):
+            results = checks_s9.check_9_storage(SID, SNAME, td)
+        log_results = {r.control_id: r for r in results if r.control_id in ("9.2.4", "9.2.5", "9.2.6")}
+        for cid in ("9.2.4", "9.2.5", "9.2.6"):
+            self.assertIn(cid, log_results, f"{cid} not found in results")
+            self.assertEqual(log_results[cid].status, FAIL, f"{cid} expected FAIL")
+
+    def test_blob_logging_enabled_returns_pass_for_924_925_926(self) -> None:
+        """Data-plane blob logging enabled — 9.2.4/5/6 should PASS."""
+        account = {
+            "name": "logon",
+            "resourceGroup": "rg",
+            "subscriptionId": SID,
+            "httpsOnly": True,
+            "publicAccess": "Disabled",
+            "crossTenant": False,
+            "blobAnon": False,
+            "defaultAction": "Deny",
+            "bypass": "AzureServices",
+            "minTls": "TLS1_2",
+            "keyAccess": False,
+            "oauthDefault": True,
+            "sku": "Standard_GRS",
+            "privateEps": 1,
+        }
+        td = _td("storage", [account])
+        blob_svc = {
+            "deleteRetentionPolicy": {"enabled": True, "days": 7},
+            "containerDeleteRetentionPolicy": {"enabled": True, "days": 7},
+            "isVersioningEnabled": True,
+        }
+        blob_log_on = {
+            "logging": {"read": True, "write": True, "delete": True},
+        }
+
+        def _az_side(args: list, *a: Any, **kw: Any) -> tuple:
+            if "blob-service-properties" in args:
+                return (0, blob_svc)
+            if "blob" in args and "service-properties" in args:
+                return (0, blob_log_on)
+            return (0, [])
+
+        with patch("checks.s9.az", side_effect=_az_side):
+            results = checks_s9.check_9_storage(SID, SNAME, td)
+        log_results = {r.control_id: r for r in results if r.control_id in ("9.2.4", "9.2.5", "9.2.6")}
+        for cid in ("9.2.4", "9.2.5", "9.2.6"):
+            self.assertIn(cid, log_results, f"{cid} not found in results")
+            self.assertEqual(log_results[cid].status, PASS, f"{cid} expected PASS")
 
 
 if __name__ == "__main__":

@@ -146,6 +146,7 @@ from checks.s5 import (
 from checks.s6 import (
     check_6_1_1_1,
     check_6_1_1_2,
+    check_6_1_1_3,
     check_6_1_1_4,
     check_6_1_1_6,
     check_6_1_2_alerts,
@@ -557,6 +558,7 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         # ── Section 6 — Monitoring ─────────────────────────────────────────
         ("6.1.1.1", lambda: [check_6_1_1_1(sid, sname)]),
         ("6.1.1.2", lambda: [check_6_1_1_2(sid, sname)]),
+        ("6.1.1.3", lambda: [check_6_1_1_3(sid, sname)]),
         ("6.1.1.4", lambda: check_6_1_1_4(sid, sname, td)),
         ("6.1.1.6", lambda: check_6_1_1_6(sid, sname, td)),
         ("6.1.2.1", lambda: _from_batch("6.1.2", lambda: check_6_1_2_alerts(sid, sname), "6.1.2.1")),
@@ -623,6 +625,9 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("9.2.1", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.1")),
         ("9.2.2", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.2")),
         ("9.2.3", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.3")),
+        ("9.2.4", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.4")),
+        ("9.2.5", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.5")),
+        ("9.2.6", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.6")),
         ("9.3.1.1", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.1.1")),
         ("9.3.1.2", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.1.2")),
         ("9.3.1.3", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.1.3")),

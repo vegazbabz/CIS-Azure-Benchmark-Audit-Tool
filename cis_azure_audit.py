@@ -806,7 +806,7 @@ def run_audit(
                     r = fn()
                     all_results.append(r)
                     icon = _STATUS_STYLE.get(r.status, ("", "", "?"))[2]
-                    LOGGER.info("    %-10s %s %s", r.control_id, icon, r.status)
+                    LOGGER.info("    %-10s %s  %s", r.control_id, icon, r.status)
                 except Exception as e:
                     LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
         return all_results
@@ -851,7 +851,7 @@ def run_audit(
                 r = fn()
                 tenant_results.append(r)
                 icon = _STATUS_STYLE.get(r.status, ("", "", "?"))[2]
-                LOGGER.info("    %-10s %s %s", r.control_id, icon, r.status)
+                LOGGER.info("    %-10s %s  %s", r.control_id, icon, r.status)
             except Exception as e:
                 LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
 

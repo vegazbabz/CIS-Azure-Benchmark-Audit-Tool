@@ -246,14 +246,12 @@ def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str:
             f"  Compliance Score : [{score_color}]{score}%[/{score_color}]"
             f"  ({counts[PASS]} of {assessed} assessed controls, excludes INFO/MANUAL/SUPPRESSED)"
         )
-        _rcon.print(
-            f"  ✅ [green]PASS {counts[PASS]:4d}[/green]"
-            f"  ❌ [bold red]FAIL {counts[FAIL]:4d}[/bold red]"
-            f"  ⚠️ [yellow]ERROR {counts[ERROR]:4d}[/yellow]"
-            f"  ℹ️ INFO {counts[INFO]:4d}"
-            f"  📋 MANUAL {counts[MANUAL]:4d}"
-            f"  🔇 SUPPRESSED {counts[SUPPRESSED]:4d}"
-        )
+        _rcon.print(f"  ✅ [green]PASS         {counts[PASS]:4d}[/green]")
+        _rcon.print(f"  ❌ [bold red]FAIL         {counts[FAIL]:4d}[/bold red]")
+        _rcon.print(f"  ⚠️  [yellow]ERROR        {counts[ERROR]:4d}[/yellow]")
+        _rcon.print(f"  ℹ️  INFO         {counts[INFO]:4d}")
+        _rcon.print(f"  📋 MANUAL       {counts[MANUAL]:4d}")
+        _rcon.print(f"  🔇 SUPPRESSED   {counts[SUPPRESSED]:4d}")
         _rcon.print(sep)
     else:
         LOGGER.info("\n%s", sep)
@@ -262,15 +260,12 @@ def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str:
             "  Compliance Score : %s%%  (%d of %d assessed controls, excludes INFO/MANUAL/SUPPRESSED)",
             score, counts[PASS], assessed,
         )
-        LOGGER.info(
-            "  ✅ PASS %4d  ❌ FAIL %4d  ⚠️ ERROR %4d  ℹ️ INFO %4d  📋 MANUAL %4d  🔇 SUPPRESSED %4d",
-            counts[PASS],
-            counts[FAIL],
-            counts[ERROR],
-            counts[INFO],
-            counts[MANUAL],
-            counts[SUPPRESSED],
-        )
+        LOGGER.info("  ✅ PASS         %4d", counts[PASS])
+        LOGGER.info("  ❌ FAIL         %4d", counts[FAIL])
+        LOGGER.info("  ⚠️  ERROR        %4d", counts[ERROR])
+        LOGGER.info("  ℹ️  INFO         %4d", counts[INFO])
+        LOGGER.info("  📋 MANUAL       %4d", counts[MANUAL])
+        LOGGER.info("  🔇 SUPPRESSED   %4d", counts[SUPPRESSED])
         LOGGER.info("%s", sep)
 
 

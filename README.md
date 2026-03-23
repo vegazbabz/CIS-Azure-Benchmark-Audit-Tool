@@ -9,7 +9,7 @@
 
 ![Sample report dashboard](docs/sample_report_dashboard.png)
 
-**Version:** 1.0.0-beta3
+**Version:** 1.1.0
 **Benchmark:** [CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure) (September 2025)
 **Coverage:** 94 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)
 
@@ -104,6 +104,7 @@ New to Python or the Azure CLI? Follow these steps to get the tool running on yo
    latest **Python 3.10+** installer for your OS.
 2. Run the installer. On Windows, check **"Add Python to PATH"** before clicking Install.
 3. Verify the installation:
+
    ```powershell
    python --version
    ```
@@ -112,6 +113,7 @@ New to Python or the Azure CLI? Follow these steps to get the tool running on yo
 
 1. Follow the official instructions at <https://aka.ms/install-azure-cli> for your OS.
 2. Verify:
+
    ```powershell
    az --version
    ```
@@ -119,12 +121,14 @@ New to Python or the Azure CLI? Follow these steps to get the tool running on yo
 ### Step 3 — Get the tool
 
 **Option A — Clone with Git** (recommended — makes updating easy):
+
 ```powershell
 git clone https://github.com/vegazbabz/CIS-Azure-Benchmark-Audit-Tool.git
 cd CIS-Azure-Benchmark-Audit-Tool
 ```
 
 **Option B — Download as ZIP** (no Git required):
+
 1. On the [GitHub repository page](https://github.com/vegazbabz/CIS-Azure-Benchmark-Audit-Tool),
    click the green **Code** button → **Download ZIP**.
 2. Extract the ZIP and open a terminal in the extracted folder.
@@ -132,6 +136,7 @@ cd CIS-Azure-Benchmark-Audit-Tool
 ### Step 4 — Install the Python dependency
 
 The only runtime dependency is `msal` (used for one optional check). Install it with:
+
 ```powershell
 pip install -r requirements.txt
 ```
@@ -155,6 +160,7 @@ The tool will enumerate all your enabled subscriptions, run all checks, and open
 in your browser automatically when done. Reports are saved to a `reports/` subfolder.
 
 > **Tip:** To audit a single subscription instead of the whole tenant, use the `-s` flag:
+>
 > ```powershell
 > python cis_azure_audit.py -s "My Subscription Name"
 > ```
@@ -480,7 +486,7 @@ The history file is always written to the same directory as the HTML report.
 
 > **History note:** `cis_run_history.json` is only updated on full-tenant runs (no `--subscription` filter).
 > Per-subscription runs do not contribute to the trend chart so the baseline stays consistent.
-
+>
 > **Note:** `--report-only` does **not** update the history file — it regenerates the report from
 > existing checkpoints but is not a new measurement.
 
@@ -593,10 +599,12 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 2. **API permissions** → Add → Microsoft Graph → **Delegated** → `Policy.Read.All` → **Grant admin consent**.
 3. For service principal / CI: also add the **Application** permission `Policy.Read.All` and consent it; set the secret via the `CIS_GRAPH_CLIENT_SECRET` **environment variable** (recommended — avoids storing credentials in `cis_audit.toml`), or set `client_secret` in `[graph_auth]` for local use only.
 4. Copy the **Application (client) ID** into `cis_audit.toml`:
+
    ```toml
    [graph_auth]
    client_id = "your-app-client-id"
    ```
+
 5. `pip install -r requirements.txt`
 6. Run the tool — a browser window opens once for interactive sign-in; subsequent runs use a token
    cached at `~/.cis_audit/msal_token_cache.json`.
@@ -777,7 +785,7 @@ This lets Azure DevOps, GitHub Actions, and similar systems fail the build on co
 Exit code summary:
 
 | Code | Meaning |
-|------|---------|
+| --- | --- |
 | `0` | Audit completed — all controls passed (or all failures are suppressed) |
 | `1` | Tool setup error — az CLI missing, not logged in, or authentication failed |
 | `2` | Compliance failure — one or more FAIL or ERROR results detected (only with `--exit-code`) |
@@ -899,6 +907,6 @@ CIS Benchmarks are the property of the Center for Internet Security (<https://ww
 used under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 This tool is not affiliated with, endorsed by, or approved by CIS.
 
-**Version:** 1.0.0-beta3
+**Version:** 1.1.0
 **Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
 **Coverage:** 94 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)

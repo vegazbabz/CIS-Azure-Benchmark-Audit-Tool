@@ -340,6 +340,128 @@ class TestCheck513(unittest.TestCase):
         self.assertEqual(result.status, MANUAL)
 
 
+class TestCheck523(unittest.TestCase):
+    """5.23 — No custom subscription administrator roles with wildcard actions."""
+
+    def test_az_fails_returns_error(self) -> None:
+        with patch("checks.s5.az", return_value=(1, "cli error")):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, ERROR)
+        self.assertEqual(result.control_id, "5.23")
+
+    def test_no_custom_roles_returns_pass(self) -> None:
+        with patch("checks.s5.az", return_value=(0, [])):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, PASS)
+        self.assertEqual(result.control_id, "5.23")
+
+    def test_custom_role_without_wildcard_returns_pass(self) -> None:
+        roles = [{"roleName": "MyReadRole", "permissions": [{"actions": ["Microsoft.Compute/*/read"]}]}]
+        with patch("checks.s5.az", return_value=(0, roles)):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, PASS)
+
+    def test_custom_role_with_wildcard_returns_fail(self) -> None:
+        roles = [{"roleName": "DangerRole", "permissions": [{"actions": ["*"]}]}]
+        with patch("checks.s5.az", return_value=(0, roles)):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("DangerRole", result.details)
+
+    def test_multiple_roles_only_wildcard_flagged(self) -> None:
+        roles = [
+            {"roleName": "SafeRole", "permissions": [{"actions": ["Microsoft.Storage/*/read"]}]},
+            {"roleName": "BadRole", "permissions": [{"actions": ["*"]}]},
+        ]
+        with patch("checks.s5.az", return_value=(0, roles)):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("BadRole", result.details)
+        self.assertNotIn("SafeRole", result.details)
+
+    def test_role_with_multiple_permission_blocks_any_wildcard_fails(self) -> None:
+        # Multiple permission blocks — wildcard in any one block should trigger FAIL
+        roles = [
+            {"roleName": "PartialBad", "permissions": [{"actions": ["Microsoft.Network/*/read"]}, {"actions": ["*"]}]}
+        ]
+        with patch("checks.s5.az", return_value=(0, roles)):
+            result = checks_s5.check_5_23(SID, SNAME)
+        self.assertEqual(result.status, FAIL)
+
+
+class TestCheck527(unittest.TestCase):
+    """5.27 — Between 2 and 3 subscription owners."""
+
+    def _owner(self, name: str, ptype: str = "User") -> dict[str, Any]:
+        from cis.config import ROLE_OWNER
+
+        return {
+            "roleDefinitionId": f"/subscriptions/{SID}/providers/Microsoft.Authorization/roleDefinitions/{ROLE_OWNER}",
+            "scope": f"/subscriptions/{SID}",
+            "principalName": name,
+            "principalType": ptype,
+            "principalId": f"id-{name}",
+        }
+
+    def test_zero_owners_returns_fail(self) -> None:
+        result = checks_s5.check_5_27(SID, SNAME, _td("roles", []))
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("0", result.details)
+        self.assertIn("management-group", result.details)
+
+    def test_one_owner_returns_fail(self) -> None:
+        td = _td("roles", [self._owner("alice")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, FAIL)
+
+    def test_two_owners_returns_pass(self) -> None:
+        td = _td("roles", [self._owner("alice"), self._owner("bob")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, PASS)
+        self.assertIn("2", result.details)
+
+    def test_three_owners_returns_pass(self) -> None:
+        td = _td("roles", [self._owner("alice"), self._owner("bob"), self._owner("carol")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, PASS)
+
+    def test_four_owners_returns_fail(self) -> None:
+        td = _td("roles", [self._owner("a"), self._owner("b"), self._owner("c"), self._owner("d")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, FAIL)
+
+    def test_group_assignment_counted_as_one_with_note(self) -> None:
+        td = _td("roles", [self._owner("Owners-Group", "Group"), self._owner("alice")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, PASS)
+        self.assertIn("Group:", result.details)
+        self.assertIn("group assignments detected", result.details)
+
+    def test_management_group_scope_not_counted(self) -> None:
+        # An Owner at management group scope should NOT count towards subscription owners
+        from cis.config import ROLE_OWNER
+
+        mg_owner = {
+            "roleDefinitionId": f"/providers/Microsoft.Authorization/roleDefinitions/{ROLE_OWNER}",
+            "scope": "/providers/Microsoft.Management/managementGroups/mg-root",
+            "principalName": "mg-admin",
+            "principalType": "User",
+            "principalId": "id-mg-admin",
+        }
+        td = _td("roles", [mg_owner])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        # Management-group-scoped Owner must NOT count — subscription still has 0 direct owners
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("0", result.details)
+
+    def test_correct_subscription_scoped_owner_counted(self) -> None:
+        # Owner scoped directly to subscription IS counted
+        td = _td("roles", [self._owner("alice"), self._owner("bob")])
+        result = checks_s5.check_5_27(SID, SNAME, td)
+        self.assertEqual(result.status, PASS)
+        self.assertIn("alice", result.details)
+
+
 class TestCheck533(unittest.TestCase):
     """5.3.3 — User Access Administrator role is restricted."""
 
@@ -453,6 +575,40 @@ class TestCheck6112(unittest.TestCase):
         ]
         with patch("checks.s6.az", return_value=(0, settings)):
             result = checks_s6.check_6_1_1_2(SID, SNAME)
+        self.assertEqual(result.status, FAIL)
+
+
+class TestCheck6113(unittest.TestCase):
+    """6.1.1.3 — Activity log retention >= 365 days."""
+
+    def test_az_fails_returns_error(self) -> None:
+        with patch("checks.s6.az", return_value=(1, "cli error")):
+            result = checks_s6.check_6_1_1_3(SID, SNAME)
+        self.assertEqual(result.status, ERROR)
+        self.assertEqual(result.control_id, "6.1.1.3")
+
+    def test_no_profile_returns_fail(self) -> None:
+        with patch("checks.s6.az", return_value=(0, [])):
+            result = checks_s6.check_6_1_1_3(SID, SNAME)
+        self.assertEqual(result.status, FAIL)
+
+    def test_retention_disabled_returns_pass(self) -> None:
+        """Retention disabled means infinite retention — compliant."""
+        profiles = [{"retentionPolicy": {"enabled": False, "days": 0}}]
+        with patch("checks.s6.az", return_value=(0, profiles)):
+            result = checks_s6.check_6_1_1_3(SID, SNAME)
+        self.assertEqual(result.status, PASS)
+
+    def test_retention_365_days_returns_pass(self) -> None:
+        profiles = [{"retentionPolicy": {"enabled": True, "days": 365}}]
+        with patch("checks.s6.az", return_value=(0, profiles)):
+            result = checks_s6.check_6_1_1_3(SID, SNAME)
+        self.assertEqual(result.status, PASS)
+
+    def test_retention_less_than_365_returns_fail(self) -> None:
+        profiles = [{"retentionPolicy": {"enabled": True, "days": 90}}]
+        with patch("checks.s6.az", return_value=(0, profiles)):
+            result = checks_s6.check_6_1_1_3(SID, SNAME)
         self.assertEqual(result.status, FAIL)
 
 
@@ -963,12 +1119,17 @@ class TestCheck9Storage(unittest.TestCase):
                 }
             },
         }
+        blob_log_svc = {
+            "logging": {"read": True, "write": True, "delete": True},
+        }
 
         def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
             if "blob-service-properties" in args:
                 return (0, blob_svc)
             if "file-service-properties" in args:
                 return (0, file_svc)
+            if "blob" in args and "service-properties" in args:
+                return (0, blob_log_svc)
             return (0, [])
 
         with patch("checks.s9.az", side_effect=_az_side_effect):
@@ -1012,7 +1173,7 @@ class TestCheck9Storage(unittest.TestCase):
         with patch("checks.s9.az", side_effect=_az_fw):
             results = checks_s9.check_9_storage(SID, SNAME, td)
 
-        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3"}
+        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3", "9.2.4", "9.2.5", "9.2.6"}
         file_ctrl_ids = {"9.1.1", "9.1.2", "9.1.3"}
         for r in results:
             if r.control_id in blob_ctrl_ids or r.control_id in file_ctrl_ids:
@@ -1050,13 +1211,97 @@ class TestCheck9Storage(unittest.TestCase):
         with patch("checks.s9.az", side_effect=_az_auth):
             results = checks_s9.check_9_storage(SID, SNAME, td)
 
-        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3"}
+        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3", "9.2.4", "9.2.5", "9.2.6"}
         file_ctrl_ids = {"9.1.1", "9.1.2", "9.1.3"}
         for r in results:
             if r.control_id in blob_ctrl_ids or r.control_id in file_ctrl_ids:
                 self.assertEqual(r.status, ERROR, f"{r.control_id} expected ERROR for auth failure")
                 self.assertNotIn("Key Vault", r.details)
                 self.assertIn("Reader", r.remediation)
+
+    def test_blob_logging_disabled_returns_fail_for_924_925_926(self) -> None:
+        """Data-plane blob logging not enabled — 9.2.4/5/6 should FAIL."""
+        account = {
+            "name": "nolog",
+            "resourceGroup": "rg",
+            "subscriptionId": SID,
+            "httpsOnly": True,
+            "publicAccess": "Disabled",
+            "crossTenant": False,
+            "blobAnon": False,
+            "defaultAction": "Deny",
+            "bypass": "AzureServices",
+            "minTls": "TLS1_2",
+            "keyAccess": False,
+            "oauthDefault": True,
+            "sku": "Standard_GRS",
+            "privateEps": 1,
+        }
+        td = _td("storage", [account])
+        blob_svc = {
+            "deleteRetentionPolicy": {"enabled": True, "days": 7},
+            "containerDeleteRetentionPolicy": {"enabled": True, "days": 7},
+            "isVersioningEnabled": True,
+        }
+        blob_log_off = {
+            "logging": {"read": False, "write": False, "delete": False},
+        }
+
+        def _az_side(args: list, *a: Any, **kw: Any) -> tuple:
+            if "blob-service-properties" in args:
+                return (0, blob_svc)
+            if "blob" in args and "service-properties" in args:
+                return (0, blob_log_off)
+            return (0, [])
+
+        with patch("checks.s9.az", side_effect=_az_side):
+            results = checks_s9.check_9_storage(SID, SNAME, td)
+        log_results = {r.control_id: r for r in results if r.control_id in ("9.2.4", "9.2.5", "9.2.6")}
+        for cid in ("9.2.4", "9.2.5", "9.2.6"):
+            self.assertIn(cid, log_results, f"{cid} not found in results")
+            self.assertEqual(log_results[cid].status, FAIL, f"{cid} expected FAIL")
+
+    def test_blob_logging_enabled_returns_pass_for_924_925_926(self) -> None:
+        """Data-plane blob logging enabled — 9.2.4/5/6 should PASS."""
+        account = {
+            "name": "logon",
+            "resourceGroup": "rg",
+            "subscriptionId": SID,
+            "httpsOnly": True,
+            "publicAccess": "Disabled",
+            "crossTenant": False,
+            "blobAnon": False,
+            "defaultAction": "Deny",
+            "bypass": "AzureServices",
+            "minTls": "TLS1_2",
+            "keyAccess": False,
+            "oauthDefault": True,
+            "sku": "Standard_GRS",
+            "privateEps": 1,
+        }
+        td = _td("storage", [account])
+        blob_svc = {
+            "deleteRetentionPolicy": {"enabled": True, "days": 7},
+            "containerDeleteRetentionPolicy": {"enabled": True, "days": 7},
+            "isVersioningEnabled": True,
+        }
+        blob_log_on = {
+            "logging": {"read": True, "write": True, "delete": True},
+        }
+
+        def _az_side(args: list, *a: Any, **kw: Any) -> tuple:
+            if "blob-service-properties" in args:
+                return (0, blob_svc)
+            if "blob" in args and "service-properties" in args:
+                return (0, blob_log_on)
+            return (0, [])
+
+        with patch("checks.s9.az", side_effect=_az_side):
+            results = checks_s9.check_9_storage(SID, SNAME, td)
+        log_results = {r.control_id: r for r in results if r.control_id in ("9.2.4", "9.2.5", "9.2.6")}
+        for cid in ("9.2.4", "9.2.5", "9.2.6"):
+            self.assertIn(cid, log_results, f"{cid} not found in results")
+            self.assertEqual(log_results[cid].status, PASS, f"{cid} expected PASS")
 
 
 if __name__ == "__main__":

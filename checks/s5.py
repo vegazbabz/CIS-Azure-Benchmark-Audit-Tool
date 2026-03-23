@@ -473,11 +473,21 @@ def check_5_27(sid: str, sname: str, td: dict[str, Any]) -> R:
     has_groups = any(o.get("principalType", "").lower() == "group" for o in owners)
 
     details = f"Owner count: {n} — {labels}"
-    if has_groups:
+    if n == 0:
+        details += (
+            " — no Owner assignments found directly on this subscription. "
+            "If ownership is managed at the management-group level, those "
+            "inherited assignments are intentionally excluded by this check "
+            "(CIS audits the subscription scope only). Verify via IAM > Role assignments > Scope: 'This resource'."
+        )
+    elif has_groups:
         details += " — group assignments detected: verify member count manually"
 
     if not 2 <= n <= 3:
-        remediation = "Adjust Owner role assignments to have 2-3 owners."
+        remediation = (
+            "Add Owner role assignments directly on the subscription so that between 2 and 3 "
+            "individual users (or groups) are listed under IAM > Role assignments > Scope: 'This resource'."
+        )
     elif has_groups:
         remediation = (
             "Group assignments counted as 1 owner each — "

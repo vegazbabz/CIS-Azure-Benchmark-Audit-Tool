@@ -750,6 +750,38 @@ A GitHub Actions pipeline runs on every push and pull request:
 
 The workflow file lives at `.github/workflows/ci.yml`.
 
+#### Using this tool in your own CI/CD pipeline
+
+Add `--exit-code` to make the tool exit with code 2 when any FAIL or ERROR results are found.
+This lets Azure DevOps, GitHub Actions, and similar systems fail the build on compliance regressions:
+
+```yaml
+# GitHub Actions example
+- name: Azure foundations audit
+  run: |
+    python cis_azure_audit.py \
+      --subscription "Production" \
+      --no-open \
+      --exit-code
+  # Step fails (exit code 2) if any controls are non-compliant
+```
+
+```yaml
+# Azure DevOps example
+- script: |
+    python cis_azure_audit.py --subscription $(SUB_NAME) --no-open --exit-code
+  displayName: 'Azure Foundations audit'
+  # Marks the pipeline stage as failed when FAIL/ERROR results are found
+```
+
+Exit code summary:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Audit completed — all controls passed (or all failures are suppressed) |
+| `1` | Tool setup error — az CLI missing, not logged in, or authentication failed |
+| `2` | Compliance failure — one or more FAIL or ERROR results detected (only with `--exit-code`) |
+
 ---
 
 ## Checkpoint Files

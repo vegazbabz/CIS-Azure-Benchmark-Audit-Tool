@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CIS Microsoft Azure Foundations Benchmark v5.0.0 — Audit Tool v1.0.0
+CIS Microsoft Azure Foundations Benchmark v5.0.0 — Audit Tool v1.1.2
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 WHAT THIS TOOL DOES

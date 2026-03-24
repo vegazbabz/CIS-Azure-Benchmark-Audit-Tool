@@ -479,31 +479,7 @@ def check_5_27(sid: str, sname: str, td: dict[str, Any]) -> R:
     ]
 
     n = len(owners)
-
-    # Build a display label per assignment that includes the principal type
-    # so auditors can immediately see which assignments are groups vs. users.
-    def _label(o: dict[str, Any]) -> str:
-        ptype = o.get("principalType", "").lower()
-        name = o.get("principalName") or o.get("principalId", "?")
-        if ptype == "group":
-            return f"Group:{name}"
-        if ptype == "serviceprincipal":
-            return f"SP:{name}"
-        return str(name)
-
-    labels = [_label(o) for o in owners]
     has_groups = any(o.get("principalType", "").lower() == "group" for o in owners)
-
-    details = f"Owner count: {n} — {labels}"
-    if n == 0:
-        details += (
-            " — no Owner assignments found directly on this subscription. "
-            "If ownership is managed at the management-group level, those "
-            "inherited assignments are intentionally excluded by this check "
-            "(CIS audits the subscription scope only). Verify via IAM > Role assignments > Scope: 'This resource'."
-        )
-    elif has_groups:
-        details += " — group assignments detected: verify member count manually"
 
     if not 2 <= n <= 3:
         remediation = (

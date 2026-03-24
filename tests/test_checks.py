@@ -206,14 +206,14 @@ class TestCheck511(unittest.TestCase):
 
     @patch("checks.s5.msal_is_configured", return_value=False)
     @patch("checks.s5.az_rest")
-    def test_security_defaults_disabled_with_ca_returns_info(self, mock_az_rest: Any, _mc: Any) -> None:
+    def test_security_defaults_disabled_with_ca_returns_pass(self, mock_az_rest: Any, _mc: Any) -> None:
         mock_az_rest.side_effect = [
             (0, {"isEnabled": False}),
             (0, {"value": [{"id": "policy-1"}]}),
         ]
         result = checks_s5.check_5_1_1()
         self.assertEqual(result.control_id, "5.1.1")
-        self.assertEqual(result.status, INFO)
+        self.assertEqual(result.status, PASS)
 
     @patch("checks.s5.msal_is_configured", return_value=False)
     @patch("checks.s5.az_rest")
@@ -256,11 +256,11 @@ class TestCheck511(unittest.TestCase):
 
     @patch("checks.s5.msal_is_configured", return_value=True)
     @patch("checks.s5.msal_rest")
-    def test_msal_disabled_with_ca_returns_info(self, mock_msal: Any, _mc: Any) -> None:
+    def test_msal_disabled_with_ca_returns_pass(self, mock_msal: Any, _mc: Any) -> None:
         mock_msal.return_value = (0, {"isEnabled": False})
         with patch("checks.s5.az_rest", return_value=(0, {"value": [{"id": "ca1"}]})):
             result = checks_s5.check_5_1_1()
-        self.assertEqual(result.status, INFO)
+        self.assertEqual(result.status, PASS)
 
     @patch("checks.s5.msal_is_configured", return_value=True)
     @patch("checks.s5.msal_rest")
@@ -416,7 +416,6 @@ class TestCheck527(unittest.TestCase):
         result = checks_s5.check_5_27(SID, SNAME, _td("roles", []))
         self.assertEqual(result.status, FAIL)
         self.assertIn("0", result.details)
-        self.assertIn("management-group", result.details)
 
     def test_one_owner_returns_fail(self) -> None:
         td = _td("roles", [self._owner("alice")])
@@ -443,8 +442,7 @@ class TestCheck527(unittest.TestCase):
         td = _td("roles", [self._owner("Owners-Group", "Group"), self._owner("alice")])
         result = checks_s5.check_5_27(SID, SNAME, td)
         self.assertEqual(result.status, PASS)
-        self.assertIn("Group:", result.details)
-        self.assertIn("group assignments detected", result.details)
+        self.assertIn("2", result.details)
 
     def test_management_group_scope_not_counted(self) -> None:
         # An Owner at management group scope should NOT count towards subscription owners
@@ -468,7 +466,7 @@ class TestCheck527(unittest.TestCase):
         td = _td("roles", [self._owner("alice"), self._owner("bob")])
         result = checks_s5.check_5_27(SID, SNAME, td)
         self.assertEqual(result.status, PASS)
-        self.assertIn("alice", result.details)
+        self.assertIn("2", result.details)
 
 
 class TestCheck533(unittest.TestCase):

@@ -406,6 +406,15 @@ def check_7_8(sid: str, sname: str) -> list[R]:
     Filters flow logs to only those targeting VNet resources (identified by
     "virtualnetworks" appearing in the targetResourceId path).
     """
+    # If there are no VNets at all, flow logs are N/A.
+    rc_vnet, vnets = az(["network", "vnet", "list"], sid, timeout=TIMEOUTS["default"])
+    if rc_vnet == 0 and not vnets:
+        return [
+            _info(
+                "7.8", "VNet flow log retention > 90 days", 2, "7 - Networking Services", "No VNets found.", sid, sname
+            )
+        ]
+
     rc, watchers = az(["network", "watcher", "list"], sid, timeout=TIMEOUTS["default"])
     if rc != 0:
         return [

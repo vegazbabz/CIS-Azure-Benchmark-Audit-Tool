@@ -340,6 +340,15 @@ class TestCheck513(unittest.TestCase):
         self.assertEqual(result.status, MANUAL)
 
 
+class TestCheck528(unittest.TestCase):
+    """5.28 — Privileged users protected by phishing-resistant MFA (Manual)."""
+
+    def test_returns_manual(self) -> None:
+        result = checks_s5.check_5_28()
+        self.assertEqual(result.control_id, "5.28")
+        self.assertEqual(result.status, MANUAL)
+
+
 class TestCheck523(unittest.TestCase):
     """5.23 — No custom subscription administrator roles with wildcard actions."""
 

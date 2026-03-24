@@ -121,7 +121,7 @@ from cis.checkpoint import (
 )
 
 # HTML report generation
-from cis.report import _STATUS_STYLE, generate_html
+from cis.report import generate_html
 
 # Finding suppression (accepted risks)
 from cis.suppressions import apply_suppressions, list_suppressions, load_suppressions
@@ -131,6 +131,7 @@ from cis.history import append_history, history_path_for, load_history
 
 # Check helpers and modular check functions
 from checks.s2 import check_2_1_2, check_2_1_7, check_2_1_9, check_2_1_10, check_2_1_11
+from checks.s3 import check_3_1_1
 from checks.s5 import (
     check_5_1_1,
     check_5_1_2,
@@ -208,6 +209,16 @@ except Exception:
     HAS_RICH = False
     _rcon = None
 
+# Console emoji for terminal output (NOT HTML entities)
+_CONSOLE_ICON: dict[str, str] = {
+    PASS: "\u2705",
+    FAIL: "\u274c",
+    ERROR: "\u26a0\ufe0f",
+    INFO: "\u2139\ufe0f",
+    MANUAL: "\U0001f4cb",
+    SUPPRESSED: "\U0001f507",
+}
+
 
 def _dedup_results(results: list[R]) -> list[R]:
     """Remove identical duplicate R instances while preserving order.
@@ -276,6 +287,7 @@ def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str:
 # Section number → display label used in console progress output.
 _SECTION_LABELS: dict[str, str] = {
     "2": "Databricks",
+    "3": "Compute",
     "5": "Identity",
     "6": "Monitoring",
     "7": "Networking",
@@ -810,6 +822,7 @@ def run_audit(
         else:
             LOGGER.info("   🔍 No tenant checkpoint found — re-running tenant checks (requires az login)...")
             for fn in [
+                check_3_1_1,
                 check_5_1_1,
                 check_5_1_2,
                 check_5_1_3,
@@ -822,7 +835,7 @@ def run_audit(
                 try:
                     r = fn()
                     all_results.append(r)
-                    icon = _STATUS_STYLE.get(r.status, ("", "", "?"))[2]
+                    icon = _CONSOLE_ICON.get(r.status, "?")
                     LOGGER.info("    %-10s %s  %s", r.control_id, icon, r.status)
                 except Exception as e:
                     LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
@@ -869,11 +882,21 @@ def run_audit(
     else:
         LOGGER.info("\n  [Tenant] Running tenant-level identity checks...")
         tenant_results = []
-        for fn in [check_5_1_1, check_5_1_2, check_5_1_3, check_5_28, check_5_4, check_5_14, check_5_15, check_5_16]:
+        for fn in [
+            check_3_1_1,
+            check_5_1_1,
+            check_5_1_2,
+            check_5_1_3,
+            check_5_28,
+            check_5_4,
+            check_5_14,
+            check_5_15,
+            check_5_16,
+        ]:
             try:
                 r = fn()
                 tenant_results.append(r)
-                icon = _STATUS_STYLE.get(r.status, ("", "", "?"))[2]
+                icon = _CONSOLE_ICON.get(r.status, "?")
                 LOGGER.info("    %-10s %s  %s", r.control_id, icon, r.status)
             except Exception as e:
                 LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)

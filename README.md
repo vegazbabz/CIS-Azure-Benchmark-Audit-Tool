@@ -11,7 +11,7 @@
 
 **Version:** 1.1.0
 **Benchmark:** [CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure) (September 2025)
-**Coverage:** 98 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)
+**Coverage:** 98 automated controls · 3 manual controls noted in output · 1 control pending (2.1.1)
 
 ---
 
@@ -562,6 +562,18 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 
 > **2.1.1** (Databricks in customer-managed VNet) — pending implementation.
 
+### Section 3 — Compute Services (1 manual)
+
+| Control | Title | Level | Notes |
+| --- | --- | --- | --- |
+| 3.1.1 | Only MFA-enabled identities can access privileged VMs | L2 | **Manual** — requires correlating role assignments with MFA status |
+
+> **Sections 3 and 4** of the CIS Azure Foundations Benchmark v5.0.0 are largely reference
+> sections — most Compute and Database controls have been relocated to the
+> *CIS Microsoft Azure Compute Services Benchmark* and *CIS Microsoft Azure Database
+> Services Benchmark* respectively. Only 3.1.1 (Virtual Machines) remains in the
+> Foundations Benchmark as an auditable control.
+
 ### Section 5 — Identity Services (9 automated · 2 manual)
 
 | Control | Title | Level | Notes |
@@ -610,7 +622,7 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 > **Device code flow is not used.** MSAL is configured to use the authorization code flow with
 > PKCE (interactive browser) in user mode, in line with CIS 5.2.3.
 
-### Section 6 — Management and Governance (17 automated)
+### Section 6 — Logging and Monitoring (17 automated)
 
 | Control | Title | Level |
 | --- | --- | --- |
@@ -911,4 +923,4 @@ This tool is not affiliated with, endorsed by, or approved by CIS.
 
 **Version:** 1.1.0
 **Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
-**Coverage:** 98 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)
+**Coverage:** 98 automated controls · 3 manual controls noted in output · 1 control pending (2.1.1)

@@ -22,10 +22,12 @@ run
 !docs/sample_report.json
 !docs/sample_report.csv
 
-# ── Debug / scratch scripts ───────────────────────────────────────────────────
+# ── Debug / scratch scripts & runtime output ─────────────────────────────────
 _*.py
 _*.js
 compare_*.py
+err.txt
+out.txt
 
 # ── Local notes / AI session files ────────────────────────────────────────────
 *improvements.txt

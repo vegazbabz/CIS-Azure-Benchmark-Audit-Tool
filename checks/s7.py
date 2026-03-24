@@ -47,7 +47,11 @@ def check_7_1(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "7 - Networking Services",
                 FAIL if bad else PASS,
-                f"Rule(s) allow RDP (3389) from internet: {', '.join(bad)}" if bad else "No rules allow RDP from internet.",
+                (
+                    f"Rule(s) allow RDP (3389) from internet: {', '.join(bad)}"
+                    if bad
+                    else "No rules allow RDP from internet."
+                ),
                 f"NSG '{name}' > Inbound rules > Remove or restrict rules {', '.join(bad)}" if bad else "",
                 sid,
                 sname,
@@ -86,7 +90,11 @@ def check_7_2(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "7 - Networking Services",
                 FAIL if bad else PASS,
-                f"Rule(s) allow SSH (22) from internet: {', '.join(bad)}" if bad else "No rules allow SSH from internet.",
+                (
+                    f"Rule(s) allow SSH (22) from internet: {', '.join(bad)}"
+                    if bad
+                    else "No rules allow SSH from internet."
+                ),
                 f"NSG '{name}' > Inbound rules > Remove or restrict rules {', '.join(bad)}" if bad else "",
                 sid,
                 sname,
@@ -205,7 +213,11 @@ def check_7_4(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "7 - Networking Services",
                 FAIL if bad else PASS,
-                f"HTTP/HTTPS inbound allowed from internet. Rules: {', '.join(bad)}" if bad else "No rules allow HTTP/HTTPS from internet.",
+                (
+                    f"HTTP/HTTPS inbound allowed from internet. Rules: {', '.join(bad)}"
+                    if bad
+                    else "No rules allow HTTP/HTTPS from internet."
+                ),
                 "Ensure HTTP/HTTPS inbound from internet is intentional and restricted." if bad else "",
                 sid,
                 sname,
@@ -477,7 +489,11 @@ def check_7_10(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             2,
             "7 - Networking Services",
             PASS if gw.get("wafEnabled") or gw.get("wafPolicyId") else FAIL,
-            "WAF is enabled." if gw.get("wafEnabled") or gw.get("wafPolicyId") else "WAF is not enabled on this Application Gateway.",
+            (
+                "WAF is enabled."
+                if gw.get("wafEnabled") or gw.get("wafPolicyId")
+                else "WAF is not enabled on this Application Gateway."
+            ),
             (
                 "Application Gateway > Web application firewall > Enable WAF"
                 if not (gw.get("wafEnabled") or gw.get("wafPolicyId"))

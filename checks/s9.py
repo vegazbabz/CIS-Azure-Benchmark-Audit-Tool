@@ -191,9 +191,11 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Secure transfer (HTTPS) required",
                 1,
                 bool(acct.get("httpsOnly")),
-                "Secure transfer (HTTPS only): Required."
-                if bool(acct.get("httpsOnly"))
-                else "Secure transfer (HTTPS only): Not required \u2014 HTTP connections are allowed.",
+                (
+                    "Secure transfer (HTTPS only): Required."
+                    if bool(acct.get("httpsOnly"))
+                    else "Secure transfer (HTTPS only): Not required \u2014 HTTP connections are allowed."
+                ),
                 "Storage Account > Configuration > Secure transfer required: Enabled",
             ),
             # 9.3.2.2 — Public network access disabled prevents all internet traffic
@@ -213,9 +215,11 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Cross-tenant replication disabled",
                 1,
                 not acct.get("crossTenant"),
-                "Cross-tenant replication: Disabled."
-                if not acct.get("crossTenant")
-                else "Cross-tenant replication: Enabled \u2014 data can be replicated to storage accounts in other tenants.",
+                (
+                    "Cross-tenant replication: Disabled."
+                    if not acct.get("crossTenant")
+                    else "Cross-tenant replication: Enabled \u2014 data can be replicated to storage accounts in other tenants."
+                ),
                 "Storage Account > Data Management > Object replication > " "Allow cross-tenant replication: Disabled",
             ),
             # 9.3.8 — Anonymous blob access allows unauthenticated public read
@@ -225,9 +229,11 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Blob anonymous access disabled",
                 1,
                 not acct.get("blobAnon"),
-                "Blob public access: Disabled."
-                if not acct.get("blobAnon")
-                else "Blob public access: Enabled \u2014 anonymous access to blob containers is allowed.",
+                (
+                    "Blob public access: Disabled."
+                    if not acct.get("blobAnon")
+                    else "Blob public access: Enabled \u2014 anonymous access to blob containers is allowed."
+                ),
                 "Storage Account > Configuration > Allow Blob anonymous access: Disabled",
             ),
             # 9.3.2.3 — Default deny ensures traffic must match an explicit allow rule
@@ -246,9 +252,11 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Minimum TLS version 1.2",
                 1,
                 str(acct.get("minTls", "")).lower() in ("tls1_2", "tls1_3"),
-                f"Minimum TLS version: {acct.get('minTls')}."
-                if str(acct.get("minTls", "")).lower() in ("tls1_2", "tls1_3")
-                else f"Minimum TLS version: {acct.get('minTls')} \u2014 must be TLS 1.2 or higher.",
+                (
+                    f"Minimum TLS version: {acct.get('minTls')}."
+                    if str(acct.get("minTls", "")).lower() in ("tls1_2", "tls1_3")
+                    else f"Minimum TLS version: {acct.get('minTls')} \u2014 must be TLS 1.2 or higher."
+                ),
                 "Storage Account > Configuration > Minimum TLS version: TLS 1.2",
             ),
             # 9.3.1.3 — Shared Key (storage account key) access allows any holder of
@@ -258,9 +266,11 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Storage account key access disabled",
                 2,
                 acct.get("keyAccess") is False,
-                "Shared key (storage account key) access: Disabled."
-                if acct.get("keyAccess") is False
-                else "Shared key (storage account key) access: Enabled \u2014 disable to enforce Entra ID authentication.",
+                (
+                    "Shared key (storage account key) access: Disabled."
+                    if acct.get("keyAccess") is False
+                    else "Shared key (storage account key) access: Enabled \u2014 disable to enforce Entra ID authentication."
+                ),
                 "Storage Account > Configuration > Allow storage account key access: Disabled",
             ),
             # 9.3.3.1 — Sets the portal UI default to Entra ID auth rather than
@@ -270,9 +280,11 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Default to Microsoft Entra authorization in Azure portal",
                 2,
                 acct.get("oauthDefault") is True,
-                "Default to Microsoft Entra ID authorization: Enabled."
-                if acct.get("oauthDefault") is True
-                else "Default to Microsoft Entra ID authorization: Disabled \u2014 storage data requests are not automatically authorized with Entra ID.",
+                (
+                    "Default to Microsoft Entra ID authorization: Enabled."
+                    if acct.get("oauthDefault") is True
+                    else "Default to Microsoft Entra ID authorization: Disabled \u2014 storage data requests are not automatically authorized with Entra ID."
+                ),
                 "Storage Account > Configuration > Default to Microsoft Entra authorization: Enabled",
             ),
             # 9.3.5 — Trusted Azure services (backup, Defender, Event Grid, etc.)
@@ -283,9 +295,11 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Allow Azure trusted services to access storage account",
                 2,
                 "azureservices" in bypass,
-                "networkAcls.bypass includes AzureServices."
-                if "azureservices" in bypass
-                else f"networkAcls.bypass: {acct.get('bypass')} \u2014 AzureServices not listed.",
+                (
+                    "networkAcls.bypass includes AzureServices."
+                    if "azureservices" in bypass
+                    else f"networkAcls.bypass: {acct.get('bypass')} \u2014 AzureServices not listed."
+                ),
                 "Storage Account > Networking > Exceptions > Allow Azure services",
             ),
             # 9.3.2.1 — Private endpoints give storage a private IP within the VNet,
@@ -295,9 +309,11 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Private endpoints used to access storage accounts",
                 2,
                 has_pe,
-                f"Private endpoints: {acct.get('privateEps') or 0} configured."
-                if has_pe
-                else f"Private endpoints: {acct.get('privateEps') or 0} \u2014 at least one private endpoint is required.",
+                (
+                    f"Private endpoints: {acct.get('privateEps') or 0} configured."
+                    if has_pe
+                    else f"Private endpoints: {acct.get('privateEps') or 0} \u2014 at least one private endpoint is required."
+                ),
                 "Storage Account > Networking > Private endpoint connections",
             ),
             # 9.3.11 — Geo-redundant storage replicates data to a secondary Azure region,
@@ -307,9 +323,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Storage redundancy set to geo-redundant (GRS)",
                 2,
                 is_grs,
-                f"Storage SKU: {sku}"
-                if is_grs
-                else f"Storage SKU: {sku} \u2014 not geo-redundant",
+                f"Storage SKU: {sku}" if is_grs else f"Storage SKU: {sku} \u2014 not geo-redundant",
                 "Storage Account > Data Management > Redundancy",
             ),
         ]
@@ -466,8 +480,18 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 blog = log_props.get("logging") or {}
                 for cid, title, label, flag in [
                     ("9.2.4", "Storage logging enabled for Blob Service read requests", "read", bool(blog.get("read"))),
-                    ("9.2.5", "Storage logging enabled for Blob Service write requests", "write", bool(blog.get("write"))),
-                    ("9.2.6", "Storage logging enabled for Blob Service delete requests", "delete", bool(blog.get("delete"))),
+                    (
+                        "9.2.5",
+                        "Storage logging enabled for Blob Service write requests",
+                        "write",
+                        bool(blog.get("write")),
+                    ),
+                    (
+                        "9.2.6",
+                        "Storage logging enabled for Blob Service delete requests",
+                        "delete",
+                        bool(blog.get("delete")),
+                    ),
                 ]:
                     acc_results.append(
                         R(
@@ -477,9 +501,11 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             "9 - Storage Services",
                             PASS if flag else FAIL,
                             f"Blob logging {label}: {flag}",
-                            f"Storage Account > Monitoring > Diagnostic settings > Enable {label.capitalize()} logging"
-                            if not flag
-                            else "",
+                            (
+                                f"Storage Account > Monitoring > Diagnostic settings > Enable {label.capitalize()} logging"
+                                if not flag
+                                else ""
+                            ),
                             sid,
                             sname,
                             aname if not flag else "",
@@ -680,9 +706,15 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         # ────────────────────────────────────────────────────────────────────
         rc_acct, acct_details = az(
             [
-                "storage", "account", "show",
-                "--name", aname, "--resource-group", rg,
-                "--query", "{keyCreationTime:keyCreationTime,keyExpirationPeriodInDays:keyPolicy.keyExpirationPeriodInDays}",
+                "storage",
+                "account",
+                "show",
+                "--name",
+                aname,
+                "--resource-group",
+                rg,
+                "--query",
+                "{keyCreationTime:keyCreationTime,keyExpirationPeriodInDays:keyPolicy.keyExpirationPeriodInDays}",
             ],
             sid,
             timeout=TIMEOUTS["storage_svc"],
@@ -737,9 +769,11 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         1,
                         "9 - Storage Services",
                         PASS if rotated else FAIL,
-                        "Both access keys rotated within 90 days."
-                        if rotated
-                        else f"Key(s) not rotated in 90 days: {'; '.join(old_keys)}",
+                        (
+                            "Both access keys rotated within 90 days."
+                            if rotated
+                            else f"Key(s) not rotated in 90 days: {'; '.join(old_keys)}"
+                        ),
                         "Storage account > Access keys > Rotate key" if not rotated else "",
                         sid,
                         sname,

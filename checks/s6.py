@@ -52,7 +52,11 @@ def check_6_1_1_1(sid: str, sname: str) -> R:
         1,
         "6 - Management & Governance",
         PASS if settings else FAIL,
-        f"Found {len(settings)} subscription-level diagnostic setting(s)." if settings else "No subscription-level diagnostic settings found.",
+        (
+            f"Found {len(settings)} subscription-level diagnostic setting(s)."
+            if settings
+            else "No subscription-level diagnostic settings found."
+        ),
         "Monitor > Activity Log > Export Activity Logs > Add diagnostic setting" if not settings else "",
         sid,
         sname,
@@ -238,7 +242,11 @@ def check_6_1_1_4(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "6 - Management & Governance",
                 PASS if enabled else FAIL,
-                f"Vault '{vname}': audit/allLogs diagnostic logging enabled." if enabled else f"Vault '{vname}': no audit logging enabled (requires 'audit' or 'allLogs' category).",
+                (
+                    f"Vault '{vname}': audit/allLogs diagnostic logging enabled."
+                    if enabled
+                    else f"Vault '{vname}': no audit logging enabled (requires 'audit' or 'allLogs' category)."
+                ),
                 "Key Vault > Diagnostic settings > Enable audit/allLogs" if not enabled else "",
                 sid,
                 sname,
@@ -503,7 +511,11 @@ def check_6_1_2_alerts(sid: str, sname: str) -> list[R]:
                 1,
                 "6 - Management & Governance",
                 PASS if found else FAIL,
-                f"Activity log alert configured for operation: {op}" if found else f"No activity log alert found for: {op}",
+                (
+                    f"Activity log alert configured for operation: {op}"
+                    if found
+                    else f"No activity log alert found for: {op}"
+                ),
                 f"Monitor > Alerts > Create activity log alert > Operation name: {op}" if not found else "",
                 sid,
                 sname,

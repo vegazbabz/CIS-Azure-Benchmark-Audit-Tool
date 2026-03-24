@@ -78,7 +78,11 @@ def check_8_1_defender(sid: str, sname: str) -> list[R]:
             level,
             "8 - Security Services",
             PASS if tier == "Standard" else FAIL,
-            f"Microsoft Defender pricing tier: Standard (enabled)." if tier == "Standard" else f"Microsoft Defender pricing tier: {tier} \u2014 must be upgraded to Standard.",
+            (
+                f"Microsoft Defender pricing tier: Standard (enabled)."
+                if tier == "Standard"
+                else f"Microsoft Defender pricing tier: {tier} \u2014 must be upgraded to Standard."
+            ),
             f"Defender for Cloud > Environment settings > Enable '{plan}'" if tier != "Standard" else "",
             sid,
             sname,
@@ -555,7 +559,11 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         1,
                         "8 - Security Services",
                         PASS if exp else FAIL,
-                        f"Key '{k.get('name')}': expiration set ({exp})." if exp else f"Key '{k.get('name')}': expiration NOT set.",
+                        (
+                            f"Key '{k.get('name')}': expiration set ({exp})."
+                            if exp
+                            else f"Key '{k.get('name')}': expiration NOT set."
+                        ),
                         "Key Vault > Keys > Set expiration date" if not exp else "",
                         sid,
                         sname,
@@ -678,7 +686,11 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             1,
                             "8 - Security Services",
                             PASS if exp else FAIL,
-                            f"Secret '{s.get('name')}': expiration set ({exp})." if exp else f"Secret '{s.get('name')}': expiration NOT set.",
+                            (
+                                f"Secret '{s.get('name')}': expiration set ({exp})."
+                                if exp
+                                else f"Secret '{s.get('name')}': expiration NOT set."
+                            ),
                             "Key Vault > Secrets > Set expiration date" if not exp else "",
                             sid,
                             sname,
@@ -778,7 +790,11 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             1,
                             "8 - Security Services",
                             PASS if ok else FAIL,
-                            f"Certificate '{cname}': validity {months} month(s) (<= 12)." if ok else f"Certificate '{cname}': validity {months} month(s) (> 12 months).",
+                            (
+                                f"Certificate '{cname}': validity {months} month(s) (<= 12)."
+                                if ok
+                                else f"Certificate '{cname}': validity {months} month(s) (> 12 months)."
+                            ),
                             (
                                 "Key Vault > Certificates > Issuance policy > " "Set validity <= 12 months"
                                 if not ok

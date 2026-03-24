@@ -299,7 +299,11 @@ def check_5_4() -> R:
         1,
         "5 - Identity Services",
         FAIL if allowed else PASS,
-        f"Non-admin users can create tenants (defaultUserRolePermissions.allowedToCreateTenants: {allowed})." if allowed else "Non-admin tenant creation is restricted.",
+        (
+            f"Non-admin users can create tenants (defaultUserRolePermissions.allowedToCreateTenants: {allowed})."
+            if allowed
+            else "Non-admin tenant creation is restricted."
+        ),
         "Entra ID > User settings > Restrict non-admin users from creating tenants: Yes" if allowed else "",
     )
 
@@ -360,7 +364,11 @@ def check_5_15() -> R:
         1,
         "5 - Identity Services",
         PASS if role_id == MOST_RESTRICTIVE else FAIL,
-        "Guest user access is restricted to most restrictive level (Restricted Guest User)." if role_id == MOST_RESTRICTIVE else f"Guest user role is not the most restrictive setting (current: {role_id}). Must be Restricted Guest User ({MOST_RESTRICTIVE}).",
+        (
+            "Guest user access is restricted to most restrictive level (Restricted Guest User)."
+            if role_id == MOST_RESTRICTIVE
+            else f"Guest user role is not the most restrictive setting (current: {role_id}). Must be Restricted Guest User ({MOST_RESTRICTIVE})."
+        ),
         (
             "Entra ID > External Identities > External collaboration settings > "
             "Guest user access restrictions: Most Restrictive"
@@ -398,7 +406,11 @@ def check_5_16() -> R:
         2,
         "5 - Identity Services",
         PASS if compliant else FAIL,
-        f"Guest invitations restricted to admins/guest inviters (allowInvitesFrom: {val})." if compliant else f"Any user can invite guests (allowInvitesFrom: {val}).",
+        (
+            f"Guest invitations restricted to admins/guest inviters (allowInvitesFrom: {val})."
+            if compliant
+            else f"Any user can invite guests (allowInvitesFrom: {val})."
+        ),
         (
             "Entra ID > External Identities > External collaboration settings > "
             "Guest invite restrictions: Only users assigned to specific admin roles"

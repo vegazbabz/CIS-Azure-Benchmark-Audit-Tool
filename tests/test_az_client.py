@@ -114,11 +114,15 @@ class TestFriendlyError(unittest.TestCase):
     def test_authz_error_collapsed(self) -> None:
         result = az_client._friendly_error("AuthorizationFailed")
         self.assertIn("Audit incomplete", result)
-        self.assertIn("data-plane permissions", result)
+        self.assertIn("RBAC role", result)
 
     def test_not_authorized_collapsed(self) -> None:
         result = az_client._friendly_error("The client is not authorized to perform this action")
         self.assertIn("Audit incomplete", result)
+        self.assertIn("RBAC role", result)
+
+    def test_keyvault_authz_error_uses_kv_message(self) -> None:
+        result = az_client._friendly_error("AuthorizationFailed for Key Vault 'myvault'")
         self.assertIn("data-plane permissions", result)
 
     def test_plain_error_first_line(self) -> None:

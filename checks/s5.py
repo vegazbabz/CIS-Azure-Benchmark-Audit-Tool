@@ -191,6 +191,28 @@ def check_5_1_3() -> R:
     )
 
 
+def check_5_28() -> R:
+    """
+    5.28 — Privileged users are protected by phishing-resistant MFA (Manual, Level 1)
+
+    Requires manual verification in the Entra ID portal: confirm that all
+    privileged-role holders (Global Administrator, Security Administrator,
+    etc.) are enrolled in phishing-resistant MFA methods (FIDO2, Windows
+    Hello for Business, or certificate-based authentication).  The Graph
+    API does not expose the per-user MFA method strength requirement.
+    """
+    return R(
+        "5.28",
+        "Privileged users protected by phishing-resistant MFA",
+        1,
+        "5 - Identity Services",
+        MANUAL,
+        "Manual verification required — review privileged-role MFA methods in the Entra ID portal.",
+        "Entra ID > Users > Per-user MFA, or Conditional Access > Grant > Require "
+        "authentication strength > Phishing-resistant MFA for all privileged roles.",
+    )
+
+
 def check_5_3_3(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     """
     5.3.3 — User Access Administrator role is restricted (Level 1)

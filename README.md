@@ -11,7 +11,7 @@
 
 **Version:** 1.1.0
 **Benchmark:** [CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure) (September 2025)
-**Coverage:** 94 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)
+**Coverage:** 98 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)
 
 ---
 
@@ -610,12 +610,13 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 > **Device code flow is not used.** MSAL is configured to use the authorization code flow with
 > PKCE (interactive browser) in user mode, in line with CIS 5.2.3.
 
-### Section 6 — Management and Governance (16 automated)
+### Section 6 — Management and Governance (17 automated)
 
 | Control | Title | Level |
 | --- | --- | --- |
 | 6.1.1.1 | Diagnostic Setting exists for Subscription Activity Logs | L1 |
 | 6.1.1.2 | Diagnostic Setting captures required categories | L1 |
+| 6.1.1.3 | Activity log retention >= 365 days | L1 |
 | 6.1.1.4 | Key Vault diagnostic logging enabled | L1 |
 | 6.1.1.6 | Azure AppService HTTP logs enabled | L2 |
 | 6.1.2.1 | Activity Log Alert: Create Policy Assignment | L1 |
@@ -689,7 +690,7 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 > lacks a Key Vault data-plane role / access policy, the check returns ERROR with an actionable message
 > explaining exactly what is missing — compliance is unknown, not assumed clean.
 
-### Section 9 — Storage Services (21 automated)
+### Section 9 — Storage Services (24 automated)
 
 | Control | Title | Level |
 | --- | --- | --- |
@@ -699,6 +700,9 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 | 9.2.1 | Blob soft delete enabled | L1 |
 | 9.2.2 | Container soft delete enabled | L1 |
 | 9.2.3 | Blob versioning enabled | L2 |
+| 9.2.4 | Storage logging enabled for Blob Service read requests | L2 |
+| 9.2.5 | Storage logging enabled for Blob Service write requests | L2 |
+| 9.2.6 | Storage logging enabled for Blob Service delete requests | L2 |
 | 9.3.1.1 | Key rotation reminders enabled | L1 |
 | 9.3.1.2 | Access keys regenerated within 90 days | L1 |
 | 9.3.1.3 | Storage account key access disabled | L1 |
@@ -907,4 +911,4 @@ This tool is not affiliated with, endorsed by, or approved by CIS.
 
 **Version:** 1.1.0
 **Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
-**Coverage:** 94 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)
+**Coverage:** 98 automated controls · 2 manual controls noted in output · 1 control pending (2.1.1)

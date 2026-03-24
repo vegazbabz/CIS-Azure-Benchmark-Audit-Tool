@@ -126,11 +126,11 @@ from cis.report import generate_html
 # Console emoji for terminal output (NOT HTML entities)
 _CONSOLE_ICON: dict[str, str] = {
     PASS: "\u2705",
-    FAIL: "\u274C",
-    ERROR: "\u26A0\uFE0F",
-    INFO: "\u2139\uFE0F",
-    MANUAL: "\U0001F4CB",
-    SUPPRESSED: "\U0001F507",
+    FAIL: "\u274c",
+    ERROR: "\u26a0\ufe0f",
+    INFO: "\u2139\ufe0f",
+    MANUAL: "\U0001f4cb",
+    SUPPRESSED: "\U0001f507",
 }
 
 # Finding suppression (accepted risks)
@@ -882,7 +882,17 @@ def run_audit(
     else:
         LOGGER.info("\n  [Tenant] Running tenant-level identity checks...")
         tenant_results = []
-        for fn in [check_3_1_1, check_5_1_1, check_5_1_2, check_5_1_3, check_5_28, check_5_4, check_5_14, check_5_15, check_5_16]:
+        for fn in [
+            check_3_1_1,
+            check_5_1_1,
+            check_5_1_2,
+            check_5_1_3,
+            check_5_28,
+            check_5_4,
+            check_5_14,
+            check_5_15,
+            check_5_16,
+        ]:
             try:
                 r = fn()
                 tenant_results.append(r)

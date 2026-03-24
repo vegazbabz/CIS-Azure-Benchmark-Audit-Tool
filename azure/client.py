@@ -185,7 +185,13 @@ def _friendly_error(msg: str) -> str:
             "permission (for service principals)."
         )
     if any(t in lowered for t in _AUTHZ_TOKENS):
-        return _CLEAN_KV_AUTHZ_MSG
+        # Only use the KV-specific message when the error is actually about Key Vault.
+        if "key vault" in lowered or "keyvault" in lowered:
+            return _CLEAN_KV_AUTHZ_MSG
+        return (
+            "Audit incomplete — insufficient permissions. "
+            "Check that the runner account has the required RBAC role for this resource."
+        )
     first = _first_error_line(msg)
     return first[:160] if len(first) > 160 else first
 

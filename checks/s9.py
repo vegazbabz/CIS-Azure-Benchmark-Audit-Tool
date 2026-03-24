@@ -395,8 +395,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             # 9.2.1 — Blob soft delete allows recovery of deleted blobs within
             # the retention period. Essential for ransomware recovery.
             _sd_on = drp.get("enabled", False)
-            _sd_days = drp.get("days", 0)
-            _sd_ok = bool(_sd_on) and (isinstance(_sd_days, int) and _sd_days >= 7)
+            _sd_days = drp.get("days")
+            _sd_ok = bool(_sd_on) and _sd_days is not None and _sd_days > 0
             acc_results.append(
                 R(
                     "9.2.1",
@@ -405,11 +405,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "9 - Storage Services",
                     PASS if _sd_ok else FAIL,
                     f"Blob soft delete: enabled={_sd_on}, days={_sd_days}",
-                    (
-                        "Storage Account > Data protection > Enable soft delete for blobs (>= 7 days)"
-                        if not _sd_ok
-                        else ""
-                    ),
+                    ("Storage Account > Data protection > Enable soft delete for blobs" if not _sd_ok else ""),
                     sid,
                     sname,
                     aname,
@@ -419,8 +415,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             # 9.2.2 — Container soft delete allows recovery of deleted containers
             # (and all blobs within) within the retention period.
             _cd_on = crp.get("enabled", False)
-            _cd_days = crp.get("days", 0)
-            _cd_ok = bool(_cd_on) and (isinstance(_cd_days, int) and _cd_days >= 7)
+            _cd_days = crp.get("days")
+            _cd_ok = bool(_cd_on) and _cd_days is not None and _cd_days > 0
             acc_results.append(
                 R(
                     "9.2.2",
@@ -429,11 +425,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "9 - Storage Services",
                     PASS if _cd_ok else FAIL,
                     f"Container soft delete: enabled={_cd_on}, days={_cd_days}",
-                    (
-                        "Storage Account > Data protection > Enable soft delete for containers (>= 7 days)"
-                        if not _cd_ok
-                        else ""
-                    ),
+                    ("Storage Account > Data protection > Enable soft delete for containers" if not _cd_ok else ""),
                     sid,
                     sname,
                     aname,
@@ -589,7 +581,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             # 9.1.1 — File share soft delete allows recovery of deleted shares
             _fs_on = srp.get("enabled", False)
             _fs_days = srp.get("days", 0)
-            _fs_ok = bool(_fs_on) and (isinstance(_fs_days, int) and _fs_days >= 7)
+            _fs_ok = bool(_fs_on) and (isinstance(_fs_days, int) and 1 <= _fs_days <= 365)
             acc_results.append(
                 R(
                     "9.1.1",
@@ -599,7 +591,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     PASS if _fs_ok else FAIL,
                     f"File share soft delete: enabled={_fs_on}, days={_fs_days}",
                     (
-                        "Storage Account > Data protection > Enable soft delete for file shares (>= 7 days)"
+                        "Storage Account > Data protection > Enable soft delete for file shares (1-365 days)"
                         if not _fs_ok
                         else ""
                     ),

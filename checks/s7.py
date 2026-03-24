@@ -744,22 +744,38 @@ def check_7_14(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     ]
 
 
+def _has_bot_protection(pol: dict) -> tuple[bool, str]:
+    """Check if a WAF policy has Microsoft_BotManagerRuleSet enabled.
+
+    Returns (ok, detail) where ok=True means the rule set is present
+    and KnownBadBots is not disabled via ruleGroupOverrides.
+    """
+    rule_sets = pol.get("managedRuleSets") or []
+    for rs in rule_sets:
+        if str(rs.get("ruleSetType", "")).lower() == "microsoft_botmanagerruleset":
+            # Check that KnownBadBots is not disabled via overrides
+            for override in rs.get("ruleGroupOverrides") or []:
+                if str(override.get("ruleGroupName", "")).lower() == "knownbadbots":
+                    # If any rule in KnownBadBots is explicitly disabled, fail
+                    for rule in override.get("rules") or []:
+                        if str(rule.get("state", "")).lower() == "disabled":
+                            return False, "Microsoft_BotManagerRuleSet found but KnownBadBots rules disabled"
+            return True, "Microsoft_BotManagerRuleSet enabled"
+    return False, "Microsoft_BotManagerRuleSet not found"
+
+
 def check_7_15(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     """
     7.15 — WAF bot protection is enabled (Level 2)
 
     Bot protection rules block known malicious bots (crawlers, scanners,
-    scrapers) based on Microsoft's threat intelligence feed. Prevention mode
-    actively blocks; Detection mode only logs. Only Prevention mode is
-    considered compliant.
+    scrapers) based on Microsoft's threat intelligence feed.
 
-    Note: This check targets standalone WAF POLICY resources
-    (type: applicationGatewayWebApplicationFirewallPolicies), which are
-    separate from WAF configuration embedded in Application Gateways.
-    A WAF policy must exist and be in Prevention mode.
+    Checks that managedRules.managedRuleSets contains a rule set with
+    ruleSetType of Microsoft_BotManagerRuleSet, and that no
+    ruleGroupOverrides for ruleGroupName KnownBadBots have state Disabled.
 
-    Data source: Resource Graph 'waf_policies' query (botEnabled field,
-    which maps to policySettings.mode).
+    Data source: Resource Graph 'waf_policies' query (managedRuleSets field).
     """
     policies = _idx(td, "waf_policies", sid)
     if not policies:
@@ -769,26 +785,24 @@ def check_7_15(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             )
         ]
 
-    return [
-        R(
-            "7.15",
-            "WAF bot protection enabled",
-            2,
-            "7 - Networking Services",
-            # botEnabled field contains the mode string: "Prevention" or "Detection"
-            PASS if str(pol.get("botEnabled", "")).lower() == "prevention" else FAIL,
-            f"Bot protection mode: {pol.get('botEnabled') or 'Not configured'}",
-            (
-                "WAF policy > Bot protection > Set to Prevention mode"
-                if str(pol.get("botEnabled", "")).lower() != "prevention"
-                else ""
-            ),
-            sid,
-            sname,
-            pol.get("name", ""),
+    results: list[R] = []
+    for pol in policies:
+        ok, detail = _has_bot_protection(pol)
+        results.append(
+            R(
+                "7.15",
+                "WAF bot protection enabled",
+                2,
+                "7 - Networking Services",
+                PASS if ok else FAIL,
+                detail,
+                "WAF policy > Managed rules > Add Microsoft_BotManagerRuleSet" if not ok else "",
+                sid,
+                sname,
+                pol.get("name", ""),
+            )
         )
-        for pol in policies
-    ]
+    return results
 
 
 def check_7_7(sid: str, sname: str) -> R:

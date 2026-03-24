@@ -483,7 +483,7 @@ _QUERIES = {
     "waf_policies": """
         resources | where type =~ 'microsoft.network/applicationgatewaywebapplicationfirewallpolicies'
         | project id, name, subscriptionId,
-            botEnabled         = properties.policySettings.mode,
+            managedRuleSets    = properties.managedRules.managedRuleSets,
             requestBodyInspect = properties.policySettings.requestBodyInspect
     """,
 }

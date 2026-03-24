@@ -78,7 +78,7 @@ def check_8_1_defender(sid: str, sname: str) -> list[R]:
             level,
             "8 - Security Services",
             PASS if tier == "Standard" else FAIL,
-            f"Pricing tier: {tier}",
+            f"Microsoft Defender pricing tier: Standard (enabled)." if tier == "Standard" else f"Microsoft Defender pricing tier: {tier} \u2014 must be upgraded to Standard.",
             f"Defender for Cloud > Environment settings > Enable '{plan}'" if tier != "Standard" else "",
             sid,
             sname,
@@ -130,7 +130,7 @@ def check_8_1_3_3(sid: str, sname: str) -> R:
         1,
         "8 - Security Services",
         PASS if enabled else FAIL,
-        f"WDATP integration: {'enabled' if enabled else 'NOT enabled'}",
+        f"Microsoft Defender for Endpoint integration: {'Enabled' if enabled else 'Disabled'}.",
         (
             "Defender for Cloud > Environment settings > Integrations > Enable Microsoft Defender for Endpoint"
             if not enabled
@@ -171,7 +171,7 @@ def check_8_1_10(sid: str, sname: str) -> R:
         1,
         "8 - Security Services",
         PASS if enabled else FAIL,
-        f"MDE TVM vulnerability assessment: {'enabled' if enabled else 'NOT enabled'}",
+        f"MDE TVM vulnerability assessment: {'enabled.' if enabled else 'NOT enabled.'}",
         (
             "Defender for Cloud > Environment settings > VM vulnerability assessment: "
             "Microsoft Defender Vulnerability Management."
@@ -406,7 +406,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "8 - Security Services",
                 PASS if purge else FAIL,
-                f"Vault '{vname}': enablePurgeProtection = {purge}",
+                f"Purge protection {'enabled' if purge else 'not enabled'}.",
                 "Key Vault > Properties > Enable purge protection" if not purge else "",
                 sid,
                 sname,
@@ -426,7 +426,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 2,
                 "8 - Security Services",
                 PASS if is_rbac else FAIL,
-                f"Vault '{vname}': enableRbacAuthorization = {is_rbac}",
+                "RBAC authorization model enabled." if is_rbac else "Using legacy Vault Access Policy, not RBAC.",
                 (
                     "Key Vault > Access configuration > Permission model: " "Azure role-based access control"
                     if not is_rbac
@@ -450,7 +450,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "8 - Security Services",
                 PASS if str(pub).lower() == "disabled" else FAIL,
-                f"Vault '{vname}': publicNetworkAccess = {pub}",
+                f"Public network access: {pub}.",
                 "Key Vault > Networking > Public network access: Disabled" if str(pub).lower() != "disabled" else "",
                 sid,
                 sname,
@@ -469,7 +469,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 2,
                 "8 - Security Services",
                 PASS if pe_count > 0 else FAIL,
-                f"Vault '{vname}': private endpoints = {pe_count}",
+                f"Private endpoint(s) configured: {pe_count}." if pe_count > 0 else "No private endpoints configured.",
                 "Key Vault > Networking > Private endpoint connections > Add" if pe_count == 0 else "",
                 sid,
                 sname,
@@ -555,7 +555,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         1,
                         "8 - Security Services",
                         PASS if exp else FAIL,
-                        f"Vault '{vname}' key '{k.get('name')}': expires = {exp or 'NOT SET'}",
+                        f"Key '{k.get('name')}': expiration set ({exp})." if exp else f"Key '{k.get('name')}': expiration NOT set.",
                         "Key Vault > Keys > Set expiration date" if not exp else "",
                         sid,
                         sname,
@@ -619,8 +619,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                                 2,
                                 "8 - Security Services",
                                 PASS if has_rotate else FAIL,
-                                f"Vault '{vname}' key '{kname}': auto-rotation "
-                                f"{'configured' if has_rotate else 'NOT configured'}",
+                                f"Key '{kname}': automatic rotation {'configured' if has_rotate else 'NOT configured'}.",
                                 "Key Vault > Keys > Rotation policy > Set rotation action" if not has_rotate else "",
                                 sid,
                                 sname,
@@ -679,7 +678,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             1,
                             "8 - Security Services",
                             PASS if exp else FAIL,
-                            f"Vault '{vname}' secret '{s.get('name')}': expires = {exp or 'NOT SET'}",
+                            f"Secret '{s.get('name')}': expiration set ({exp})." if exp else f"Secret '{s.get('name')}': expiration NOT set.",
                             "Key Vault > Secrets > Set expiration date" if not exp else "",
                             sid,
                             sname,
@@ -779,7 +778,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             1,
                             "8 - Security Services",
                             PASS if ok else FAIL,
-                            f"Vault '{vname}' cert '{cname}': validityInMonths = {months}",
+                            f"Certificate '{cname}': validity {months} month(s) (<= 12)." if ok else f"Certificate '{cname}': validity {months} month(s) (> 12 months).",
                             (
                                 "Key Vault > Certificates > Issuance policy > " "Set validity <= 12 months"
                                 if not ok
@@ -818,14 +817,14 @@ def check_8_4_1(sid: str, sname: str, td: dict[str, Any]) -> R:
     """
     hosts = _idx(td, "bastion", sid)
     if hosts:
-        labels = [f"{h.get('name')} (SKU: {(h.get('sku') or {}).get('name', '?')})" for h in hosts]
+        names = ", ".join(h.get("name", "?") for h in hosts)
         return R(
             "8.4.1",
             "Azure Bastion Host exists",
             2,
             "8 - Security Services",
             PASS,
-            f"Bastion host(s) found: {labels}",
+            f"Azure Bastion found: {names}",
             "",
             sid,
             sname,
@@ -840,20 +839,19 @@ def check_8_4_1(sid: str, sname: str, td: dict[str, Any]) -> R:
             2,
             "8 - Security Services",
             INFO,
-            "No VMs found in this subscription — Bastion not required.",
+            "No VMs found in subscription.",
             "",
             sid,
             sname,
         )
 
-    vm_names = [v.get("name") for v in vms]
     return R(
         "8.4.1",
         "Azure Bastion Host exists",
         2,
         "8 - Security Services",
         FAIL,
-        f"No Bastion host found. Subscription has {len(vms)} VM(s): {vm_names}.",
+        f"No Azure Bastion found. {len(vms)} VM(s) present.",
         "Deploy Azure Bastion to enable secure RDP/SSH access without public IPs.",
         sid,
         sname,
@@ -893,7 +891,7 @@ def check_8_5(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             2,
             "8 - Security Services",
             PASS if v.get("hasDdos") else FAIL,
-            f"VNet '{v.get('name')}': DDoS {'enabled' if v.get('hasDdos') else 'NOT enabled'}",
+            f"DDoS Network Protection {'enabled' if v.get('hasDdos') else 'not enabled'}.",
             "VNet > DDoS protection > Enable Standard plan" if not v.get("hasDdos") else "",
             sid,
             sname,

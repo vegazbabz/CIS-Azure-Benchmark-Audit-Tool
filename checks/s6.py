@@ -52,7 +52,7 @@ def check_6_1_1_1(sid: str, sname: str) -> R:
         1,
         "6 - Management & Governance",
         PASS if settings else FAIL,
-        f"Found {len(settings)} diagnostic setting(s)." if settings else "No subscription diagnostic settings found.",
+        f"Found {len(settings)} subscription-level diagnostic setting(s)." if settings else "No subscription-level diagnostic settings found.",
         "Monitor > Activity Log > Export Activity Logs > Add diagnostic setting" if not settings else "",
         sid,
         sname,
@@ -104,9 +104,9 @@ def check_6_1_1_2(sid: str, sname: str) -> R:
         "6 - Management & Governance",
         PASS if not missing else FAIL,
         (
-            f"Missing categories: {sorted(missing)}"
+            f"Missing required log categories: {', '.join(sorted(missing))}. Found: {', '.join(sorted(found))}."
             if missing
-            else "All required categories enabled (Security/Administrative/Alert/Policy)."
+            else "All required categories enabled: Security, Administrative, Alert, Policy."
         ),
         "Enable missing categories in subscription diagnostic settings." if missing else "",
         sid,
@@ -238,7 +238,7 @@ def check_6_1_1_4(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "6 - Management & Governance",
                 PASS if enabled else FAIL,
-                f"Vault '{vname}': audit logging {'enabled' if enabled else 'NOT enabled'}.",
+                f"Vault '{vname}': audit/allLogs diagnostic logging enabled." if enabled else f"Vault '{vname}': no audit logging enabled (requires 'audit' or 'allLogs' category).",
                 "Key Vault > Diagnostic settings > Enable audit/allLogs" if not enabled else "",
                 sid,
                 sname,
@@ -387,7 +387,7 @@ def check_6_1_1_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     2,
                     "6 - Management & Governance",
                     PASS,
-                    f"App '{aname}' (kind: {kind}): " f"compliant diagnostic setting '{compliant_setting}' found.",
+                    f"App '{aname}' (kind: {kind}): " f"compliant diagnostic setting found.",
                     "",
                     sid,
                     sname,
@@ -409,9 +409,9 @@ def check_6_1_1_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     2,
                     "6 - Management & Governance",
                     FAIL,
-                    f"App '{aname}' (kind: {kind}): diagnostic settings exist but "
+                    f"App '{aname}': diagnostic settings exist but "
                     f"no log meets the retention requirement (>= {REQUIRED_RETENTION} days "
-                    f"or Log Analytics destination). Enabled categories: {categories or 'none'}.",
+                    f"or Log Analytics destination).",
                     "App Service > Monitoring > Diagnostic settings > "
                     "Ensure logs are sent to Log Analytics, or set storage retention >= 365 days.",
                     sid,
@@ -428,7 +428,7 @@ def check_6_1_1_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     2,
                     "6 - Management & Governance",
                     FAIL,
-                    f"App '{aname}' (kind: {kind}): no diagnostic settings configured.",
+                    f"App '{aname}': no diagnostic settings configured.",
                     "App Service > Monitoring > Diagnostic settings > Add diagnostic setting > "
                     "Enable resource logs and send to Log Analytics workspace.",
                     sid,
@@ -503,7 +503,7 @@ def check_6_1_2_alerts(sid: str, sname: str) -> list[R]:
                 1,
                 "6 - Management & Governance",
                 PASS if found else FAIL,
-                f"Alert for '{op}' {'found' if found else 'NOT found'}.",
+                f"Activity log alert configured for operation: {op}" if found else f"No activity log alert found for: {op}",
                 f"Monitor > Alerts > Create activity log alert > Operation name: {op}" if not found else "",
                 sid,
                 sname,
@@ -524,7 +524,7 @@ def check_6_1_2_alerts(sid: str, sname: str) -> list[R]:
             1,
             "6 - Management & Governance",
             PASS if sh_found else FAIL,
-            "Service Health activity alert found." if sh_found else "No Service Health activity alert found.",
+            "Service Health activity log alert found." if sh_found else "No Service Health activity log alert found.",
             "Monitor > Alerts > Create alert > Category = ServiceHealth" if not sh_found else "",
             sid,
             sname,
@@ -570,7 +570,7 @@ def check_6_1_3_1(sid: str, sname: str) -> R:
         "6 - Management & Governance",
         PASS if components else FAIL,
         (
-            f"Found {len(components)} Application Insights component(s): {names}"
+            f"{len(components)} Application Insights component(s) found."
             if components
             else "No Application Insights components found."
         ),

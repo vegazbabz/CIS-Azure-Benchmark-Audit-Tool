@@ -231,7 +231,7 @@ CONTROL_CATALOG: tuple[tuple[str, int, str, str, str], ...] = (
     ("9.2.5", 1, "9 - Storage Services", "Trusted Azure Services can access storage account", "Resource Graph: storage accounts"),
     ("9.2.6", 1, "9 - Storage Services", "Private endpoints used for storage accounts", "Resource Graph: storage accounts"),
     ("9.3.1.1", 1, "9 - Storage Services", "Storage account key rotation reminders enabled", "az storage account show --query keyPolicy"),
-    ("9.3.1.2", 1, "9 - Storage Services", "Storage access keys regenerated within 90 days", "az monitor activity-log list --offset 90d (status=Succeeded)"),
+    ("9.3.1.2", 1, "9 - Storage Services", "Storage access keys regenerated within 90 days", "az storage account show --query keyCreationTime"),
     ("9.3.1.3", 1, "9 - Storage Services", "Storage account access keys periodically regenerated", "az storage account show --query keyPolicy"),
     ("9.3.2.1", 1, "9 - Storage Services", "Minimum TLS version set to 1.2", "Resource Graph: storage accounts"),
     ("9.3.2.2", 1, "9 - Storage Services", "Shared key access disabled", "'Not Applicable' — deprecated by Microsoft"),

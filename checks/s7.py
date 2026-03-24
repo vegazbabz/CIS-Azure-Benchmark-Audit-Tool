@@ -47,8 +47,8 @@ def check_7_1(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "7 - Networking Services",
                 FAIL if bad else PASS,
-                f"NSG '{name}': {'non-compliant rules: ' + str(bad) if bad else 'compliant'}",
-                f"NSG '{name}' > Inbound rules > Remove or restrict rules {bad}" if bad else "",
+                f"Rule(s) allow RDP (3389) from internet: {', '.join(bad)}" if bad else "No rules allow RDP from internet.",
+                f"NSG '{name}' > Inbound rules > Remove or restrict rules {', '.join(bad)}" if bad else "",
                 sid,
                 sname,
                 name if bad else "",
@@ -86,8 +86,8 @@ def check_7_2(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "7 - Networking Services",
                 FAIL if bad else PASS,
-                f"NSG '{name}': {'non-compliant rules: ' + str(bad) if bad else 'compliant'}",
-                f"NSG '{name}' > Inbound rules > Remove or restrict rules {bad}" if bad else "",
+                f"Rule(s) allow SSH (22) from internet: {', '.join(bad)}" if bad else "No rules allow SSH from internet.",
+                f"NSG '{name}' > Inbound rules > Remove or restrict rules {', '.join(bad)}" if bad else "",
                 sid,
                 sname,
                 name if bad else "",
@@ -149,8 +149,8 @@ def check_7_3(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "7 - Networking Services",
                 FAIL if bad else PASS,
-                f"NSG '{name}': {'inbound UDP rules open to internet: ' + str(bad) if bad else 'compliant'}",
-                f"NSG '{name}' > Inbound rules > Remove or restrict UDP rules {bad}" if bad else "",
+                f"Rule(s) allow UDP from internet: {', '.join(bad)}" if bad else "No rules allow UDP from internet.",
+                f"NSG '{name}' > Inbound rules > Remove or restrict UDP rules {', '.join(bad)}" if bad else "",
                 sid,
                 sname,
                 name if bad else "",
@@ -205,7 +205,7 @@ def check_7_4(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "7 - Networking Services",
                 FAIL if bad else PASS,
-                f"NSG '{name}': {'non-compliant rules (80/443): ' + str(bad) if bad else 'compliant'}",
+                f"HTTP/HTTPS inbound allowed from internet. Rules: {', '.join(bad)}" if bad else "No rules allow HTTP/HTTPS from internet.",
                 "Ensure HTTP/HTTPS inbound from internet is intentional and restricted." if bad else "",
                 sid,
                 sname,
@@ -262,7 +262,7 @@ def check_7_5(sid: str, sname: str) -> list[R]:
                     2,
                     "7 - Networking Services",
                     PASS if ok else FAIL,
-                    f"Flow log '{fname}': retention = {ret} days, enabled = {enabled}",
+                    f"Retention: {ret} days (enabled: {enabled}). Flow log: {fname}",
                     "Network Watcher > Flow logs > Set retention >= 90 days" if not ok else "",
                     sid,
                     sname,
@@ -278,8 +278,7 @@ def check_7_5(sid: str, sname: str) -> list[R]:
                 2,
                 "7 - Networking Services",
                 FAIL,
-                "No NSG flow logs configured — flow logging has not been enabled for any NSG in this subscription."
-                " See also CIS 6.1.1.5 (NSG flow logs to Log Analytics).",
+                "No NSG flow logs found.",
                 "Network Watcher > Flow logs > Create a flow log for each NSG with retention >= 90 days"
                 " and Traffic Analytics enabled (CIS 6.1.1.5).",
                 sid,
@@ -349,7 +348,7 @@ def check_7_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Network Watcher enabled for all regions",
                 1,
                 "7 - Networking Services",
-                "No resources found to determine regions.",
+                "No regions with resources found.",
                 sid,
                 sname,
             )
@@ -366,9 +365,9 @@ def check_7_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "7 - Networking Services",
             FAIL if missing else PASS,
             (
-                f"Missing Network Watcher in: {sorted(missing)}"
+                f"Network Watcher missing in: {', '.join(sorted(missing))}"
                 if missing
-                else f"Network Watcher enabled in all {len(used_locs)} regions."
+                else f"Network Watcher enabled in all {len(used_locs)} region(s)."
             ),
             "Network Watcher > Regions > Enable for each region in use." if missing else "",
             sid,
@@ -478,9 +477,7 @@ def check_7_10(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             2,
             "7 - Networking Services",
             PASS if gw.get("wafEnabled") or gw.get("wafPolicyId") else FAIL,
-            f"Gateway '{gw.get('name')}': WAF enabled = {gw.get('wafEnabled')}, "
-            f"mode = {gw.get('wafMode', 'N/A')}"
-            + (f", wafPolicy = {gw.get('wafPolicyId')}" if gw.get("wafPolicyId") else ""),
+            "WAF is enabled." if gw.get("wafEnabled") or gw.get("wafPolicyId") else "WAF is not enabled on this Application Gateway.",
             (
                 "Application Gateway > Web application firewall > Enable WAF"
                 if not (gw.get("wafEnabled") or gw.get("wafPolicyId"))
@@ -592,7 +589,7 @@ def check_7_11(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "Subnets associated with network security groups",
             1,
             "7 - Networking Services",
-            "No applicable subnets found (only platform subnets exist).",
+            "No applicable subnets found (only platform-managed subnets exist).",
             sid,
             sname,
         )
@@ -634,7 +631,7 @@ def check_7_12(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             1,
             "7 - Networking Services",
             PASS if str(gw.get("sslMinProto", "")).lower() in GOOD_PROTOS else FAIL,
-            f"Gateway '{gw.get('name')}': minProtocolVersion = {gw.get('sslMinProto', 'not set')}",
+            f"Minimum TLS: {gw.get('sslMinProto') or 'not set'}",
             (
                 "Application Gateway > Listeners > SSL policy > Set minimum TLS to 1.2"
                 if str(gw.get("sslMinProto", "")).lower() not in GOOD_PROTOS
@@ -679,7 +676,7 @@ def check_7_13(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             2,
             "7 - Networking Services",
             PASS if gw.get("enableHttp2") else FAIL,
-            f"Gateway '{gw.get('name')}': enableHttp2 = {gw.get('enableHttp2')}",
+            f"HTTP2 enabled: {gw.get('enableHttp2')}",
             "Application Gateway > Configuration > HTTP2: Enabled" if not gw.get("enableHttp2") else "",
             sid,
             sname,
@@ -721,7 +718,7 @@ def check_7_14(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             2,
             "7 - Networking Services",
             PASS if gw.get("wafReqBody") else FAIL,
-            f"Gateway '{gw.get('name')}': requestBodyCheck = {gw.get('wafReqBody')}",
+            f"Request body inspection: {gw.get('wafReqBody')}",
             "Application Gateway > WAF > Advanced > Enable Request body inspection" if not gw.get("wafReqBody") else "",
             sid,
             sname,
@@ -764,7 +761,7 @@ def check_7_15(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "7 - Networking Services",
             # botEnabled field contains the mode string: "Prevention" or "Detection"
             PASS if str(pol.get("botEnabled", "")).lower() == "prevention" else FAIL,
-            f"WAF policy '{pol.get('name')}': mode = {pol.get('botEnabled')}",
+            f"Bot protection mode: {pol.get('botEnabled') or 'Not configured'}",
             (
                 "WAF policy > Bot protection > Set to Prevention mode"
                 if str(pol.get("botEnabled", "")).lower() != "prevention"

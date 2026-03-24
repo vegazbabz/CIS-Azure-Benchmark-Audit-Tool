@@ -58,7 +58,7 @@ def check_2_1_2(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     1,
                     "2 - Databricks",
                     INFO,
-                    f"Workspace '{wname}': no custom VNet (managed VNet in use).",
+                    f"Workspace '{wname}': no custom VNet (managed VNet in use \u2014 Azure manages NSGs).",
                     "",
                     sid,
                     sname,
@@ -108,7 +108,7 @@ def check_2_1_2(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "2 - Databricks",
                 FAIL if missing else PASS,
                 (
-                    f"Workspace '{wname}': subnets without NSG: {missing}"
+                    f"Workspace '{wname}': subnets without NSG: {', '.join(str(m) for m in missing)}"
                     if missing
                     else f"Workspace '{wname}': all Databricks subnets have NSGs."
                 ),
@@ -177,7 +177,7 @@ def check_2_1_7(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 2,
                 "2 - Databricks",
                 PASS if enabled else FAIL,
-                f"Workspace '{wname}': diagnostic settings {'found' if enabled else 'NOT configured'}.",
+                "Diagnostic settings configured." if enabled else "No diagnostic settings found on workspace.",
                 "Databricks > Monitoring > Diagnostic settings > Add diagnostic setting" if not enabled else "",
                 sid,
                 sname,
@@ -220,7 +220,7 @@ def check_2_1_9(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             2,
             "2 - Databricks",
             PASS if ws.get("noPublicIp") else FAIL,
-            f"Workspace '{ws.get('name')}': enableNoPublicIp = {ws.get('noPublicIp')}",
+            "No Public IP is enabled." if ws.get("noPublicIp") else "No Public IP is not enabled.",
             "Databricks workspace > Configure > Disable public IP" if not ws.get("noPublicIp") else "",
             sid,
             sname,
@@ -262,7 +262,7 @@ def check_2_1_10(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             2,
             "2 - Databricks",
             PASS if str(ws.get("publicAccess", "Enabled")).lower() == "disabled" else FAIL,
-            f"Workspace '{ws.get('name')}': publicNetworkAccess = {ws.get('publicAccess')}",
+            "Public network access is disabled." if str(ws.get("publicAccess", "Enabled")).lower() == "disabled" else f"Public network access is enabled (value: {ws.get('publicAccess')}).",
             (
                 "Databricks workspace > Networking > Disable public network access"
                 if str(ws.get("publicAccess", "Enabled")).lower() != "disabled"
@@ -308,7 +308,7 @@ def check_2_1_11(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             2,
             "2 - Databricks",
             PASS if (ws.get("privateEps") or 0) > 0 else FAIL,
-            f"Workspace '{ws.get('name')}': private endpoints = {ws.get('privateEps') or 0}",
+            f"{ws.get('privateEps') or 0} private endpoint(s) configured." if (ws.get("privateEps") or 0) > 0 else "No private endpoints configured.",
             "Configure private endpoint for Databricks workspace." if not (ws.get("privateEps") or 0) > 0 else "",
             sid,
             sname,

@@ -84,14 +84,14 @@ def check_5_1_1() -> R:
     # control goal (enforced sign-in security) is fulfilled by CA instead.
     rc_ca, ca_data = az_rest("https://graph.microsoft.com/v1.0/policies/conditionalAccessPolicies?$top=1")
     if rc_ca == 0 and isinstance(ca_data, dict) and ca_data.get("value"):
+        count = len(ca_data["value"])
         return R(
             _CTRL,
             _TITLE,
             1,
             _SEC,
-            INFO,
-            "Security defaults disabled — tenant uses Conditional Access. "
-            "Verify CA policies enforce MFA for all users.",
+            PASS,
+            f"Security defaults off but Conditional Access policies exist ({count} policies). Acceptable alternative.",
             "Verify Conditional Access policies enforce MFA for all users.",
         )
 
@@ -101,7 +101,7 @@ def check_5_1_1() -> R:
         1,
         _SEC,
         FAIL,
-        "Security defaults are disabled and no Conditional Access policies were found.",
+        "Security defaults are disabled and no Conditional Access policies found.",
         "Entra ID > Properties > Manage security defaults, or configure Conditional Access to enforce MFA.",
     )
 
@@ -151,10 +151,11 @@ def check_5_1_2() -> R:
 
     if not without_mfa:
         n = len(users)
-        msg = f"All {n} user(s) have MFA registered." if n else "No users found."
+        msg = f"All {n} users have MFA registered." if n else "No users found."
         return R(_CTRL, _TITLE, 1, _SEC, PASS, msg, "")
 
-    detail = f"{len(without_mfa)} user(s) without MFA registered."
+    sample = ", ".join(without_mfa[:5])
+    detail = f"{len(without_mfa)} user(s) without MFA registered (of {len(users)} total). Sample: {sample}"
     return R(
         _CTRL,
         _TITLE,
@@ -248,14 +249,15 @@ def check_5_3_3(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 1,
                 "5 - Identity Services",
                 PASS,
-                "No UAA assignments at subscription scope.",
+                "No User Access Administrator assignments at subscription scope.",
                 "",
                 sid,
                 sname,
             )
         ]
 
-    # One FAIL result per assignment found (may be multiple)
+    # Single FAIL result with all names joined, matching PS
+    names = ", ".join(a.get("principalName") or a.get("principalId", "?") for a in uaa)
     return [
         R(
             "5.3.3",
@@ -263,13 +265,11 @@ def check_5_3_3(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             1,
             "5 - Identity Services",
             FAIL,
-            f"UAA assigned to: {a.get('principalName') or a.get('principalId')}",
+            f"User Access Administrator assigned at subscription scope to: {names}",
             "Review and remove unnecessary User Access Administrator assignments.",
             sid,
             sname,
-            a.get("principalName") or a.get("principalId", "?"),
         )
-        for a in uaa
     ]
 
 
@@ -299,7 +299,7 @@ def check_5_4() -> R:
         1,
         "5 - Identity Services",
         FAIL if allowed else PASS,
-        f"allowedToCreateTenants = {allowed}",
+        f"Non-admin users can create tenants (defaultUserRolePermissions.allowedToCreateTenants: {allowed})." if allowed else "Non-admin tenant creation is restricted.",
         "Entra ID > User settings > Restrict non-admin users from creating tenants: Yes" if allowed else "",
     )
 
@@ -328,7 +328,7 @@ def check_5_14() -> R:
         1,
         "5 - Identity Services",
         FAIL if allowed else PASS,
-        f"allowedToCreateApps = {allowed}",
+        "Users can register applications." if allowed else "Users cannot register applications.",
         "Entra ID > Users > User settings > Users can register applications: No" if allowed else "",
     )
 
@@ -360,7 +360,7 @@ def check_5_15() -> R:
         1,
         "5 - Identity Services",
         PASS if role_id == MOST_RESTRICTIVE else FAIL,
-        f"guestUserRoleId = {role_id}",
+        "Guest user access is restricted to most restrictive level (Restricted Guest User)." if role_id == MOST_RESTRICTIVE else f"Guest user role is not the most restrictive setting (current: {role_id}). Must be Restricted Guest User ({MOST_RESTRICTIVE}).",
         (
             "Entra ID > External Identities > External collaboration settings > "
             "Guest user access restrictions: Most Restrictive"
@@ -398,7 +398,7 @@ def check_5_16() -> R:
         2,
         "5 - Identity Services",
         PASS if compliant else FAIL,
-        f"allowInvitesFrom = {val}",
+        f"Guest invitations restricted to admins/guest inviters (allowInvitesFrom: {val})." if compliant else f"Any user can invite guests (allowInvitesFrom: {val}).",
         (
             "Entra ID > External Identities > External collaboration settings > "
             "Guest invite restrictions: Only users assigned to specific admin roles"
@@ -437,9 +437,9 @@ def check_5_23(sid: str, sname: str) -> R:
         "5 - Identity Services",
         FAIL if bad else PASS,
         (
-            f"Custom roles with wildcard (*) actions: {bad}"
+            f"Custom role(s) with Owner-level permissions: {', '.join(bad)}"
             if bad
-            else "No custom admin roles with wildcard actions found."
+            else "No custom roles with wildcard (*) permissions found."
         ),
         "Remove or restrict wildcard permissions from custom roles." if bad else "",
         sid,
@@ -524,7 +524,7 @@ def check_5_27(sid: str, sname: str, td: dict[str, Any]) -> R:
         1,
         "5 - Identity Services",
         PASS if 2 <= n <= 3 else FAIL,
-        details,
+        f"Found {n} subscription Owner(s). CIS recommends 2\u20133.",
         remediation,
         sid,
         sname,

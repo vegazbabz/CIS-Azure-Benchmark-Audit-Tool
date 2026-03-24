@@ -9,7 +9,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from cis.config import PASS, FAIL, ERROR, INFO, TIMEOUTS, LOGGER
+from cis.config import PASS, FAIL, ERROR, INFO, MANUAL, TIMEOUTS, LOGGER
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az, az_rest, _friendly_error
@@ -915,3 +915,26 @@ def check_8_5(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         )
         for v in vnets
     ]
+
+
+def check_8_3_10(sid: str, sname: str) -> R:
+    """
+    8.3.10 — Key Vault Managed HSM is used when required (Manual, Level 2)
+
+    Managed HSM provides FIPS 140-2 Level 3 validated HSMs for cryptographic
+    key operations. Whether it is required depends on regulatory and
+    compliance needs that cannot be determined programmatically.
+    """
+    return R(
+        "8.3.10",
+        "Key Vault Managed HSM used when required",
+        2,
+        "8 - Security Services",
+        MANUAL,
+        "Manual verification required — determine if regulatory or compliance "
+        "requirements mandate FIPS 140-2 Level 3 HSMs and verify Managed HSM is "
+        "provisioned accordingly (az keyvault list --hsm-name).",
+        "Azure Portal > Key Vaults > Create Managed HSM for workloads requiring FIPS 140-2 Level 3.",
+        sid,
+        sname,
+    )

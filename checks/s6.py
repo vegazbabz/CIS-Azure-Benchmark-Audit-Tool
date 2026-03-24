@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, TIMEOUTS
+from cis.config import PASS, FAIL, MANUAL, TIMEOUTS
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az, az_rest
@@ -587,6 +587,70 @@ def check_6_1_3_1(sid: str, sname: str) -> R:
             else "No Application Insights components found."
         ),
         "Create an Application Insights resource linked to your application(s)." if not components else "",
+        sid,
+        sname,
+    )
+
+
+def check_6_1_4(sid: str, sname: str) -> R:
+    """
+    6.1.4 — Azure Monitor resource logging enabled for all services (Manual, Level 1)
+
+    Requires manually iterating every resource in the subscription and checking
+    for diagnostic settings. Not automatable at scale without excessive API calls.
+    """
+    return R(
+        "6.1.4",
+        "Azure Monitor resource logging enabled for all services",
+        1,
+        "6 - Management & Governance",
+        MANUAL,
+        "Manual verification required — list all resources (az resource list) and verify "
+        "diagnostic settings exist for each (az monitor diagnostic-settings list --resource <id>).",
+        "Azure Monitor > Diagnostic settings > Add diagnostic setting for each resource.",
+        sid,
+        sname,
+    )
+
+
+def check_6_1_5(sid: str, sname: str) -> R:
+    """
+    6.1.5 — SKU Basic/Consumption not used on production artifacts (Manual, Level 1)
+
+    Requires reviewing all resource SKUs and determining which are production
+    workloads. The determination of 'production' is a business decision that
+    cannot be automated.
+    """
+    return R(
+        "6.1.5",
+        "SKU Basic/Consumption not used on production artifacts",
+        1,
+        "6 - Management & Governance",
+        MANUAL,
+        "Manual verification required — run 'az graph query' to list Basic/Consumption SKU resources "
+        "and verify none are used for production workloads.",
+        "Upgrade production resources to Standard or Premium SKU tiers.",
+        sid,
+        sname,
+    )
+
+
+def check_6_2(sid: str, sname: str) -> R:
+    """
+    6.2 — Resource Locks set for mission-critical Azure resources (Manual, Level 2)
+
+    Identifying which resources are 'mission-critical' requires business context.
+    Cannot be fully automated.
+    """
+    return R(
+        "6.2",
+        "Resource Locks set for mission-critical Azure resources",
+        2,
+        "6 - Management & Governance",
+        MANUAL,
+        "Manual verification required — review mission-critical resources and ensure "
+        "CanNotDelete or ReadOnly locks are configured.",
+        "Resource > Settings > Locks > Add lock (CanNotDelete or ReadOnly).",
         sid,
         sname,
     )

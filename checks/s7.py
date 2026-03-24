@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, TIMEOUTS, INTERNET_SRCS, EXEMPT_SUBNETS
+from cis.config import PASS, FAIL, MANUAL, TIMEOUTS, INTERNET_SRCS, EXEMPT_SUBNETS
 from cis.models import R
 from cis.helpers import nsg_bad_rules
 from cis.check_helpers import _err, _idx, _info
@@ -789,3 +789,47 @@ def check_7_15(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         )
         for pol in policies
     ]
+
+
+def check_7_7(sid: str, sname: str) -> R:
+    """
+    7.7 — Public IP addresses are evaluated on a periodic basis (Manual, Level 1)
+
+    Requires reviewing all public IPs and their associations to ensure they
+    are still necessary. This is a governance/process check that cannot be
+    fully automated.
+    """
+    return R(
+        "7.7",
+        "Public IP addresses evaluated on a periodic basis",
+        1,
+        "7 - Networking Services",
+        MANUAL,
+        "Manual verification required — run 'az network public-ip list' and review "
+        "each public IP to ensure it is still required and properly secured.",
+        "Remove unnecessary public IPs or restrict access via NSG/Firewall rules.",
+        sid,
+        sname,
+    )
+
+
+def check_7_16(sid: str, sname: str) -> R:
+    """
+    7.16 — Azure Network Security Perimeter (NSP) is used (Manual, Level 2)
+
+    NSP is a relatively new feature for securing PaaS resources at the network
+    level. Determining whether it should be used is a design decision that
+    cannot be fully automated.
+    """
+    return R(
+        "7.16",
+        "Azure Network Security Perimeter (NSP) is used",
+        2,
+        "7 - Networking Services",
+        MANUAL,
+        "Manual verification required — review whether Network Security Perimeter "
+        "is configured for PaaS resources that support it.",
+        "Azure Portal > Network Security Perimeter > Create and associate with PaaS resources.",
+        sid,
+        sname,
+    )

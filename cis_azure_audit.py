@@ -131,15 +131,18 @@ from cis.suppressions import apply_suppressions, list_suppressions, load_suppres
 from cis.history import append_history, history_path_for, load_history
 
 # Check helpers and modular check functions
-from checks.s2 import check_2_1_2, check_2_1_7, check_2_1_9, check_2_1_10, check_2_1_11
+from checks.s2 import check_2_1_1, check_2_1_2, check_2_1_7, check_2_1_8, check_2_1_9, check_2_1_10, check_2_1_11
 from checks.s3 import check_3_1_1
 from checks.s5 import (
     check_5_1_1,
     check_5_1_2,
     check_5_1_3,
+    check_5_2_2,
     check_5_28,
+    check_5_3_2,
     check_5_3_3,
     check_5_4,
+    check_5_6,
     check_5_14,
     check_5_15,
     check_5_16,
@@ -154,6 +157,9 @@ from checks.s6 import (
     check_6_1_1_6,
     check_6_1_2_alerts,
     check_6_1_3_1,
+    check_6_1_4,
+    check_6_1_5,
+    check_6_2,
 )
 from checks.s7 import (
     check_7_1,
@@ -162,6 +168,7 @@ from checks.s7 import (
     check_7_4,
     check_7_5,
     check_7_6,
+    check_7_7,
     check_7_8,
     check_7_10,
     check_7_11,
@@ -169,6 +176,7 @@ from checks.s7 import (
     check_7_13,
     check_7_14,
     check_7_15,
+    check_7_16,
 )
 from checks.s8 import (
     check_8_1_defender,
@@ -176,6 +184,7 @@ from checks.s8 import (
     check_8_1_10,
     check_8_1_12_to_15,
     check_8_3_keyvaults,
+    check_8_3_10,
     check_8_4_1,
     check_8_5,
 )
@@ -458,7 +467,8 @@ _QUERIES = {
             noPublicIp   = properties.parameters.enableNoPublicIp.value,
             publicAccess = properties.publicNetworkAccess,
             vnetId       = tostring(properties.parameters.customVirtualNetworkId.value),
-            privateEps   = array_length(properties.privateEndpointConnections)
+            privateEps   = array_length(properties.privateEndpointConnections),
+            encryptionKeySource = tostring(properties.encryption.entities.managedDisk.keySource)
     """,
     # ── App Services ──────────────────────────────────────────────────────────
     # Only id, name, resourceGroup, subscriptionId are needed — diagnostic
@@ -586,8 +596,10 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
     # Each tuple: (console_label, callable_returning_list_or_single_R)
     checks = [
         # ── Section 2 — Azure Databricks ──────────────────────────────────
+        ("2.1.1", lambda: check_2_1_1(sid, sname, td)),
         ("2.1.2", lambda: check_2_1_2(sid, sname, td)),
         ("2.1.7", lambda: check_2_1_7(sid, sname, td)),
+        ("2.1.8", lambda: check_2_1_8(sid, sname, td)),
         ("2.1.9", lambda: check_2_1_9(sid, sname, td)),
         ("2.1.10", lambda: check_2_1_10(sid, sname, td)),
         ("2.1.11", lambda: check_2_1_11(sid, sname, td)),
@@ -615,6 +627,9 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("6.1.2.10", lambda: _from_batch("6.1.2", lambda: check_6_1_2_alerts(sid, sname), "6.1.2.10")),
         ("6.1.2.11", lambda: _from_batch("6.1.2", lambda: check_6_1_2_alerts(sid, sname), "6.1.2.11")),
         ("6.1.3.1", lambda: [check_6_1_3_1(sid, sname)]),
+        ("6.1.4", lambda: [check_6_1_4(sid, sname)]),
+        ("6.1.5", lambda: [check_6_1_5(sid, sname)]),
+        ("6.2", lambda: [check_6_2(sid, sname)]),
         # ── Section 7 — Networking ─────────────────────────────────────────
         ("7.1", lambda: check_7_1(sid, sname, td)),
         ("7.2", lambda: check_7_2(sid, sname, td)),
@@ -622,6 +637,7 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("7.4", lambda: check_7_4(sid, sname, td)),
         ("7.5", lambda: check_7_5(sid, sname)),
         ("7.6", lambda: check_7_6(sid, sname, td)),
+        ("7.7", lambda: [check_7_7(sid, sname)]),
         ("7.8", lambda: check_7_8(sid, sname)),
         ("7.10", lambda: check_7_10(sid, sname, td)),
         ("7.11", lambda: check_7_11(sid, sname, td)),
@@ -629,6 +645,7 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("7.13", lambda: check_7_13(sid, sname, td)),
         ("7.14", lambda: check_7_14(sid, sname, td)),
         ("7.15", lambda: check_7_15(sid, sname, td)),
+        ("7.16", lambda: [check_7_16(sid, sname)]),
         # ── Section 8 — Security ───────────────────────────────────────────
         ("8.1.1.1", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.1.1")),
         ("8.1.2.1", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.2.1")),
@@ -657,6 +674,7 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("8.3.7", lambda: _from_batch("8.3", lambda: check_8_3_keyvaults(sid, sname, td), "8.3.7")),
         ("8.3.8", lambda: _from_batch("8.3", lambda: check_8_3_keyvaults(sid, sname, td), "8.3.8")),
         ("8.3.9", lambda: _from_batch("8.3", lambda: check_8_3_keyvaults(sid, sname, td), "8.3.9")),
+        ("8.3.10", lambda: [check_8_3_10(sid, sname)]),
         ("8.3.11", lambda: _from_batch("8.3", lambda: check_8_3_keyvaults(sid, sname, td), "8.3.11")),
         ("8.4.1", lambda: [check_8_4_1(sid, sname, td)]),
         ("8.5", lambda: check_8_5(sid, sname, td)),
@@ -853,8 +871,11 @@ def run_audit(
                 check_5_1_1,
                 check_5_1_2,
                 check_5_1_3,
+                check_5_2_2,
                 check_5_28,
+                check_5_3_2,
                 check_5_4,
+                check_5_6,
                 check_5_14,
                 check_5_15,
                 check_5_16,
@@ -914,8 +935,11 @@ def run_audit(
             check_5_1_1,
             check_5_1_2,
             check_5_1_3,
+            check_5_2_2,
             check_5_28,
+            check_5_3_2,
             check_5_4,
+            check_5_6,
             check_5_14,
             check_5_15,
             check_5_16,

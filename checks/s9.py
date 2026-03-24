@@ -341,7 +341,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     remediation if not compliant else "",
                     sid,
                     sname,
-                    aname if not compliant else "",
+                    aname,
                 )
             )
 
@@ -412,7 +412,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     ),
                     sid,
                     sname,
-                    aname if not _sd_ok else "",
+                    aname,
                 )
             )
 
@@ -436,7 +436,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     ),
                     sid,
                     sname,
-                    aname if not _cd_ok else "",
+                    aname,
                 )
             )
 
@@ -453,7 +453,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "Storage Account > Data protection > Enable blob versioning" if not ver else "",
                     sid,
                     sname,
-                    aname if not ver else "",
+                    aname,
                 )
             )
 
@@ -508,7 +508,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             ),
                             sid,
                             sname,
-                            aname if not flag else "",
+                            aname,
                         )
                     )
             else:
@@ -538,7 +538,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             "",
                             sid,
                             sname,
-                            aname if _log_status == ERROR else "",
+                            aname,
                         )
                     )
         else:
@@ -577,7 +577,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         _blob_remediation,
                         sid,
                         sname,
-                        aname if _blob_status == ERROR else "",
+                        aname,
                     )
                 )
 
@@ -605,7 +605,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     ),
                     sid,
                     sname,
-                    aname if not _fs_ok else "",
+                    aname,
                 )
             )
 
@@ -636,7 +636,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     ),
                     sid,
                     sname,
-                    aname if not has_good_ver and smb else "",
+                    aname,
                 )
             )
 
@@ -657,7 +657,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     ),
                     sid,
                     sname,
-                    aname if not has_good_enc and smb else "",
+                    aname,
                 )
             )
         else:
@@ -693,7 +693,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         _file_remediation,
                         sid,
                         sname,
-                        aname if _file_status == ERROR else "",
+                        aname,
                     )
                 )
 
@@ -737,7 +737,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "Storage Account > Access keys > Set rotation reminder" if not reminder_days else "",
                     sid,
                     sname,
-                    aname if not reminder_days else "",
+                    aname,
                 )
             )
 
@@ -777,7 +777,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         "Storage account > Access keys > Rotate key" if not rotated else "",
                         sid,
                         sname,
-                        aname if not rotated else "",
+                        aname,
                     )
                 )
             else:
@@ -893,7 +893,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "Storage Account > Locks > Add lock > Lock type: Delete" if not has_delete else "",
                     sid,
                     sname,
-                    aname if not has_delete else "",
+                    aname,
                 )
             )
             results.append(
@@ -907,7 +907,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "Storage Account > Locks > Add lock > Lock type: Read-only" if not has_read else "",
                     sid,
                     sname,
-                    aname if not has_read else "",
+                    aname,
                 )
             )
 

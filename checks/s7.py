@@ -55,7 +55,7 @@ def check_7_1(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 f"NSG '{name}' > Inbound rules > Remove or restrict rules {', '.join(bad)}" if bad else "",
                 sid,
                 sname,
-                name if bad else "",
+                name,
             )
         )
     return results
@@ -98,7 +98,7 @@ def check_7_2(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 f"NSG '{name}' > Inbound rules > Remove or restrict rules {', '.join(bad)}" if bad else "",
                 sid,
                 sname,
-                name if bad else "",
+                name,
             )
         )
     return results
@@ -161,7 +161,7 @@ def check_7_3(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 f"NSG '{name}' > Inbound rules > Remove or restrict UDP rules {', '.join(bad)}" if bad else "",
                 sid,
                 sname,
-                name if bad else "",
+                name,
             )
         )
     return results
@@ -221,7 +221,7 @@ def check_7_4(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Ensure HTTP/HTTPS inbound from internet is intentional and restricted." if bad else "",
                 sid,
                 sname,
-                name if bad else "",
+                name,
             )
         )
     return results
@@ -278,7 +278,7 @@ def check_7_5(sid: str, sname: str) -> list[R]:
                     "Network Watcher > Flow logs > Set retention >= 90 days" if not ok else "",
                     sid,
                     sname,
-                    fname if not ok else "",
+                    fname,
                 )
             )
 
@@ -434,7 +434,7 @@ def check_7_8(sid: str, sname: str) -> list[R]:
                     "Network Watcher > Flow logs > Set retention >= 90 days" if not ok else "",
                     sid,
                     sname,
-                    fname if not ok else "",
+                    fname,
                 )
             )
 
@@ -501,7 +501,7 @@ def check_7_10(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             ),
             sid,
             sname,
-            gw.get("name", "") if not (gw.get("wafEnabled") or gw.get("wafPolicyId")) else "",
+            gw.get("name", ""),
         )
         for gw in gws
     ]
@@ -655,7 +655,7 @@ def check_7_12(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             ),
             sid,
             sname,
-            gw.get("name", "") if str(gw.get("sslMinProto", "")).lower() not in GOOD_PROTOS else "",
+            gw.get("name", ""),
         )
         for gw in gws
     ]
@@ -696,7 +696,7 @@ def check_7_13(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "Application Gateway > Configuration > HTTP2: Enabled" if not gw.get("enableHttp2") else "",
             sid,
             sname,
-            gw.get("name", "") if not gw.get("enableHttp2") else "",
+            gw.get("name", ""),
         )
         for gw in gws
     ]
@@ -738,7 +738,7 @@ def check_7_14(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "Application Gateway > WAF > Advanced > Enable Request body inspection" if not gw.get("wafReqBody") else "",
             sid,
             sname,
-            gw.get("name", "") if not gw.get("wafReqBody") else "",
+            gw.get("name", ""),
         )
         for gw in gws
     ]
@@ -785,7 +785,7 @@ def check_7_15(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             ),
             sid,
             sname,
-            pol.get("name", "") if str(pol.get("botEnabled", "")).lower() != "prevention" else "",
+            pol.get("name", ""),
         )
         for pol in policies
     ]

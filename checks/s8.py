@@ -414,7 +414,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Key Vault > Properties > Enable purge protection" if not purge else "",
                 sid,
                 sname,
-                vname if not purge else "",
+                vname,
             )
         )
 
@@ -438,7 +438,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 ),
                 sid,
                 sname,
-                vname if not is_rbac else "",
+                vname,
             )
         )
 
@@ -458,7 +458,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Key Vault > Networking > Public network access: Disabled" if str(pub).lower() != "disabled" else "",
                 sid,
                 sname,
-                vname if str(pub).lower() != "disabled" else "",
+                vname,
             )
         )
 
@@ -477,7 +477,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Key Vault > Networking > Private endpoint connections > Add" if pe_count == 0 else "",
                 sid,
                 sname,
-                vname if pe_count == 0 else "",
+                vname,
             )
         )
 
@@ -567,7 +567,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         "Key Vault > Keys > Set expiration date" if not exp else "",
                         sid,
                         sname,
-                        vname if not exp else "",
+                        vname,
                     )
                 )
 
@@ -631,7 +631,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                                 "Key Vault > Keys > Rotation policy > Set rotation action" if not has_rotate else "",
                                 sid,
                                 sname,
-                                vname if not has_rotate else "",
+                                vname,
                             )
                         )
 
@@ -694,7 +694,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             "Key Vault > Secrets > Set expiration date" if not exp else "",
                             sid,
                             sname,
-                            vname if not exp else "",
+                            vname,
                         )
                     )
 
@@ -802,7 +802,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             ),
                             sid,
                             sname,
-                            vname if not ok else "",
+                            vname,
                         )
                     )
 
@@ -911,7 +911,7 @@ def check_8_5(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "VNet > DDoS protection > Enable Standard plan" if not v.get("hasDdos") else "",
             sid,
             sname,
-            v.get("name", "") if not v.get("hasDdos") else "",
+            v.get("name", ""),
         )
         for v in vnets
     ]

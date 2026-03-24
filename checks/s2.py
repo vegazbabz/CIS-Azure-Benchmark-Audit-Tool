@@ -115,7 +115,7 @@ def check_2_1_2(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Associate NSGs with the public and private Databricks subnets." if missing else "",
                 sid,
                 sname,
-                wname if missing else "",
+                wname,
             )
         )
 
@@ -181,7 +181,7 @@ def check_2_1_7(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Databricks > Monitoring > Diagnostic settings > Add diagnostic setting" if not enabled else "",
                 sid,
                 sname,
-                wname if not enabled else "",
+                wname,
             )
         )
 
@@ -224,7 +224,7 @@ def check_2_1_9(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "Databricks workspace > Configure > Disable public IP" if not ws.get("noPublicIp") else "",
             sid,
             sname,
-            ws.get("name", "") if not ws.get("noPublicIp") else "",
+            ws.get("name", ""),
         )
         for ws in workspaces
     ]
@@ -274,7 +274,7 @@ def check_2_1_10(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             ),
             sid,
             sname,
-            ws.get("name", "") if str(ws.get("publicAccess", "Enabled")).lower() != "disabled" else "",
+            ws.get("name", ""),
         )
         for ws in workspaces
     ]
@@ -320,7 +320,7 @@ def check_2_1_11(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "Configure private endpoint for Databricks workspace." if not (ws.get("privateEps") or 0) > 0 else "",
             sid,
             sname,
-            ws.get("name", "") if not (ws.get("privateEps") or 0) > 0 else "",
+            ws.get("name", ""),
         )
         for ws in workspaces
     ]

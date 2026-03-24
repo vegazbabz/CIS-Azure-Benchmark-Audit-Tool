@@ -250,7 +250,7 @@ def check_6_1_1_4(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Key Vault > Diagnostic settings > Enable audit/allLogs" if not enabled else "",
                 sid,
                 sname,
-                vname if not enabled else "",
+                vname,
             )
         )
 

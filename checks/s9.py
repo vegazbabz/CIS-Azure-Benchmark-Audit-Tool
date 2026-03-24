@@ -716,11 +716,13 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
         # contains() to fail in JMESPath. Fetch all events and filter in Python.
         if rc_log == 0:
             all_events = log_data if isinstance(log_data, list) else []
-            # Filter in Python — safe against null authorization.action values
+            # Filter in Python — safe against null authorization.action values.
+            # CIS requires status.value == "Succeeded"; exclude failed attempts.
             regen_events = [
                 e.get("eventTimestamp", "")
                 for e in all_events
                 if "regeneratekey" in str((e.get("authorization") or {}).get("action", "")).lower()
+                and str((e.get("status") or {}).get("value", "")).lower() == "succeeded"
             ]
             last = regen_events[-1][:10] if regen_events else None
             acc_results.append(

@@ -97,6 +97,7 @@ from cis.config import (
     SUPPRESSED,
     TRACE_LEVEL,
     LOGGER,
+    CONTROL_CATALOG,
     load_config_file,
 )
 
@@ -236,6 +237,32 @@ def _dedup_results(results: list[R]) -> list[R]:
             seen.add(key)
             out.append(r)
     return out
+
+
+def _print_control_catalog(level_filter: int | None = None) -> None:
+    """Print a formatted table of all CIS controls the tool audits, then exit."""
+    rows = CONTROL_CATALOG
+    if level_filter:
+        rows = tuple(r for r in rows if r[1] == level_filter)
+
+    print(f"CIS Azure Foundations Benchmark v{BENCHMARK_VER} — Audit Tool v{VERSION}")
+    print(f"{len(rows)} controls" + (f" (Level {level_filter} only)" if level_filter else ""))
+    print()
+
+    # Column widths
+    w_id, w_lv, w_title, w_method = 10, 4, 62, 60
+    hdr = f"{'Control':<{w_id}} {'Lv':<{w_lv}} {'Title':<{w_title}} {'Audit Method'}"
+    print(hdr)
+    print("─" * len(hdr))
+
+    prev_section = ""
+    for cid, lv, section, title, method in rows:
+        if section != prev_section:
+            print(f"\n── {section} {'─' * max(1, len(hdr) - len(section) - 4)}")
+            prev_section = section
+        print(f"{cid:<{w_id}} L{lv:<{w_lv - 1}} {title:<{w_title}} {method}")
+
+    print()
 
 
 def _print_summary(counts: dict[str, int], total: int, n_subs: int, elapsed_str: str, score: float) -> None:
@@ -1233,6 +1260,11 @@ Examples:
         help="Print all active suppressions and exit",
     )
     parser.add_argument(
+        "--preview",
+        action="store_true",
+        help="Print the control catalog (ID, level, title, audit method) and exit — useful for cross-referencing against the CIS Benchmark PDF",
+    )
+    parser.add_argument(
         "--no-open",
         dest="open",
         action="store_false",
@@ -1296,6 +1328,10 @@ Examples:
 
     if args.list_suppressions:
         list_suppressions(suppressions, suppressions_path)
+        return
+
+    if args.preview:
+        _print_control_catalog(args.level)
         return
 
     LOGGER.info("\n🔒 CIS Azure Foundations Benchmark v%s — Audit Tool v%s\n", BENCHMARK_VER, VERSION)

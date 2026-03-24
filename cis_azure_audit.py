@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CIS Microsoft Azure Foundations Benchmark v5.0.0 — Audit Tool v1.1.2
+CIS Microsoft Azure Foundations Benchmark v5.0.0 — Audit Tool v1.1.3
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 WHAT THIS TOOL DOES
@@ -1005,9 +1005,9 @@ def run_audit(
                     else:
                         all_results.extend(sub_results)
                         save_checkpoint(sub["id"], sub["name"], sub_results)
-                        LOGGER.debug("  ✅ [%d/%d] Completed: %s", n, _total, sub["name"])
 
                     completed_in_todo += 1
+                    LOGGER.debug("  ✅ [%d/%d] Completed: %s", completed_in_todo, _total, sub["name"])
                     if progress is not None:
                         _active_names.discard(sub.get("name", ""))
                         progress.update(task_id, completed=completed_in_todo, description=_progress_desc())

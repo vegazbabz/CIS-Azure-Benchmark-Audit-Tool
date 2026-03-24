@@ -25,10 +25,12 @@ run
 # ── Debug / scratch scripts ───────────────────────────────────────────────────
 _*.py
 _*.js
+compare_*.py
 
 # ── Local notes / AI session files ────────────────────────────────────────────
 *improvements.txt
-GitHub Copilot improvements.txt
+REVIEW_TODO.md
+REDACTED
 
 # ── Editor / OS ───────────────────────────────────────────────────────────────
 .vscode/

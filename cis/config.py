@@ -41,7 +41,7 @@ else:
         _tomllib = None  # type: ignore[assignment]
 
 # ── Tool / benchmark identity ──────────────────────────────────────────────────
-VERSION = "1.1.2"  # Written into checkpoints for change detection
+VERSION = "1.1.3"  # Written into checkpoints for change detection
 BENCHMARK_VER = "5.0.0"  # CIS Benchmark version this tool targets
 
 

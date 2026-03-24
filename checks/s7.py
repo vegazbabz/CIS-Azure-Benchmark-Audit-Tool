@@ -244,6 +244,13 @@ def check_7_5(sid: str, sname: str) -> list[R]:
     If no flow logs are found, returns FAIL with a message stating that flow
     logging has not been enabled — absence of flow logs is non-compliant.
     """
+    # If there are no NSGs at all, flow logs are N/A — same logic as 7.1–7.4.
+    rc_nsg, nsgs = az(["network", "nsg", "list"], sid, timeout=TIMEOUTS["default"])
+    if rc_nsg == 0 and not nsgs:
+        return [
+            _info("7.5", "NSG flow log retention > 90 days", 2, "7 - Networking Services", "No NSGs found.", sid, sname)
+        ]
+
     rc, watchers = az(["network", "watcher", "list"], sid, timeout=TIMEOUTS["default"])
     if rc != 0:
         return [

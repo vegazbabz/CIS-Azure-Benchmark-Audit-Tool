@@ -790,8 +790,19 @@ class TestCheck72(unittest.TestCase):
 class TestCheck75(unittest.TestCase):
     """7.5 — NSG flow log retention >= 90 days."""
 
+    def test_no_nsgs_returns_info(self) -> None:
+        with patch("checks.s7.az", return_value=(0, [])):
+            results = checks_s7.check_7_5(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, INFO)
+
     def test_az_watcher_list_fails_returns_error(self) -> None:
-        with patch("checks.s7.az", return_value=(1, "err")):
+        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+            if "nsg" in args:
+                return (0, [{"name": "nsg1"}])
+            return (1, "err")
+
+        with patch("checks.s7.az", side_effect=_az_side_effect):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, ERROR)
@@ -799,7 +810,12 @@ class TestCheck75(unittest.TestCase):
     def test_no_watchers_returns_fail(self) -> None:
         # No watchers → no flow logs possible → non-compliant (FAIL)
         # check_7_6 separately covers the missing Network Watcher itself.
-        with patch("checks.s7.az", return_value=(0, [])):
+        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+            if "nsg" in args:
+                return (0, [{"name": "nsg1"}])
+            return (0, [])
+
+        with patch("checks.s7.az", side_effect=_az_side_effect):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, FAIL)
@@ -812,6 +828,8 @@ class TestCheck75(unittest.TestCase):
         }
 
         def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+            if "nsg" in args:
+                return (0, [{"name": "nsg1"}])
             # Check for flow-log first — its args also contain "watcher" and "list"
             if "flow-log" in args:
                 return (0, [flow_log])
@@ -832,6 +850,8 @@ class TestCheck75(unittest.TestCase):
         }
 
         def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+            if "nsg" in args:
+                return (0, [{"name": "nsg1"}])
             if "flow-log" in args:
                 return (0, [flow_log])
             if "watcher" in args and "list" in args:
@@ -851,6 +871,8 @@ class TestCheck75(unittest.TestCase):
         }
 
         def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+            if "nsg" in args:
+                return (0, [{"name": "nsg1"}])
             if "flow-log" in args:
                 return (0, [flow_log])
             if "watcher" in args and "list" in args:

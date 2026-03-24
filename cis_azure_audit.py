@@ -123,16 +123,6 @@ from cis.checkpoint import (
 # HTML report generation
 from cis.report import generate_html
 
-# Console emoji for terminal output (NOT HTML entities)
-_CONSOLE_ICON: dict[str, str] = {
-    PASS: "\u2705",
-    FAIL: "\u274c",
-    ERROR: "\u26a0\ufe0f",
-    INFO: "\u2139\ufe0f",
-    MANUAL: "\U0001f4cb",
-    SUPPRESSED: "\U0001f507",
-}
-
 # Finding suppression (accepted risks)
 from cis.suppressions import apply_suppressions, list_suppressions, load_suppressions
 
@@ -218,6 +208,16 @@ try:
 except Exception:
     HAS_RICH = False
     _rcon = None
+
+# Console emoji for terminal output (NOT HTML entities)
+_CONSOLE_ICON: dict[str, str] = {
+    PASS: "\u2705",
+    FAIL: "\u274c",
+    ERROR: "\u26a0\ufe0f",
+    INFO: "\u2139\ufe0f",
+    MANUAL: "\U0001f4cb",
+    SUPPRESSED: "\U0001f507",
+}
 
 
 def _dedup_results(results: list[R]) -> list[R]:

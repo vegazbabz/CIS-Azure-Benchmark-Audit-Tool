@@ -14,7 +14,7 @@ from cis.helpers import nsg_bad_rules
 from cis.check_helpers import _err, _idx, _info
 
 
-from azure.helpers import az
+from azure.helpers import az, az_rest
 
 
 def check_7_1(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
@@ -485,7 +485,12 @@ def check_7_9(sid: str, sname: str) -> list[R]:
     CLI: az network vnet-gateway list → for each gateway with P2S config,
     check vpnClientConfiguration.vpnAuthenticationTypes == ["AAD"].
     """
-    rc, gws = az(["network", "vnet-gateway", "list"], sid, timeout=TIMEOUTS["default"])
+    url = (
+        f"/subscriptions/{sid}"
+        "/providers/Microsoft.Network/virtualNetworkGateways"
+        "?api-version=2024-05-01"
+    )
+    rc, data = az_rest(url, timeout=TIMEOUTS["default"])
     if rc != 0:
         return [
             _err(
@@ -493,11 +498,13 @@ def check_7_9(sid: str, sname: str) -> list[R]:
                 "VPN Gateway P2S uses Azure AD auth only",
                 2,
                 "7 - Networking Services",
-                str(gws),
+                str(data),
                 sid,
                 sname,
             )
         ]
+
+    gws = data.get("value", []) if isinstance(data, dict) else []
 
     if not gws:
         return [
@@ -515,7 +522,8 @@ def check_7_9(sid: str, sname: str) -> list[R]:
     results: list[R] = []
     for gw in gws:
         gname = gw.get("name", "?")
-        vpn_cfg = gw.get("vpnClientConfiguration")
+        props = gw.get("properties") or {}
+        vpn_cfg = props.get("vpnClientConfiguration")
 
         if not vpn_cfg:
             # No P2S configured — not applicable for this gateway

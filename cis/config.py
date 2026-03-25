@@ -386,7 +386,7 @@ CONTROL_CATALOG: tuple[tuple[str, int, str, str, str], ...] = (
         2,
         "7 - Networking Services",
         "VPN Gateway P2S uses Azure AD authentication",
-        "az network vnet-gateway list",
+        "ARM REST: GET /providers/Microsoft.Network/virtualNetworkGateways",
     ),
     (
         "7.10",

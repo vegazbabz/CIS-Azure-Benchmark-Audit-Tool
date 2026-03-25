@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, INFO, ERROR, MANUAL, TIMEOUTS, ROLE_OWNER, ROLE_UAA, CALLER_TYPE
+from cis.config import PASS, FAIL, ERROR, MANUAL, TIMEOUTS, ROLE_OWNER, ROLE_UAA, CALLER_TYPE
 from cis.models import R
 from cis.check_helpers import _err, _idx
 from azure.helpers import az, az_rest, az_rest_paged
@@ -214,6 +214,113 @@ def check_5_28() -> R:
     )
 
 
+def check_5_2_2() -> R:
+    """
+    5.2.2 — Exclusionary geographic Conditional Access policy is considered (Manual, Level 1)
+
+    There is no Azure CLI subcommand for Conditional Access Policies (per CIS
+    benchmark documentation). Verification requires manual review of CA policies
+    in the Entra ID portal to confirm a geographic exclusion/block policy exists.
+    """
+    return R(
+        "5.2.2",
+        "Exclusionary geographic Conditional Access policy considered",
+        1,
+        "5 - Identity Services",
+        MANUAL,
+        "Manual verification required — confirm a Conditional Access policy exists "
+        "that blocks sign-ins from excluded geographic locations.",
+        "Entra ID > Security > Conditional Access > New policy > "
+        "Conditions > Locations > Configure Include/Exclude locations > "
+        "Grant > Block access.",
+    )
+
+
+def check_5_3_2() -> R:
+    """
+    5.3.2 — Guest users are reviewed on a regular basis (Manual, Level 1)
+
+    Guest users should be reviewed periodically to ensure they are still
+    required. Stale guest accounts increase the attack surface. Azure CLI
+    can list guests (az ad user list --query "[?userType=='Guest']") but
+    determining whether each guest is still needed requires human judgment.
+    """
+    return R(
+        "5.3.2",
+        "Guest users reviewed on a regular basis",
+        1,
+        "5 - Identity Services",
+        MANUAL,
+        "Manual verification required — review guest users to ensure all are still needed " "and not inactive.",
+        "Entra ID > Users > Filter by User type: Guest > Review each guest user.",
+    )
+
+
+def check_5_6() -> R:
+    """
+    5.6 — Account lockout threshold ≤ 10 (Manual per CIS, but automatable via Graph)
+
+    Checks the passwordProtection.lockoutThreshold setting from the
+    authenticationMethodsPolicy Graph API. The value should be ≤ 10.
+    """
+    _CTRL = "5.6"
+    _TITLE = "Account lockout threshold is ≤ 10"
+    _SEC = "5 - Identity Services"
+
+    url = "https://graph.microsoft.com/v1.0/policies/authenticationMethodsPolicy"
+
+    if msal_is_configured():
+        rc, data = msal_rest(url)
+    else:
+        rc, data = az_rest(url)
+
+    if rc != 0:
+        if is_authz_error(str(data)):
+            return R(
+                _CTRL,
+                _TITLE,
+                1,
+                _SEC,
+                ERROR,
+                "Insufficient permissions to read authenticationMethodsPolicy. "
+                "Requires Policy.ReadWrite.AuthenticationMethod or Policy.Read.All.",
+                "",
+            )
+        return R(_CTRL, _TITLE, 1, _SEC, ERROR, f"Graph API error: {str(data)[:200]}", "")
+
+    if not isinstance(data, dict):
+        return R(_CTRL, _TITLE, 1, _SEC, ERROR, "Unexpected response format.", "")
+
+    pw_prot = data.get("passwordProtection") or {}
+    threshold = pw_prot.get("lockoutThreshold")
+    if threshold is None:
+        return R(
+            _CTRL,
+            _TITLE,
+            1,
+            _SEC,
+            ERROR,
+            "lockoutThreshold not found in authenticationMethodsPolicy response.",
+            "",
+        )
+
+    compliant = threshold <= 10
+    return R(
+        _CTRL,
+        _TITLE,
+        1,
+        _SEC,
+        PASS if compliant else FAIL,
+        f"Lockout threshold is {threshold}." if compliant else f"Lockout threshold is {threshold} (should be ≤ 10).",
+        (
+            "Entra ID > Security > Authentication methods > Password protection > "
+            "Smart lockout > Lockout threshold ≤ 10."
+            if not compliant
+            else ""
+        ),
+    )
+
+
 def check_5_3_3(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     """
     5.3.3 — User Access Administrator role is restricted (Level 1)
@@ -367,7 +474,8 @@ def check_5_15() -> R:
         (
             "Guest user access is restricted to most restrictive level (Restricted Guest User)."
             if role_id == MOST_RESTRICTIVE
-            else f"Guest user role is not the most restrictive setting (current: {role_id}). Must be Restricted Guest User ({MOST_RESTRICTIVE})."
+            else f"Guest user role is not the most restrictive setting (current: {role_id})."
+            f" Must be Restricted Guest User ({MOST_RESTRICTIVE})."
         ),
         (
             "Entra ID > External Identities > External collaboration settings > "

@@ -790,8 +790,19 @@ class TestCheck72(unittest.TestCase):
 class TestCheck75(unittest.TestCase):
     """7.5 — NSG flow log retention >= 90 days."""
 
+    def test_no_nsgs_returns_info(self) -> None:
+        with patch("checks.s7.az", return_value=(0, [])):
+            results = checks_s7.check_7_5(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, INFO)
+
     def test_az_watcher_list_fails_returns_error(self) -> None:
-        with patch("checks.s7.az", return_value=(1, "err")):
+        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+            if "nsg" in args:
+                return (0, [{"name": "nsg1"}])
+            return (1, "err")
+
+        with patch("checks.s7.az", side_effect=_az_side_effect):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, ERROR)
@@ -799,7 +810,12 @@ class TestCheck75(unittest.TestCase):
     def test_no_watchers_returns_fail(self) -> None:
         # No watchers → no flow logs possible → non-compliant (FAIL)
         # check_7_6 separately covers the missing Network Watcher itself.
-        with patch("checks.s7.az", return_value=(0, [])):
+        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+            if "nsg" in args:
+                return (0, [{"name": "nsg1"}])
+            return (0, [])
+
+        with patch("checks.s7.az", side_effect=_az_side_effect):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, FAIL)
@@ -812,6 +828,8 @@ class TestCheck75(unittest.TestCase):
         }
 
         def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+            if "nsg" in args:
+                return (0, [{"name": "nsg1"}])
             # Check for flow-log first — its args also contain "watcher" and "list"
             if "flow-log" in args:
                 return (0, [flow_log])
@@ -832,6 +850,8 @@ class TestCheck75(unittest.TestCase):
         }
 
         def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+            if "nsg" in args:
+                return (0, [{"name": "nsg1"}])
             if "flow-log" in args:
                 return (0, [flow_log])
             if "watcher" in args and "list" in args:
@@ -851,6 +871,8 @@ class TestCheck75(unittest.TestCase):
         }
 
         def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+            if "nsg" in args:
+                return (0, [{"name": "nsg1"}])
             if "flow-log" in args:
                 return (0, [flow_log])
             if "watcher" in args and "list" in args:
@@ -861,6 +883,66 @@ class TestCheck75(unittest.TestCase):
             results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, FAIL)
+
+
+class TestCheck79(unittest.TestCase):
+    """7.9 — VPN Gateway P2S uses Azure AD authentication only."""
+
+    def test_no_gateways_returns_info(self) -> None:
+        with patch("checks.s7.az_rest", return_value=(0, {"value": []})):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, INFO)
+
+    def test_az_fails_returns_error(self) -> None:
+        with patch("checks.s7.az_rest", return_value=(1, "err")):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, ERROR)
+
+    def test_no_p2s_config_returns_info(self) -> None:
+        gw = {"name": "gw1", "properties": {"vpnClientConfiguration": None}}
+        with patch("checks.s7.az_rest", return_value=(0, {"value": [gw]})):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, INFO)
+
+    def test_aad_only_returns_pass(self) -> None:
+        gw = {"name": "gw1", "properties": {"vpnClientConfiguration": {"vpnAuthenticationTypes": ["AAD"]}}}
+        with patch("checks.s7.az_rest", return_value=(0, {"value": [gw]})):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, PASS)
+
+    def test_certificate_only_returns_fail(self) -> None:
+        gw = {"name": "gw1", "properties": {"vpnClientConfiguration": {"vpnAuthenticationTypes": ["Certificate"]}}}
+        with patch("checks.s7.az_rest", return_value=(0, {"value": [gw]})):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, FAIL)
+
+    def test_mixed_auth_returns_fail(self) -> None:
+        gw = {
+            "name": "gw1",
+            "properties": {"vpnClientConfiguration": {"vpnAuthenticationTypes": ["AAD", "Certificate"]}},
+        }
+        with patch("checks.s7.az_rest", return_value=(0, {"value": [gw]})):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, FAIL)
+
+    def test_multiple_gateways(self) -> None:
+        gws = [
+            {"name": "gw-aad", "properties": {"vpnClientConfiguration": {"vpnAuthenticationTypes": ["AAD"]}}},
+            {"name": "gw-cert", "properties": {"vpnClientConfiguration": {"vpnAuthenticationTypes": ["Certificate"]}}},
+            {"name": "gw-nop2s", "properties": {"vpnClientConfiguration": None}},
+        ]
+        with patch("checks.s7.az_rest", return_value=(0, {"value": gws})):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results[0].status, PASS)
+        self.assertEqual(results[1].status, FAIL)
+        self.assertEqual(results[2].status, INFO)
 
 
 # =============================================================================

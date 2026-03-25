@@ -9,7 +9,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from cis.config import PASS, FAIL, ERROR, INFO, TIMEOUTS, LOGGER
+from cis.config import PASS, FAIL, ERROR, INFO, MANUAL, TIMEOUTS, LOGGER
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az, az_rest, _friendly_error
@@ -79,7 +79,7 @@ def check_8_1_defender(sid: str, sname: str) -> list[R]:
             "8 - Security Services",
             PASS if tier == "Standard" else FAIL,
             (
-                f"Microsoft Defender pricing tier: Standard (enabled)."
+                "Microsoft Defender pricing tier: Standard (enabled)."
                 if tier == "Standard"
                 else f"Microsoft Defender pricing tier: {tier} \u2014 must be upgraded to Standard."
             ),
@@ -414,7 +414,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Key Vault > Properties > Enable purge protection" if not purge else "",
                 sid,
                 sname,
-                vname if not purge else "",
+                vname,
             )
         )
 
@@ -438,7 +438,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 ),
                 sid,
                 sname,
-                vname if not is_rbac else "",
+                vname,
             )
         )
 
@@ -458,7 +458,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Key Vault > Networking > Public network access: Disabled" if str(pub).lower() != "disabled" else "",
                 sid,
                 sname,
-                vname if str(pub).lower() != "disabled" else "",
+                vname,
             )
         )
 
@@ -477,7 +477,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Key Vault > Networking > Private endpoint connections > Add" if pe_count == 0 else "",
                 sid,
                 sname,
-                vname if pe_count == 0 else "",
+                vname,
             )
         )
 
@@ -567,7 +567,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         "Key Vault > Keys > Set expiration date" if not exp else "",
                         sid,
                         sname,
-                        vname if not exp else "",
+                        vname,
                     )
                 )
 
@@ -627,11 +627,12 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                                 2,
                                 "8 - Security Services",
                                 PASS if has_rotate else FAIL,
-                                f"Key '{kname}': automatic rotation {'configured' if has_rotate else 'NOT configured'}.",
+                                f"Key '{kname}': automatic rotation"
+                                f" {'configured' if has_rotate else 'NOT configured'}.",
                                 "Key Vault > Keys > Rotation policy > Set rotation action" if not has_rotate else "",
                                 sid,
                                 sname,
-                                vname if not has_rotate else "",
+                                vname,
                             )
                         )
 
@@ -694,7 +695,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             "Key Vault > Secrets > Set expiration date" if not exp else "",
                             sid,
                             sname,
-                            vname if not exp else "",
+                            vname,
                         )
                     )
 
@@ -802,7 +803,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             ),
                             sid,
                             sname,
-                            vname if not ok else "",
+                            vname,
                         )
                     )
 
@@ -911,7 +912,30 @@ def check_8_5(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "VNet > DDoS protection > Enable Standard plan" if not v.get("hasDdos") else "",
             sid,
             sname,
-            v.get("name", "") if not v.get("hasDdos") else "",
+            v.get("name", ""),
         )
         for v in vnets
     ]
+
+
+def check_8_3_10(sid: str, sname: str) -> R:
+    """
+    8.3.10 — Key Vault Managed HSM is used when required (Manual, Level 2)
+
+    Managed HSM provides FIPS 140-2 Level 3 validated HSMs for cryptographic
+    key operations. Whether it is required depends on regulatory and
+    compliance needs that cannot be determined programmatically.
+    """
+    return R(
+        "8.3.10",
+        "Key Vault Managed HSM used when required",
+        2,
+        "8 - Security Services",
+        MANUAL,
+        "Manual verification required — determine if regulatory or compliance "
+        "requirements mandate FIPS 140-2 Level 3 HSMs and verify Managed HSM is "
+        "provisioned accordingly (az keyvault list --hsm-name).",
+        "Azure Portal > Key Vaults > Create Managed HSM for workloads requiring FIPS 140-2 Level 3.",
+        sid,
+        sname,
+    )

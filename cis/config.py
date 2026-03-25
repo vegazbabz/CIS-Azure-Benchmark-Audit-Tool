@@ -41,7 +41,7 @@ else:
         _tomllib = None  # type: ignore[assignment]
 
 # ── Tool / benchmark identity ──────────────────────────────────────────────────
-VERSION = "1.1.3"  # Written into checkpoints for change detection
+VERSION = "1.2.0"  # Written into checkpoints for change detection
 BENCHMARK_VER = "5.0.0"  # CIS Benchmark version this tool targets
 
 
@@ -380,6 +380,13 @@ CONTROL_CATALOG: tuple[tuple[str, int, str, str, str], ...] = (
         "7 - Networking Services",
         "NSG flow logs enabled and sent to Log Analytics",
         "az network watcher flow-log list",
+    ),
+    (
+        "7.9",
+        2,
+        "7 - Networking Services",
+        "VPN Gateway P2S uses Azure AD authentication",
+        "ARM REST: GET /providers/Microsoft.Network/virtualNetworkGateways",
     ),
     (
         "7.10",

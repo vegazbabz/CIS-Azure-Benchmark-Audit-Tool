@@ -485,11 +485,7 @@ def check_7_9(sid: str, sname: str) -> list[R]:
     CLI: az network vnet-gateway list → for each gateway with P2S config,
     check vpnClientConfiguration.vpnAuthenticationTypes == ["AAD"].
     """
-    url = (
-        f"/subscriptions/{sid}"
-        "/providers/Microsoft.Network/virtualNetworkGateways"
-        "?api-version=2024-05-01"
-    )
+    url = f"/subscriptions/{sid}" "/providers/Microsoft.Network/virtualNetworkGateways" "?api-version=2024-05-01"
     rc, data = az_rest(url, timeout=TIMEOUTS["default"])
     if rc != 0:
         return [

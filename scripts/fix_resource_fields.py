@@ -61,11 +61,20 @@ gw_count = 0
 # gw.get("name", "") if not SOMETHING else ""
 # Replace with gw.get("name", "")
 for pattern, repl in [
-    (r'gw\.get\("name", ""\) if not \(gw\.get\("wafEnabled"\) or gw\.get\("wafPolicyId"\)\) else ""', 'gw.get("name", "")'),
-    (r'gw\.get\("name", ""\) if str\(gw\.get\("sslMinProto", ""\)\)\.lower\(\) not in GOOD_PROTOS else ""', 'gw.get("name", "")'),
+    (
+        r'gw\.get\("name", ""\) if not \(gw\.get\("wafEnabled"\) or gw\.get\("wafPolicyId"\)\) else ""',
+        'gw.get("name", "")',
+    ),
+    (
+        r'gw\.get\("name", ""\) if str\(gw\.get\("sslMinProto", ""\)\)\.lower\(\) not in GOOD_PROTOS else ""',
+        'gw.get("name", "")',
+    ),
     (r'gw\.get\("name", ""\) if not gw\.get\("enableHttp2"\) else ""', 'gw.get("name", "")'),
     (r'gw\.get\("name", ""\) if not gw\.get\("wafReqBody"\) else ""', 'gw.get("name", "")'),
-    (r'pol\.get\("name", ""\) if str\(pol\.get\("botEnabled", ""\)\)\.lower\(\) != "prevention" else ""', 'pol.get("name", "")'),
+    (
+        r'pol\.get\("name", ""\) if str\(pol\.get\("botEnabled", ""\)\)\.lower\(\) != "prevention" else ""',
+        'pol.get("name", "")',
+    ),
 ]:
     new_content = re.sub(pattern, repl, content)
     if new_content != content:

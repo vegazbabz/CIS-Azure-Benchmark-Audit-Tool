@@ -2,5 +2,6 @@
   "pythonVersion": "3.10",
   "include": ["."],
   "extraPaths": ["."],
-  "typeCheckingMode": "off"
+  "typeCheckingMode": "off",
+  "reportMissingImports": "none"
 }

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, INFO, MANUAL, TIMEOUTS
+from cis.config import PASS, FAIL, INFO, TIMEOUTS
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az
@@ -100,7 +100,8 @@ def check_2_1_8(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 (
                     f"Workspace '{wname}': encryption uses customer-managed key (CMK)."
                     if compliant
-                    else f"Workspace '{wname}': encryption uses platform-managed keys (keySource: {key_source or 'default'})."
+                    else f"Workspace '{wname}': encryption uses platform-managed keys"
+                    f" (keySource: {key_source or 'default'})."
                 ),
                 "Databricks workspace > Encryption > Configure customer-managed key" if not compliant else "",
                 sid,

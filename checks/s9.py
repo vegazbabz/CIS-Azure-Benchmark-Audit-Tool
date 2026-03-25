@@ -218,7 +218,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 (
                     "Cross-tenant replication: Disabled."
                     if not acct.get("crossTenant")
-                    else "Cross-tenant replication: Enabled \u2014 data can be replicated to storage accounts in other tenants."
+                    else "Cross-tenant replication: Enabled \u2014 data can be replicated"
+                    " to storage accounts in other tenants."
                 ),
                 "Storage Account > Data Management > Object replication > " "Allow cross-tenant replication: Disabled",
             ),
@@ -269,7 +270,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 (
                     "Shared key (storage account key) access: Disabled."
                     if acct.get("keyAccess") is False
-                    else "Shared key (storage account key) access: Enabled \u2014 disable to enforce Entra ID authentication."
+                    else "Shared key (storage account key) access: Enabled \u2014"
+                    " disable to enforce Entra ID authentication."
                 ),
                 "Storage Account > Configuration > Allow storage account key access: Disabled",
             ),
@@ -283,7 +285,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 (
                     "Default to Microsoft Entra ID authorization: Enabled."
                     if acct.get("oauthDefault") is True
-                    else "Default to Microsoft Entra ID authorization: Disabled \u2014 storage data requests are not automatically authorized with Entra ID."
+                    else "Default to Microsoft Entra ID authorization: Disabled \u2014"
+                    " storage data requests are not automatically authorized with Entra ID."
                 ),
                 "Storage Account > Configuration > Default to Microsoft Entra authorization: Enabled",
             ),
@@ -312,7 +315,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 (
                     f"Private endpoints: {acct.get('privateEps') or 0} configured."
                     if has_pe
-                    else f"Private endpoints: {acct.get('privateEps') or 0} \u2014 at least one private endpoint is required."
+                    else f"Private endpoints: {acct.get('privateEps') or 0} \u2014"
+                    f" at least one private endpoint is required."
                 ),
                 "Storage Account > Networking > Private endpoint connections",
             ),
@@ -494,7 +498,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             PASS if flag else FAIL,
                             f"Blob logging {label}: {flag}",
                             (
-                                f"Storage Account > Monitoring > Diagnostic settings > Enable {label.capitalize()} logging"
+                                "Storage Account > Monitoring > Diagnostic settings"
+                                f" > Enable {label.capitalize()} logging"
                                 if not flag
                                 else ""
                             ),

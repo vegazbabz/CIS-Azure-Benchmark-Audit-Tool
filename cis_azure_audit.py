@@ -260,7 +260,7 @@ def _print_control_catalog(level_filter: int | None = None) -> None:
     print()
 
     # Column widths
-    w_id, w_lv, w_title, w_method = 10, 4, 62, 60
+    w_id, w_lv, w_title = 10, 4, 62
     hdr = f"{'Control':<{w_id}} {'Lv':<{w_lv}} {'Title':<{w_title}} {'Audit Method'}"
     print(hdr)
     print("─" * len(hdr))
@@ -1288,7 +1288,10 @@ Examples:
     parser.add_argument(
         "--preview",
         action="store_true",
-        help="Print the control catalog (ID, level, title, audit method) and exit — useful for cross-referencing against the CIS Benchmark PDF",
+        help=(
+            "Print the control catalog (ID, level, title, audit method)"
+            " and exit — useful for cross-referencing against the CIS Benchmark PDF"
+        ),
     )
     parser.add_argument(
         "--no-open",

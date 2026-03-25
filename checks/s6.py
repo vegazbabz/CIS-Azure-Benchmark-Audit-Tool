@@ -351,7 +351,6 @@ def check_6_1_1_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
         # Evaluate each diagnostic setting against the two-branch policy condition
         compliant = False
-        compliant_setting = None
 
         for setting in diag_list:
             has_storage = bool(setting.get("storageAccountId"))
@@ -367,21 +366,18 @@ def check_6_1_1_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 # Branch A: retention enforced, days == 0 (infinite) or >= 365
                 if ret_enabled and (ret_days == 0 or ret_days >= REQUIRED_RETENTION):
                     compliant = True
-                    compliant_setting = setting.get("name", "?")
                     break
 
                 # Branch B: no storage account, so no retention policy needed
                 # (logs going to Log Analytics workspace or Event Hub)
                 if not has_storage:
                     compliant = True
-                    compliant_setting = setting.get("name", "?")
                     break
 
                 # Branch B also fires when retention policy is not enforced
                 # even if a storage account exists
                 if not ret_enabled:
                     compliant = True
-                    compliant_setting = setting.get("name", "?")
                     break
 
             if compliant:
@@ -404,12 +400,6 @@ def check_6_1_1_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             )
         elif diag_list:
             # Settings exist but none satisfy the retention condition
-            categories = [
-                log.get("category") or log.get("categoryGroup", "?")
-                for s in diag_list
-                for log in s.get("logs", [])
-                if log.get("enabled")
-            ]
             results.append(
                 R(
                     "6.1.1.6",
@@ -573,7 +563,6 @@ def check_6_1_3_1(sid: str, sname: str) -> R:
         )
 
     components = data.get("value", []) if isinstance(data, dict) else []
-    names = [c.get("name", "?") for c in components]
 
     return R(
         "6.1.3.1",

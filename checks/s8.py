@@ -79,7 +79,7 @@ def check_8_1_defender(sid: str, sname: str) -> list[R]:
             "8 - Security Services",
             PASS if tier == "Standard" else FAIL,
             (
-                f"Microsoft Defender pricing tier: Standard (enabled)."
+                "Microsoft Defender pricing tier: Standard (enabled)."
                 if tier == "Standard"
                 else f"Microsoft Defender pricing tier: {tier} \u2014 must be upgraded to Standard."
             ),
@@ -627,7 +627,8 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                                 2,
                                 "8 - Security Services",
                                 PASS if has_rotate else FAIL,
-                                f"Key '{kname}': automatic rotation {'configured' if has_rotate else 'NOT configured'}.",
+                                f"Key '{kname}': automatic rotation"
+                                f" {'configured' if has_rotate else 'NOT configured'}.",
                                 "Key Vault > Keys > Rotation policy > Set rotation action" if not has_rotate else "",
                                 sid,
                                 sname,

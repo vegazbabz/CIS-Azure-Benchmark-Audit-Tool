@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, INFO, ERROR, MANUAL, TIMEOUTS, ROLE_OWNER, ROLE_UAA, CALLER_TYPE
+from cis.config import PASS, FAIL, ERROR, MANUAL, TIMEOUTS, ROLE_OWNER, ROLE_UAA, CALLER_TYPE
 from cis.models import R
 from cis.check_helpers import _err, _idx
 from azure.helpers import az, az_rest, az_rest_paged
@@ -474,7 +474,8 @@ def check_5_15() -> R:
         (
             "Guest user access is restricted to most restrictive level (Restricted Guest User)."
             if role_id == MOST_RESTRICTIVE
-            else f"Guest user role is not the most restrictive setting (current: {role_id}). Must be Restricted Guest User ({MOST_RESTRICTIVE})."
+            else f"Guest user role is not the most restrictive setting (current: {role_id})."
+            f" Must be Restricted Guest User ({MOST_RESTRICTIVE})."
         ),
         (
             "Entra ID > External Identities > External collaboration settings > "

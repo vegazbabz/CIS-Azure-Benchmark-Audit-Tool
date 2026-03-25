@@ -11,7 +11,7 @@
 
 **Version:** 1.2.0
 **Benchmark:** [CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure) (September 2025)
-**Coverage:** 99 automated controls · 3 manual controls noted in output · 1 control pending (2.1.1)
+**Coverage:** 113 of 155 CIS benchmark controls (102 automated · 11 manual)
 
 ---
 
@@ -550,19 +550,21 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 
 ## Controls Covered
 
-### Section 2 — Azure Databricks (5 of 6 automated)
+### Section 2 — Azure Databricks (7 of 11 · 7 automated)
 
-| Control | Title | Level |
-| --- | --- | --- |
-| 2.1.2 | NSGs configured for Databricks subnets | L1 |
-| 2.1.7 | Diagnostic logging configured | L1 |
-| 2.1.9 | No Public IP enabled | L1 |
-| 2.1.10 | Public network access disabled | L1 |
-| 2.1.11 | Private endpoints used to access workspaces | L2 |
+| Control | Title | Level | Notes |
+| --- | --- | --- | --- |
+| 2.1.1 | Databricks deployed in customer-managed VNet | L2 | |
+| 2.1.2 | NSGs configured for Databricks subnets | L1 | |
+| 2.1.7 | Diagnostic logging configured | L1 | |
+| 2.1.8 | Databricks encryption uses customer-managed keys | L2 | |
+| 2.1.9 | No Public IP enabled | L1 | |
+| 2.1.10 | Public network access disabled | L1 | |
+| 2.1.11 | Private endpoints used to access workspaces | L2 | |
 
-> **2.1.1** (Databricks in customer-managed VNet) — pending implementation.
+> **Not covered:** 2.1.3 (encrypted traffic between worker nodes — Manual), 2.1.4 (Entra ID sync — Manual), 2.1.5 (Unity Catalog — Manual), 2.1.6 (personal access token restrictions — Manual). These require Databricks workspace-internal configuration that cannot be audited from the Azure control plane.
 
-### Section 3 — Compute Services (1 manual)
+### Section 3 — Compute Services (1 of 1 · 1 manual)
 
 | Control | Title | Level | Notes |
 | --- | --- | --- | --- |
@@ -574,15 +576,18 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 > Services Benchmark* respectively. Only 3.1.1 (Virtual Machines) remains in the
 > Foundations Benchmark as an auditable control.
 
-### Section 5 — Identity Services (9 automated · 2 manual)
+### Section 5 — Identity Services (14 of 43 · 10 automated · 4 manual)
 
 | Control | Title | Level | Notes |
 | --- | --- | --- | --- |
 | 5.1.1 | Security defaults enabled | L1 | Requires `[graph_auth]` setup — see below |
 | 5.1.2 | MFA enabled for all users | L1 | |
 | 5.1.3 | Allow users to remember MFA on trusted devices disabled | L1 | **Manual** — no API available |
+| 5.2.2 | Exclusionary geographic Conditional Access policy considered | L1 | **Manual** — Entra ID portal review |
+| 5.3.2 | Guest users reviewed on a regular basis | L1 | **Manual** — requires human review |
 | 5.3.3 | User Access Administrator role restricted | L1 | |
 | 5.4 | Restrict non-admin users from creating tenants | L1 | |
+| 5.6 | Account lockout threshold ≤ 10 | L1 | Graph API — authenticationMethodsPolicy |
 | 5.14 | Users cannot register applications | L1 | |
 | 5.15 | Guest access restricted to own directory objects | L1 | |
 | 5.16 | Guest invite restrictions set to admins or no one | L2 | |
@@ -622,88 +627,94 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 > **Device code flow is not used.** MSAL is configured to use the authorization code flow with
 > PKCE (interactive browser) in user mode, in line with CIS 5.2.3.
 
-### Section 6 — Logging and Monitoring (17 automated)
+### Section 6 — Logging and Monitoring (20 of 25 · 17 automated · 3 manual)
 
-| Control | Title | Level |
-| --- | --- | --- |
-| 6.1.1.1 | Diagnostic Setting exists for Subscription Activity Logs | L1 |
-| 6.1.1.2 | Diagnostic Setting captures required categories | L1 |
-| 6.1.1.3 | Activity log retention >= 365 days | L1 |
-| 6.1.1.4 | Key Vault diagnostic logging enabled | L1 |
-| 6.1.1.6 | Azure AppService HTTP logs enabled | L2 |
-| 6.1.2.1 | Activity Log Alert: Create Policy Assignment | L1 |
-| 6.1.2.2 | Activity Log Alert: Delete Policy Assignment | L1 |
-| 6.1.2.3 | Activity Log Alert: Create or Update NSG | L1 |
-| 6.1.2.4 | Activity Log Alert: Delete NSG | L1 |
-| 6.1.2.5 | Activity Log Alert: Create or Update Security Solution | L1 |
-| 6.1.2.6 | Activity Log Alert: Delete Security Solution | L1 |
-| 6.1.2.7 | Activity Log Alert: Create or Update SQL Firewall Rule | L1 |
-| 6.1.2.8 | Activity Log Alert: Delete SQL Firewall Rule | L1 |
-| 6.1.2.9 | Activity Log Alert: Create or Update Public IP | L1 |
-| 6.1.2.10 | Activity Log Alert: Delete Public IP | L1 |
-| 6.1.2.11 | Activity Log Alert: Service Health | L1 |
-| 6.1.3.1 | Application Insights configured | L2 |
+| Control | Title | Level | Notes |
+| --- | --- | --- | --- |
+| 6.1.1.1 | Diagnostic Setting exists for Subscription Activity Logs | L1 | |
+| 6.1.1.2 | Diagnostic Setting captures required categories | L1 | |
+| 6.1.1.3 | Activity log retention >= 365 days | L1 | |
+| 6.1.1.4 | Key Vault diagnostic logging enabled | L1 | |
+| 6.1.1.6 | Azure AppService HTTP logs enabled | L2 | |
+| 6.1.2.1 | Activity Log Alert: Create Policy Assignment | L1 | |
+| 6.1.2.2 | Activity Log Alert: Delete Policy Assignment | L1 | |
+| 6.1.2.3 | Activity Log Alert: Create or Update NSG | L1 | |
+| 6.1.2.4 | Activity Log Alert: Delete NSG | L1 | |
+| 6.1.2.5 | Activity Log Alert: Create or Update Security Solution | L1 | |
+| 6.1.2.6 | Activity Log Alert: Delete Security Solution | L1 | |
+| 6.1.2.7 | Activity Log Alert: Create or Update SQL Firewall Rule | L1 | |
+| 6.1.2.8 | Activity Log Alert: Delete SQL Firewall Rule | L1 | |
+| 6.1.2.9 | Activity Log Alert: Create or Update Public IP | L1 | |
+| 6.1.2.10 | Activity Log Alert: Delete Public IP | L1 | |
+| 6.1.2.11 | Activity Log Alert: Service Health | L1 | |
+| 6.1.3.1 | Application Insights configured | L2 | |
+| 6.1.4 | Azure Monitor resource logging enabled for all services | L1 | **Manual** — requires per-resource review |
+| 6.1.5 | SKU Basic/Consumption not used on production artifacts | L1 | **Manual** — requires business context |
+| 6.2 | Resource Locks set for mission-critical Azure resources | L2 | **Manual** — requires business context |
 
-### Section 7 — Networking Services (14 automated)
+### Section 7 — Networking Services (16 of 16 · 14 automated · 2 manual)
 
-| Control | Title | Level |
-| --- | --- | --- |
-| 7.1 | RDP (3389) not open to internet | L1 |
-| 7.2 | SSH (22) not open to internet | L1 |
-| 7.3 | UDP access from internet restricted | L1 |
-| 7.4 | HTTP/HTTPS (80/443) from internet evaluated and restricted | L1 |
-| 7.5 | NSG flow log retention >= 90 days | L2 |
-| 7.6 | Network Watcher enabled for all regions in use | L2 |
-| 7.8 | VNet flow log retention >= 90 days | L2 |
-| 7.9 | VPN Gateway P2S uses Azure AD authentication | L2 |
-| 7.10 | WAF enabled on Azure Application Gateway | L2 |
-| 7.11 | Subnets associated with NSGs | L1 |
-| 7.12 | App Gateway SSL policy min TLS 1.2+ | L1 |
-| 7.13 | HTTP2 enabled on Application Gateway | L1 |
-| 7.14 | WAF request body inspection enabled | L2 |
-| 7.15 | WAF bot protection enabled | L2 |
+| Control | Title | Level | Notes |
+| --- | --- | --- | --- |
+| 7.1 | RDP (3389) not open to internet | L1 | |
+| 7.2 | SSH (22) not open to internet | L1 | |
+| 7.3 | UDP access from internet restricted | L1 | |
+| 7.4 | HTTP/HTTPS (80/443) from internet evaluated and restricted | L1 | |
+| 7.5 | NSG flow log retention >= 90 days | L2 | |
+| 7.6 | Network Watcher enabled for all regions in use | L2 | |
+| 7.7 | Public IP addresses evaluated on a periodic basis | L1 | **Manual** — requires periodic review |
+| 7.8 | VNet flow log retention >= 90 days | L2 | |
+| 7.9 | VPN Gateway P2S uses Azure AD authentication | L2 | |
+| 7.10 | WAF enabled on Azure Application Gateway | L2 | |
+| 7.11 | Subnets associated with NSGs | L1 | |
+| 7.12 | App Gateway SSL policy min TLS 1.2+ | L1 | |
+| 7.13 | HTTP2 enabled on Application Gateway | L1 | |
+| 7.14 | WAF request body inspection enabled | L2 | |
+| 7.15 | WAF bot protection enabled | L2 | |
+| 7.16 | Azure Network Security Perimeter (NSP) is used | L2 | **Manual** — requires architecture review |
 
-### Section 8 — Security Services (30 automated)
+### Section 8 — Security Services (31 of 38 · 30 automated · 1 manual)
 
-| Control | Title | Level |
-| --- | --- | --- |
-| 8.1.1.1 | Microsoft Defender CSPM | L2 |
-| 8.1.2.1 | Microsoft Defender for APIs | L2 |
-| 8.1.3.1 | Microsoft Defender for Servers | L2 |
-| 8.1.3.3 | Endpoint protection (WDATP) component | L2 |
-| 8.1.4.1 | Microsoft Defender for Containers | L2 |
-| 8.1.5.1 | Microsoft Defender for Storage | L2 |
-| 8.1.6.1 | Microsoft Defender for App Services | L2 |
-| 8.1.7.1 | Microsoft Defender for Azure Cosmos DB | L2 |
-| 8.1.7.2 | Microsoft Defender for Open-Source Relational DBs | L2 |
-| 8.1.7.3 | Microsoft Defender for SQL (Managed Instance) | L2 |
-| 8.1.7.4 | Microsoft Defender for SQL Servers on Machines | L2 |
-| 8.1.8.1 | Microsoft Defender for Key Vault | L2 |
-| 8.1.9.1 | Microsoft Defender for Resource Manager | L2 |
-| 8.1.10 | Defender configured to check VM OS updates | L1 |
-| 8.1.12 | Security alerts notify subscription Owners | L1 |
-| 8.1.13 | Additional email addresses for security contact | L1 |
-| 8.1.14 | Alert severity notifications configured | L1 |
-| 8.1.15 | Attack path notifications configured | L1 |
-| 8.3.1 | Key expiration set — RBAC Key Vaults | L1 |
-| 8.3.2 | Key expiration set — non-RBAC Key Vaults | L1 |
-| 8.3.3 | Secret expiration set — RBAC Key Vaults | L1 |
-| 8.3.4 | Secret expiration set — non-RBAC Key Vaults | L1 |
-| 8.3.5 | Key Vault purge protection enabled | L1 |
-| 8.3.6 | Key Vault RBAC authorization enabled | L2 |
-| 8.3.7 | Key Vault public network access disabled | L1 |
-| 8.3.8 | Private endpoints used to access Key Vault | L2 |
-| 8.3.9 | Automatic key rotation enabled | L2 |
-| 8.3.11 | Certificate validity period <= 12 months | L1 |
-| 8.4.1 | Azure Bastion Host exists | L2 |
-| 8.5 | DDoS Network Protection enabled on VNets | L2 |
+| Control | Title | Level | Notes |
+| --- | --- | --- | --- |
+| 8.1.1.1 | Microsoft Defender CSPM | L2 | |
+| 8.1.2.1 | Microsoft Defender for APIs | L2 | |
+| 8.1.3.1 | Microsoft Defender for Servers | L2 | |
+| 8.1.3.3 | Endpoint protection (WDATP) component | L2 | |
+| 8.1.4.1 | Microsoft Defender for Containers | L2 | |
+| 8.1.5.1 | Microsoft Defender for Storage | L2 | |
+| 8.1.6.1 | Microsoft Defender for App Services | L2 | |
+| 8.1.7.1 | Microsoft Defender for Azure Cosmos DB | L2 | |
+| 8.1.7.2 | Microsoft Defender for Open-Source Relational DBs | L2 | |
+| 8.1.7.3 | Microsoft Defender for SQL (Managed Instance) | L2 | |
+| 8.1.7.4 | Microsoft Defender for SQL Servers on Machines | L2 | |
+| 8.1.8.1 | Microsoft Defender for Key Vault | L2 | |
+| 8.1.9.1 | Microsoft Defender for Resource Manager | L2 | |
+| 8.1.10 | Defender configured to check VM OS updates | L1 | |
+| 8.1.12 | Security alerts notify subscription Owners | L1 | |
+| 8.1.13 | Additional email addresses for security contact | L1 | |
+| 8.1.14 | Alert severity notifications configured | L1 | |
+| 8.1.15 | Attack path notifications configured | L1 | |
+| 8.3.1 | Key expiration set — RBAC Key Vaults | L1 | |
+| 8.3.2 | Key expiration set — non-RBAC Key Vaults | L1 | |
+| 8.3.3 | Secret expiration set — RBAC Key Vaults | L1 | |
+| 8.3.4 | Secret expiration set — non-RBAC Key Vaults | L1 | |
+| 8.3.5 | Key Vault purge protection enabled | L1 | |
+| 8.3.6 | Key Vault RBAC authorization enabled | L2 | |
+| 8.3.7 | Key Vault public network access disabled | L1 | |
+| 8.3.8 | Private endpoints used to access Key Vault | L2 | |
+| 8.3.9 | Automatic key rotation enabled | L2 | |
+| 8.3.10 | Key Vault Managed HSM used when required | L2 | **Manual** — requires regulatory assessment |
+| 8.3.11 | Certificate validity period <= 12 months | L1 | |
+| 8.4.1 | Azure Bastion Host exists | L2 | |
+| 8.5 | DDoS Network Protection enabled on VNets | L2 | |
 
 > **Key Vault data-plane checks (8.3.1–8.3.4, 8.3.9, 8.3.11):** these require data-plane access
 > beyond subscription Reader. If the runner cannot reach the vault (firewall, private endpoint) or
 > lacks a Key Vault data-plane role / access policy, the check returns ERROR with an actionable message
 > explaining exactly what is missing — compliance is unknown, not assumed clean.
 
-### Section 9 — Storage Services (24 automated)
+### Section 9 — Storage Services (21 of 21 · 24 automated)
 
 | Control | Title | Level |
 | --- | --- | --- |
@@ -921,7 +932,3 @@ This is an independent community implementation referencing the publicly availab
 CIS Benchmarks are the property of the Center for Internet Security (<https://www.cisecurity.org>),
 used under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 This tool is not affiliated with, endorsed by, or approved by CIS.
-
-**Version:** 1.2.0
-**Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
-**Coverage:** 99 automated controls · 3 manual controls noted in output · 1 control pending (2.1.1)

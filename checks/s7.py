@@ -8,13 +8,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, TIMEOUTS, INTERNET_SRCS, EXEMPT_SUBNETS
+from cis.config import PASS, FAIL, INFO, MANUAL, TIMEOUTS, INTERNET_SRCS, EXEMPT_SUBNETS
 from cis.models import R
 from cis.helpers import nsg_bad_rules
 from cis.check_helpers import _err, _idx, _info
 
 
-from azure.helpers import az
+from azure.helpers import az, az_rest
 
 
 def check_7_1(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
@@ -55,7 +55,7 @@ def check_7_1(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 f"NSG '{name}' > Inbound rules > Remove or restrict rules {', '.join(bad)}" if bad else "",
                 sid,
                 sname,
-                name if bad else "",
+                name,
             )
         )
     return results
@@ -98,7 +98,7 @@ def check_7_2(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 f"NSG '{name}' > Inbound rules > Remove or restrict rules {', '.join(bad)}" if bad else "",
                 sid,
                 sname,
-                name if bad else "",
+                name,
             )
         )
     return results
@@ -161,7 +161,7 @@ def check_7_3(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 f"NSG '{name}' > Inbound rules > Remove or restrict UDP rules {', '.join(bad)}" if bad else "",
                 sid,
                 sname,
-                name if bad else "",
+                name,
             )
         )
     return results
@@ -221,7 +221,7 @@ def check_7_4(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Ensure HTTP/HTTPS inbound from internet is intentional and restricted." if bad else "",
                 sid,
                 sname,
-                name if bad else "",
+                name,
             )
         )
     return results
@@ -244,6 +244,13 @@ def check_7_5(sid: str, sname: str) -> list[R]:
     If no flow logs are found, returns FAIL with a message stating that flow
     logging has not been enabled — absence of flow logs is non-compliant.
     """
+    # If there are no NSGs at all, flow logs are N/A — same logic as 7.1–7.4.
+    rc_nsg, nsgs = az(["network", "nsg", "list"], sid, timeout=TIMEOUTS["default"])
+    if rc_nsg == 0 and not nsgs:
+        return [
+            _info("7.5", "NSG flow log retention > 90 days", 2, "7 - Networking Services", "No NSGs found.", sid, sname)
+        ]
+
     rc, watchers = az(["network", "watcher", "list"], sid, timeout=TIMEOUTS["default"])
     if rc != 0:
         return [
@@ -278,7 +285,7 @@ def check_7_5(sid: str, sname: str) -> list[R]:
                     "Network Watcher > Flow logs > Set retention >= 90 days" if not ok else "",
                     sid,
                     sname,
-                    fname if not ok else "",
+                    fname,
                 )
             )
 
@@ -399,6 +406,15 @@ def check_7_8(sid: str, sname: str) -> list[R]:
     Filters flow logs to only those targeting VNet resources (identified by
     "virtualnetworks" appearing in the targetResourceId path).
     """
+    # If there are no VNets at all, flow logs are N/A.
+    rc_vnet, vnets = az(["network", "vnet", "list"], sid, timeout=TIMEOUTS["default"])
+    if rc_vnet == 0 and not vnets:
+        return [
+            _info(
+                "7.8", "VNet flow log retention > 90 days", 2, "7 - Networking Services", "No VNets found.", sid, sname
+            )
+        ]
+
     rc, watchers = az(["network", "watcher", "list"], sid, timeout=TIMEOUTS["default"])
     if rc != 0:
         return [
@@ -434,7 +450,7 @@ def check_7_8(sid: str, sname: str) -> list[R]:
                     "Network Watcher > Flow logs > Set retention >= 90 days" if not ok else "",
                     sid,
                     sname,
-                    fname if not ok else "",
+                    fname,
                 )
             )
 
@@ -454,6 +470,111 @@ def check_7_8(sid: str, sname: str) -> list[R]:
                 sname,
             )
         )
+    return results
+
+
+def check_7_9(sid: str, sname: str) -> list[R]:
+    """
+    7.9 — VPN Gateway P2S uses Azure AD authentication only (Level 2)
+
+    Azure VPN Gateway point-to-site (P2S) connections should use Azure AD
+    (Microsoft Entra ID) authentication exclusively. This provides strong
+    identity management and eliminates risks from static credentials or
+    certificate management.
+
+    CLI: az network vnet-gateway list → for each gateway with P2S config,
+    check vpnClientConfiguration.vpnAuthenticationTypes == ["AAD"].
+    """
+    url = f"/subscriptions/{sid}" "/providers/Microsoft.Network/virtualNetworkGateways" "?api-version=2024-05-01"
+    rc, data = az_rest(url, timeout=TIMEOUTS["default"])
+    if rc != 0:
+        return [
+            _err(
+                "7.9",
+                "VPN Gateway P2S uses Azure AD auth only",
+                2,
+                "7 - Networking Services",
+                str(data),
+                sid,
+                sname,
+            )
+        ]
+
+    gws = data.get("value", []) if isinstance(data, dict) else []
+
+    if not gws:
+        return [
+            _info(
+                "7.9",
+                "VPN Gateway P2S uses Azure AD auth only",
+                2,
+                "7 - Networking Services",
+                "No VPN Gateways found.",
+                sid,
+                sname,
+            )
+        ]
+
+    results: list[R] = []
+    for gw in gws:
+        gname = gw.get("name", "?")
+        props = gw.get("properties") or {}
+        vpn_cfg = props.get("vpnClientConfiguration")
+
+        if not vpn_cfg:
+            # No P2S configured — not applicable for this gateway
+            results.append(
+                R(
+                    "7.9",
+                    "VPN Gateway P2S uses Azure AD auth only",
+                    2,
+                    "7 - Networking Services",
+                    INFO,
+                    f"Gateway '{gname}': No point-to-site configuration.",
+                    "",
+                    sid,
+                    sname,
+                    gname,
+                )
+            )
+            continue
+
+        auth_types = vpn_cfg.get("vpnAuthenticationTypes") or []
+        # Normalise to lowercase for comparison
+        auth_lower = [a.lower() for a in auth_types]
+
+        if auth_lower == ["aad"]:
+            results.append(
+                R(
+                    "7.9",
+                    "VPN Gateway P2S uses Azure AD auth only",
+                    2,
+                    "7 - Networking Services",
+                    PASS,
+                    f"Gateway '{gname}': P2S authentication = Azure AD only.",
+                    "",
+                    sid,
+                    sname,
+                    gname,
+                )
+            )
+        else:
+            results.append(
+                R(
+                    "7.9",
+                    "VPN Gateway P2S uses Azure AD auth only",
+                    2,
+                    "7 - Networking Services",
+                    FAIL,
+                    f"Gateway '{gname}': P2S authentication = {auth_types or 'not set'}. " "Expected Azure AD only.",
+                    "Virtual network gateways > VPN gateway > Point-to-site configuration > "
+                    "Set Authentication type to 'Azure Active Directory'.",
+                    sid,
+                    sname,
+                    gname,
+                )
+            )
+
     return results
 
 
@@ -501,7 +622,7 @@ def check_7_10(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             ),
             sid,
             sname,
-            gw.get("name", "") if not (gw.get("wafEnabled") or gw.get("wafPolicyId")) else "",
+            gw.get("name", ""),
         )
         for gw in gws
     ]
@@ -655,7 +776,7 @@ def check_7_12(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             ),
             sid,
             sname,
-            gw.get("name", "") if str(gw.get("sslMinProto", "")).lower() not in GOOD_PROTOS else "",
+            gw.get("name", ""),
         )
         for gw in gws
     ]
@@ -696,7 +817,7 @@ def check_7_13(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "Application Gateway > Configuration > HTTP2: Enabled" if not gw.get("enableHttp2") else "",
             sid,
             sname,
-            gw.get("name", "") if not gw.get("enableHttp2") else "",
+            gw.get("name", ""),
         )
         for gw in gws
     ]
@@ -738,10 +859,30 @@ def check_7_14(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "Application Gateway > WAF > Advanced > Enable Request body inspection" if not gw.get("wafReqBody") else "",
             sid,
             sname,
-            gw.get("name", "") if not gw.get("wafReqBody") else "",
+            gw.get("name", ""),
         )
         for gw in gws
     ]
+
+
+def _has_bot_protection(pol: dict) -> tuple[bool, str]:
+    """Check if a WAF policy has Microsoft_BotManagerRuleSet enabled.
+
+    Returns (ok, detail) where ok=True means the rule set is present
+    and KnownBadBots is not disabled via ruleGroupOverrides.
+    """
+    rule_sets = pol.get("managedRuleSets") or []
+    for rs in rule_sets:
+        if str(rs.get("ruleSetType", "")).lower() == "microsoft_botmanagerruleset":
+            # Check that KnownBadBots is not disabled via overrides
+            for override in rs.get("ruleGroupOverrides") or []:
+                if str(override.get("ruleGroupName", "")).lower() == "knownbadbots":
+                    # If any rule in KnownBadBots is explicitly disabled, fail
+                    for rule in override.get("rules") or []:
+                        if str(rule.get("state", "")).lower() == "disabled":
+                            return False, "Microsoft_BotManagerRuleSet found but KnownBadBots rules disabled"
+            return True, "Microsoft_BotManagerRuleSet enabled"
+    return False, "Microsoft_BotManagerRuleSet not found"
 
 
 def check_7_15(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
@@ -749,17 +890,13 @@ def check_7_15(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     7.15 — WAF bot protection is enabled (Level 2)
 
     Bot protection rules block known malicious bots (crawlers, scanners,
-    scrapers) based on Microsoft's threat intelligence feed. Prevention mode
-    actively blocks; Detection mode only logs. Only Prevention mode is
-    considered compliant.
+    scrapers) based on Microsoft's threat intelligence feed.
 
-    Note: This check targets standalone WAF POLICY resources
-    (type: applicationGatewayWebApplicationFirewallPolicies), which are
-    separate from WAF configuration embedded in Application Gateways.
-    A WAF policy must exist and be in Prevention mode.
+    Checks that managedRules.managedRuleSets contains a rule set with
+    ruleSetType of Microsoft_BotManagerRuleSet, and that no
+    ruleGroupOverrides for ruleGroupName KnownBadBots have state Disabled.
 
-    Data source: Resource Graph 'waf_policies' query (botEnabled field,
-    which maps to policySettings.mode).
+    Data source: Resource Graph 'waf_policies' query (managedRuleSets field).
     """
     policies = _idx(td, "waf_policies", sid)
     if not policies:
@@ -769,23 +906,65 @@ def check_7_15(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             )
         ]
 
-    return [
-        R(
-            "7.15",
-            "WAF bot protection enabled",
-            2,
-            "7 - Networking Services",
-            # botEnabled field contains the mode string: "Prevention" or "Detection"
-            PASS if str(pol.get("botEnabled", "")).lower() == "prevention" else FAIL,
-            f"Bot protection mode: {pol.get('botEnabled') or 'Not configured'}",
-            (
-                "WAF policy > Bot protection > Set to Prevention mode"
-                if str(pol.get("botEnabled", "")).lower() != "prevention"
-                else ""
-            ),
-            sid,
-            sname,
-            pol.get("name", "") if str(pol.get("botEnabled", "")).lower() != "prevention" else "",
+    results: list[R] = []
+    for pol in policies:
+        ok, detail = _has_bot_protection(pol)
+        results.append(
+            R(
+                "7.15",
+                "WAF bot protection enabled",
+                2,
+                "7 - Networking Services",
+                PASS if ok else FAIL,
+                detail,
+                "WAF policy > Managed rules > Add Microsoft_BotManagerRuleSet" if not ok else "",
+                sid,
+                sname,
+                pol.get("name", ""),
+            )
         )
-        for pol in policies
-    ]
+    return results
+
+
+def check_7_7(sid: str, sname: str) -> R:
+    """
+    7.7 — Public IP addresses are evaluated on a periodic basis (Manual, Level 1)
+
+    Requires reviewing all public IPs and their associations to ensure they
+    are still necessary. This is a governance/process check that cannot be
+    fully automated.
+    """
+    return R(
+        "7.7",
+        "Public IP addresses evaluated on a periodic basis",
+        1,
+        "7 - Networking Services",
+        MANUAL,
+        "Manual verification required — run 'az network public-ip list' and review "
+        "each public IP to ensure it is still required and properly secured.",
+        "Remove unnecessary public IPs or restrict access via NSG/Firewall rules.",
+        sid,
+        sname,
+    )
+
+
+def check_7_16(sid: str, sname: str) -> R:
+    """
+    7.16 — Azure Network Security Perimeter (NSP) is used (Manual, Level 2)
+
+    NSP is a relatively new feature for securing PaaS resources at the network
+    level. Determining whether it should be used is a design decision that
+    cannot be fully automated.
+    """
+    return R(
+        "7.16",
+        "Azure Network Security Perimeter (NSP) is used",
+        2,
+        "7 - Networking Services",
+        MANUAL,
+        "Manual verification required — review whether Network Security Perimeter "
+        "is configured for PaaS resources that support it.",
+        "Azure Portal > Network Security Perimeter > Create and associate with PaaS resources.",
+        sid,
+        sname,
+    )

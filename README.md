@@ -9,9 +9,9 @@
 
 ![Sample report dashboard](docs/sample_report_dashboard.png)
 
-**Version:** 1.1.3
+**Version:** 1.2.0
 **Benchmark:** [CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure) (September 2025)
-**Coverage:** 98 automated controls · 3 manual controls noted in output · 1 control pending (2.1.1)
+**Coverage:** 99 automated controls · 3 manual controls noted in output · 1 control pending (2.1.1)
 
 ---
 
@@ -644,7 +644,7 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 | 6.1.2.11 | Activity Log Alert: Service Health | L1 |
 | 6.1.3.1 | Application Insights configured | L2 |
 
-### Section 7 — Networking Services (13 automated)
+### Section 7 — Networking Services (14 automated)
 
 | Control | Title | Level |
 | --- | --- | --- |
@@ -655,6 +655,7 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 | 7.5 | NSG flow log retention >= 90 days | L2 |
 | 7.6 | Network Watcher enabled for all regions in use | L2 |
 | 7.8 | VNet flow log retention >= 90 days | L2 |
+| 7.9 | VPN Gateway P2S uses Azure AD authentication | L2 |
 | 7.10 | WAF enabled on Azure Application Gateway | L2 |
 | 7.11 | Subnets associated with NSGs | L1 |
 | 7.12 | App Gateway SSL policy min TLS 1.2+ | L1 |
@@ -921,6 +922,6 @@ CIS Benchmarks are the property of the Center for Internet Security (<https://ww
 used under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 This tool is not affiliated with, endorsed by, or approved by CIS.
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Benchmark:** CIS Microsoft Azure Foundations Benchmark v5.0.0 (September 2025)
-**Coverage:** 98 automated controls · 3 manual controls noted in output · 1 control pending (2.1.1)
+**Coverage:** 99 automated controls · 3 manual controls noted in output · 1 control pending (2.1.1)

@@ -218,7 +218,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 (
                     "Cross-tenant replication: Disabled."
                     if not acct.get("crossTenant")
-                    else "Cross-tenant replication: Enabled \u2014 data can be replicated to storage accounts in other tenants."
+                    else "Cross-tenant replication: Enabled \u2014 data can be replicated"
+                    " to storage accounts in other tenants."
                 ),
                 "Storage Account > Data Management > Object replication > " "Allow cross-tenant replication: Disabled",
             ),
@@ -269,7 +270,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 (
                     "Shared key (storage account key) access: Disabled."
                     if acct.get("keyAccess") is False
-                    else "Shared key (storage account key) access: Enabled \u2014 disable to enforce Entra ID authentication."
+                    else "Shared key (storage account key) access: Enabled \u2014"
+                    " disable to enforce Entra ID authentication."
                 ),
                 "Storage Account > Configuration > Allow storage account key access: Disabled",
             ),
@@ -283,7 +285,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 (
                     "Default to Microsoft Entra ID authorization: Enabled."
                     if acct.get("oauthDefault") is True
-                    else "Default to Microsoft Entra ID authorization: Disabled \u2014 storage data requests are not automatically authorized with Entra ID."
+                    else "Default to Microsoft Entra ID authorization: Disabled \u2014"
+                    " storage data requests are not automatically authorized with Entra ID."
                 ),
                 "Storage Account > Configuration > Default to Microsoft Entra authorization: Enabled",
             ),
@@ -312,7 +315,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 (
                     f"Private endpoints: {acct.get('privateEps') or 0} configured."
                     if has_pe
-                    else f"Private endpoints: {acct.get('privateEps') or 0} \u2014 at least one private endpoint is required."
+                    else f"Private endpoints: {acct.get('privateEps') or 0} \u2014"
+                    f" at least one private endpoint is required."
                 ),
                 "Storage Account > Networking > Private endpoint connections",
             ),
@@ -341,7 +345,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     remediation if not compliant else "",
                     sid,
                     sname,
-                    aname if not compliant else "",
+                    aname,
                 )
             )
 
@@ -395,8 +399,8 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             # 9.2.1 — Blob soft delete allows recovery of deleted blobs within
             # the retention period. Essential for ransomware recovery.
             _sd_on = drp.get("enabled", False)
-            _sd_days = drp.get("days", 0)
-            _sd_ok = bool(_sd_on) and (isinstance(_sd_days, int) and _sd_days >= 7)
+            _sd_days = drp.get("days")
+            _sd_ok = bool(_sd_on) and _sd_days is not None and _sd_days > 0
             acc_results.append(
                 R(
                     "9.2.1",
@@ -405,22 +409,18 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "9 - Storage Services",
                     PASS if _sd_ok else FAIL,
                     f"Blob soft delete: enabled={_sd_on}, days={_sd_days}",
-                    (
-                        "Storage Account > Data protection > Enable soft delete for blobs (>= 7 days)"
-                        if not _sd_ok
-                        else ""
-                    ),
+                    ("Storage Account > Data protection > Enable soft delete for blobs" if not _sd_ok else ""),
                     sid,
                     sname,
-                    aname if not _sd_ok else "",
+                    aname,
                 )
             )
 
             # 9.2.2 — Container soft delete allows recovery of deleted containers
             # (and all blobs within) within the retention period.
             _cd_on = crp.get("enabled", False)
-            _cd_days = crp.get("days", 0)
-            _cd_ok = bool(_cd_on) and (isinstance(_cd_days, int) and _cd_days >= 7)
+            _cd_days = crp.get("days")
+            _cd_ok = bool(_cd_on) and _cd_days is not None and _cd_days > 0
             acc_results.append(
                 R(
                     "9.2.2",
@@ -429,14 +429,10 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "9 - Storage Services",
                     PASS if _cd_ok else FAIL,
                     f"Container soft delete: enabled={_cd_on}, days={_cd_days}",
-                    (
-                        "Storage Account > Data protection > Enable soft delete for containers (>= 7 days)"
-                        if not _cd_ok
-                        else ""
-                    ),
+                    ("Storage Account > Data protection > Enable soft delete for containers" if not _cd_ok else ""),
                     sid,
                     sname,
-                    aname if not _cd_ok else "",
+                    aname,
                 )
             )
 
@@ -453,7 +449,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "Storage Account > Data protection > Enable blob versioning" if not ver else "",
                     sid,
                     sname,
-                    aname if not ver else "",
+                    aname,
                 )
             )
 
@@ -502,13 +498,14 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             PASS if flag else FAIL,
                             f"Blob logging {label}: {flag}",
                             (
-                                f"Storage Account > Monitoring > Diagnostic settings > Enable {label.capitalize()} logging"
+                                "Storage Account > Monitoring > Diagnostic settings"
+                                f" > Enable {label.capitalize()} logging"
                                 if not flag
                                 else ""
                             ),
                             sid,
                             sname,
-                            aname if not flag else "",
+                            aname,
                         )
                     )
             else:
@@ -538,7 +535,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                             "",
                             sid,
                             sname,
-                            aname if _log_status == ERROR else "",
+                            aname,
                         )
                     )
         else:
@@ -577,7 +574,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         _blob_remediation,
                         sid,
                         sname,
-                        aname if _blob_status == ERROR else "",
+                        aname,
                     )
                 )
 
@@ -589,7 +586,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             # 9.1.1 — File share soft delete allows recovery of deleted shares
             _fs_on = srp.get("enabled", False)
             _fs_days = srp.get("days", 0)
-            _fs_ok = bool(_fs_on) and (isinstance(_fs_days, int) and _fs_days >= 7)
+            _fs_ok = bool(_fs_on) and (isinstance(_fs_days, int) and 1 <= _fs_days <= 365)
             acc_results.append(
                 R(
                     "9.1.1",
@@ -599,13 +596,13 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     PASS if _fs_ok else FAIL,
                     f"File share soft delete: enabled={_fs_on}, days={_fs_days}",
                     (
-                        "Storage Account > Data protection > Enable soft delete for file shares (>= 7 days)"
+                        "Storage Account > Data protection > Enable soft delete for file shares (1-365 days)"
                         if not _fs_ok
                         else ""
                     ),
                     sid,
                     sname,
-                    aname if not _fs_ok else "",
+                    aname,
                 )
             )
 
@@ -636,7 +633,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     ),
                     sid,
                     sname,
-                    aname if not has_good_ver and smb else "",
+                    aname,
                 )
             )
 
@@ -657,7 +654,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     ),
                     sid,
                     sname,
-                    aname if not has_good_enc and smb else "",
+                    aname,
                 )
             )
         else:
@@ -693,7 +690,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         _file_remediation,
                         sid,
                         sname,
-                        aname if _file_status == ERROR else "",
+                        aname,
                     )
                 )
 
@@ -737,7 +734,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "Storage Account > Access keys > Set rotation reminder" if not reminder_days else "",
                     sid,
                     sname,
-                    aname if not reminder_days else "",
+                    aname,
                 )
             )
 
@@ -777,7 +774,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         "Storage account > Access keys > Rotate key" if not rotated else "",
                         sid,
                         sname,
-                        aname if not rotated else "",
+                        aname,
                     )
                 )
             else:
@@ -893,7 +890,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "Storage Account > Locks > Add lock > Lock type: Delete" if not has_delete else "",
                     sid,
                     sname,
-                    aname if not has_delete else "",
+                    aname,
                 )
             )
             results.append(
@@ -907,7 +904,7 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                     "Storage Account > Locks > Add lock > Lock type: Read-only" if not has_read else "",
                     sid,
                     sname,
-                    aname if not has_read else "",
+                    aname,
                 )
             )
 

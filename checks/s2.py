@@ -13,6 +13,104 @@ from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az
 
+_SEC = "2 - Databricks"
+
+
+def check_2_1_1(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
+    """
+    2.1.1 — Databricks deployed in customer-managed VNet (Level 2, Automated)
+
+    Checks whether each Databricks workspace has a customVirtualNetworkId set,
+    indicating deployment into a customer-managed VNet rather than using the
+    default Azure-managed VNet (which offers less network control).
+    """
+    workspaces = _idx(td, "databricks", sid)
+    if not workspaces:
+        return [
+            _info(
+                "2.1.1",
+                "Databricks deployed in customer-managed VNet",
+                2,
+                _SEC,
+                "No Databricks workspaces found.",
+                sid,
+                sname,
+            )
+        ]
+
+    results: list[R] = []
+    for ws in workspaces:
+        wname = ws.get("name", "?")
+        vnet = ws.get("vnetId", "")
+        compliant = bool(vnet)
+        results.append(
+            R(
+                "2.1.1",
+                "Databricks deployed in customer-managed VNet",
+                2,
+                _SEC,
+                PASS if compliant else FAIL,
+                (
+                    f"Workspace '{wname}': deployed in customer VNet."
+                    if compliant
+                    else f"Workspace '{wname}': using Azure-managed VNet (no custom VNet configured)."
+                ),
+                "Deploy Databricks workspace into a customer-managed VNet." if not compliant else "",
+                sid,
+                sname,
+                wname,
+            )
+        )
+    return results
+
+
+def check_2_1_8(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
+    """
+    2.1.8 — Databricks encrypted with customer-managed keys (Level 2, Automated)
+
+    Verifies that the Databricks workspace encryption keySource is set to
+    'Microsoft.Keyvault' rather than the default platform-managed keys.
+    """
+    workspaces = _idx(td, "databricks", sid)
+    if not workspaces:
+        return [
+            _info(
+                "2.1.8",
+                "Databricks encryption uses customer-managed keys",
+                2,
+                _SEC,
+                "No Databricks workspaces found.",
+                sid,
+                sname,
+            )
+        ]
+
+    results: list[R] = []
+    for ws in workspaces:
+        wname = ws.get("name", "?")
+        key_source = str(ws.get("encryptionKeySource", "") or "").lower()
+        compliant = key_source == "microsoft.keyvault"
+        results.append(
+            R(
+                "2.1.8",
+                "Databricks encryption uses customer-managed keys",
+                2,
+                _SEC,
+                PASS if compliant else FAIL,
+                (
+                    f"Workspace '{wname}': encryption uses customer-managed key (CMK)."
+                    if compliant
+                    else f"Workspace '{wname}': encryption uses platform-managed keys"
+                    f" (keySource: {key_source or 'default'})."
+                ),
+                "Databricks workspace > Encryption > Configure customer-managed key" if not compliant else "",
+                sid,
+                sname,
+                wname,
+            )
+        )
+    return results
+
 
 def check_2_1_2(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     """
@@ -115,7 +213,7 @@ def check_2_1_2(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Associate NSGs with the public and private Databricks subnets." if missing else "",
                 sid,
                 sname,
-                wname if missing else "",
+                wname,
             )
         )
 
@@ -181,7 +279,7 @@ def check_2_1_7(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "Databricks > Monitoring > Diagnostic settings > Add diagnostic setting" if not enabled else "",
                 sid,
                 sname,
-                wname if not enabled else "",
+                wname,
             )
         )
 
@@ -224,7 +322,7 @@ def check_2_1_9(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "Databricks workspace > Configure > Disable public IP" if not ws.get("noPublicIp") else "",
             sid,
             sname,
-            ws.get("name", "") if not ws.get("noPublicIp") else "",
+            ws.get("name", ""),
         )
         for ws in workspaces
     ]
@@ -274,7 +372,7 @@ def check_2_1_10(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             ),
             sid,
             sname,
-            ws.get("name", "") if str(ws.get("publicAccess", "Enabled")).lower() != "disabled" else "",
+            ws.get("name", ""),
         )
         for ws in workspaces
     ]
@@ -320,7 +418,7 @@ def check_2_1_11(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             "Configure private endpoint for Databricks workspace." if not (ws.get("privateEps") or 0) > 0 else "",
             sid,
             sname,
-            ws.get("name", "") if not (ws.get("privateEps") or 0) > 0 else "",
+            ws.get("name", ""),
         )
         for ws in workspaces
     ]

@@ -73,6 +73,7 @@ def _first_error_line(msg: str) -> str:
 _AUTHZ_TOKENS = frozenset(
     [
         "forbiddenbyrbac",
+        "accessdenied",
         "not authorized",
         "authorizationfailed",
         "does not have authorization",

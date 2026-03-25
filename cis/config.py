@@ -137,6 +137,7 @@ EXEMPT_SUBNETS: frozenset[str] = frozenset(
 
 CONTROL_CATALOG: tuple[tuple[str, int, str, str, str], ...] = (
     # ── Section 2 — Azure Databricks ──────────────────────────────────────
+    ("2.1.1", 2, "2 - Azure Databricks", "Databricks deployed in customer-managed VNet", "Resource Graph: databricks"),
     (
         "2.1.2",
         1,
@@ -153,6 +154,13 @@ CONTROL_CATALOG: tuple[tuple[str, int, str, str, str], ...] = (
     ),
     ("2.1.9", 2, "2 - Azure Databricks", "Databricks 'No Public IP' is enabled", "Resource Graph: databricks"),
     ("2.1.10", 2, "2 - Azure Databricks", "Databricks public network access is disabled", "Resource Graph: databricks"),
+    (
+        "2.1.8",
+        2,
+        "2 - Azure Databricks",
+        "Databricks encryption uses customer-managed keys",
+        "Resource Graph: databricks",
+    ),
     ("2.1.11", 2, "2 - Azure Databricks", "Private endpoints used to access Databricks", "Resource Graph: databricks"),
     # ── Section 3 — Compute Services ──────────────────────────────────────
     (
@@ -235,6 +243,29 @@ CONTROL_CATALOG: tuple[tuple[str, int, str, str, str], ...] = (
         "az role definition list --custom-role-only true",
     ),
     ("5.27", 1, "5 - Identity Services", "Between 2 and 3 subscription owners", "Resource Graph: role assignments"),
+    # ── Section 5 — Identity Services (MANUAL) ────────────────────────────
+    (
+        "5.2.2",
+        1,
+        "5 - Identity Services",
+        "Exclusionary geographic Conditional Access policy considered",
+        "MANUAL — requires Entra ID portal review",
+    ),
+    (
+        "5.3.2",
+        1,
+        "5 - Identity Services",
+        "Guest users reviewed on a regular basis",
+        "MANUAL — requires human review of guest accounts",
+    ),
+    # ── Section 5 — Identity Services (automated via Graph API) ───────────
+    (
+        "5.6",
+        1,
+        "5 - Identity Services",
+        "Account lockout threshold is ≤ 10",
+        "Graph API: GET /v1.0/policies/authenticationMethodsPolicy",
+    ),
     # ── Section 6 — Management & Governance ──────────────────────────────
     (
         "6.1.1.1",
@@ -337,6 +368,27 @@ CONTROL_CATALOG: tuple[tuple[str, int, str, str, str], ...] = (
         "Application Insights configured",
         "ARM REST: GET /providers/microsoft.insights/components",
     ),
+    (
+        "6.1.4",
+        1,
+        "6 - Management and Governance",
+        "Azure Monitor resource logging enabled for all services",
+        "MANUAL — requires per-resource diagnostic settings review",
+    ),
+    (
+        "6.1.5",
+        1,
+        "6 - Management and Governance",
+        "SKU Basic/Consumption not used on production artifacts",
+        "MANUAL — requires business context to identify production resources",
+    ),
+    (
+        "6.2",
+        2,
+        "6 - Management and Governance",
+        "Resource Locks set for mission-critical Azure resources",
+        "MANUAL — requires business context to identify mission-critical resources",
+    ),
     # ── Section 7 — Networking Services ───────────────────────────────────
     (
         "7.1",
@@ -424,6 +476,20 @@ CONTROL_CATALOG: tuple[tuple[str, int, str, str, str], ...] = (
         "Resource Graph: application gateways",
     ),
     ("7.15", 2, "7 - Networking Services", "WAF set to Prevention mode", "Resource Graph: WAF policies"),
+    (
+        "7.7",
+        1,
+        "7 - Networking Services",
+        "Public IP addresses evaluated on a periodic basis",
+        "MANUAL — requires periodic review of public IPs",
+    ),
+    (
+        "7.16",
+        2,
+        "7 - Networking Services",
+        "Azure Network Security Perimeter (NSP) is used",
+        "MANUAL — requires architecture review",
+    ),
     # ── Section 8 — Security Services ─────────────────────────────────────
     (
         "8.1.1.1",
@@ -560,6 +626,13 @@ CONTROL_CATALOG: tuple[tuple[str, int, str, str, str], ...] = (
     ("8.3.7", 2, "8 - Security Services", "Key Vaults use RBAC (not access policies)", "Resource Graph: Key Vaults"),
     ("8.3.8", 2, "8 - Security Services", "Key Vault purge protection enabled", "Resource Graph: Key Vaults"),
     ("8.3.9", 2, "8 - Security Services", "Private endpoints used for Key Vaults", "Resource Graph: Key Vaults"),
+    (
+        "8.3.10",
+        2,
+        "8 - Security Services",
+        "Key Vault Managed HSM used when required",
+        "MANUAL — requires regulatory/compliance assessment",
+    ),
     ("8.3.11", 2, "8 - Security Services", "Key Vault key rotation enabled", "az keyvault key rotation-policy show"),
     ("8.4.1", 2, "8 - Security Services", "Azure Bastion Host exists", "Resource Graph: Bastion hosts + VMs"),
     ("8.5", 2, "8 - Security Services", "DDoS Network Protection enabled on VNets", "Resource Graph: VNets"),

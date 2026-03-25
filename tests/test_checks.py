@@ -885,6 +885,63 @@ class TestCheck75(unittest.TestCase):
         self.assertEqual(results[0].status, FAIL)
 
 
+class TestCheck79(unittest.TestCase):
+    """7.9 — VPN Gateway P2S uses Azure AD authentication only."""
+
+    def test_no_gateways_returns_info(self) -> None:
+        with patch("checks.s7.az", return_value=(0, [])):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, INFO)
+
+    def test_az_fails_returns_error(self) -> None:
+        with patch("checks.s7.az", return_value=(1, "err")):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, ERROR)
+
+    def test_no_p2s_config_returns_info(self) -> None:
+        gw = {"name": "gw1", "vpnClientConfiguration": None}
+        with patch("checks.s7.az", return_value=(0, [gw])):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, INFO)
+
+    def test_aad_only_returns_pass(self) -> None:
+        gw = {"name": "gw1", "vpnClientConfiguration": {"vpnAuthenticationTypes": ["AAD"]}}
+        with patch("checks.s7.az", return_value=(0, [gw])):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, PASS)
+
+    def test_certificate_only_returns_fail(self) -> None:
+        gw = {"name": "gw1", "vpnClientConfiguration": {"vpnAuthenticationTypes": ["Certificate"]}}
+        with patch("checks.s7.az", return_value=(0, [gw])):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, FAIL)
+
+    def test_mixed_auth_returns_fail(self) -> None:
+        gw = {"name": "gw1", "vpnClientConfiguration": {"vpnAuthenticationTypes": ["AAD", "Certificate"]}}
+        with patch("checks.s7.az", return_value=(0, [gw])):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, FAIL)
+
+    def test_multiple_gateways(self) -> None:
+        gws = [
+            {"name": "gw-aad", "vpnClientConfiguration": {"vpnAuthenticationTypes": ["AAD"]}},
+            {"name": "gw-cert", "vpnClientConfiguration": {"vpnAuthenticationTypes": ["Certificate"]}},
+            {"name": "gw-nop2s", "vpnClientConfiguration": None},
+        ]
+        with patch("checks.s7.az", return_value=(0, gws)):
+            results = checks_s7.check_7_9(SID, SNAME)
+        self.assertEqual(len(results), 3)
+        self.assertEqual(results[0].status, PASS)
+        self.assertEqual(results[1].status, FAIL)
+        self.assertEqual(results[2].status, INFO)
+
+
 # =============================================================================
 # SECTION 8 — SECURITY SERVICES
 # =============================================================================

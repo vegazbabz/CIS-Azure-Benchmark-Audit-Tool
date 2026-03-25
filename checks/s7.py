@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, MANUAL, TIMEOUTS, INTERNET_SRCS, EXEMPT_SUBNETS
+from cis.config import PASS, FAIL, INFO, MANUAL, TIMEOUTS, INTERNET_SRCS, EXEMPT_SUBNETS
 from cis.models import R
 from cis.helpers import nsg_bad_rules
 from cis.check_helpers import _err, _idx, _info
@@ -470,6 +470,107 @@ def check_7_8(sid: str, sname: str) -> list[R]:
                 sname,
             )
         )
+    return results
+
+
+def check_7_9(sid: str, sname: str) -> list[R]:
+    """
+    7.9 — VPN Gateway P2S uses Azure AD authentication only (Level 2)
+
+    Azure VPN Gateway point-to-site (P2S) connections should use Azure AD
+    (Microsoft Entra ID) authentication exclusively. This provides strong
+    identity management and eliminates risks from static credentials or
+    certificate management.
+
+    CLI: az network vnet-gateway list → for each gateway with P2S config,
+    check vpnClientConfiguration.vpnAuthenticationTypes == ["AAD"].
+    """
+    rc, gws = az(["network", "vnet-gateway", "list"], sid, timeout=TIMEOUTS["default"])
+    if rc != 0:
+        return [
+            _err(
+                "7.9",
+                "VPN Gateway P2S uses Azure AD auth only",
+                2,
+                "7 - Networking Services",
+                str(gws),
+                sid,
+                sname,
+            )
+        ]
+
+    if not gws:
+        return [
+            _info(
+                "7.9",
+                "VPN Gateway P2S uses Azure AD auth only",
+                2,
+                "7 - Networking Services",
+                "No VPN Gateways found.",
+                sid,
+                sname,
+            )
+        ]
+
+    results: list[R] = []
+    for gw in gws:
+        gname = gw.get("name", "?")
+        vpn_cfg = gw.get("vpnClientConfiguration")
+
+        if not vpn_cfg:
+            # No P2S configured — not applicable for this gateway
+            results.append(
+                R(
+                    "7.9",
+                    "VPN Gateway P2S uses Azure AD auth only",
+                    2,
+                    "7 - Networking Services",
+                    INFO,
+                    f"Gateway '{gname}': No point-to-site configuration.",
+                    "",
+                    sid,
+                    sname,
+                    gname,
+                )
+            )
+            continue
+
+        auth_types = vpn_cfg.get("vpnAuthenticationTypes") or []
+        # Normalise to lowercase for comparison
+        auth_lower = [a.lower() for a in auth_types]
+
+        if auth_lower == ["aad"]:
+            results.append(
+                R(
+                    "7.9",
+                    "VPN Gateway P2S uses Azure AD auth only",
+                    2,
+                    "7 - Networking Services",
+                    PASS,
+                    f"Gateway '{gname}': P2S authentication = Azure AD only.",
+                    "",
+                    sid,
+                    sname,
+                    gname,
+                )
+            )
+        else:
+            results.append(
+                R(
+                    "7.9",
+                    "VPN Gateway P2S uses Azure AD auth only",
+                    2,
+                    "7 - Networking Services",
+                    FAIL,
+                    f"Gateway '{gname}': P2S authentication = {auth_types or 'not set'}. " "Expected Azure AD only.",
+                    "Virtual network gateways > VPN gateway > Point-to-site configuration > "
+                    "Set Authentication type to 'Azure Active Directory'.",
+                    sid,
+                    sname,
+                    gname,
+                )
+            )
+
     return results
 
 

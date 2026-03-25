@@ -264,7 +264,7 @@ CONTROL_CATALOG: tuple[tuple[str, int, str, str, str], ...] = (
         1,
         "5 - Identity Services",
         "Account lockout threshold is ≤ 10",
-        "Graph API: GET /v1.0/policies/authenticationMethodsPolicy",
+        "Graph API (beta): GET /beta/settings (templateId 5cf42378-d67d-4f36-ba46-e8b86229381d)",
     ),
     # ── Section 6 — Management & Governance ──────────────────────────────
     (

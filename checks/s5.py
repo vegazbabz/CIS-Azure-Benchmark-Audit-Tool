@@ -258,16 +258,25 @@ def check_5_3_2() -> R:
 
 def check_5_6() -> R:
     """
-    5.6 — Account lockout threshold ≤ 10 (Manual per CIS, but automatable via Graph)
+    5.6 — Account lockout threshold ≤ 10 (Level 1)
 
-    Checks the passwordProtection.lockoutThreshold setting from the
-    authenticationMethodsPolicy Graph API. The value should be ≤ 10.
+    The Smart Lockout threshold controls how many failed sign-in attempts are
+    allowed before an account is locked. CIS requires this to be ≤ 10.
+
+    The setting lives in the tenant-wide directory settings object with
+    templateId "5cf42378-d67d-4f36-ba46-e8b86229381d" (Password Rule Settings).
+    If the tenant has never customised password protection, the setting object
+    won't exist and the platform default of 10 applies — which is compliant.
+
+    API: GET https://graph.microsoft.com/beta/settings
+    Requires: Directory.Read.All
     """
     _CTRL = "5.6"
     _TITLE = "Account lockout threshold is ≤ 10"
     _SEC = "5 - Identity Services"
+    _TEMPLATE = "5cf42378-d67d-4f36-ba46-e8b86229381d"
 
-    url = "https://graph.microsoft.com/v1.0/policies/authenticationMethodsPolicy"
+    url = "https://graph.microsoft.com/beta/settings"
 
     if msal_is_configured():
         rc, data = msal_rest(url)
@@ -282,8 +291,8 @@ def check_5_6() -> R:
                 1,
                 _SEC,
                 ERROR,
-                "Insufficient permissions to read authenticationMethodsPolicy. "
-                "Requires Policy.ReadWrite.AuthenticationMethod or Policy.Read.All.",
+                "Insufficient permissions to read directory settings. "
+                "Requires Directory.Read.All.",
                 "",
             )
         return R(_CTRL, _TITLE, 1, _SEC, ERROR, f"Graph API error: {str(data)[:200]}", "")
@@ -291,18 +300,23 @@ def check_5_6() -> R:
     if not isinstance(data, dict):
         return R(_CTRL, _TITLE, 1, _SEC, ERROR, "Unexpected response format.", "")
 
-    pw_prot = data.get("passwordProtection") or {}
-    threshold = pw_prot.get("lockoutThreshold")
-    if threshold is None:
-        return R(
-            _CTRL,
-            _TITLE,
-            1,
-            _SEC,
-            ERROR,
-            "lockoutThreshold not found in authenticationMethodsPolicy response.",
-            "",
-        )
+    # Find the Password Rule Settings entry; absent means default (10) applies.
+    entries = data.get("value", [])
+    pw_entry = next((e for e in entries if e.get("templateId") == _TEMPLATE), None)
+
+    if pw_entry is None:
+        # Tenant uses platform defaults — lockout threshold is 10 (compliant).
+        return R(_CTRL, _TITLE, 1, _SEC, PASS, "Password protection settings not customised; platform default lockout threshold (10) applies.", "")
+
+    values = {v["name"]: v["value"] for v in pw_entry.get("values", [])}
+    raw = values.get("LockoutThreshold")
+    if raw is None:
+        return R(_CTRL, _TITLE, 1, _SEC, PASS, "LockoutThreshold not set; platform default (10) applies.", "")
+
+    try:
+        threshold = int(raw)
+    except (ValueError, TypeError):
+        return R(_CTRL, _TITLE, 1, _SEC, ERROR, f"Unexpected LockoutThreshold value: {raw!r}", "")
 
     compliant = threshold <= 10
     return R(
@@ -313,8 +327,8 @@ def check_5_6() -> R:
         PASS if compliant else FAIL,
         f"Lockout threshold is {threshold}." if compliant else f"Lockout threshold is {threshold} (should be ≤ 10).",
         (
-            "Entra ID > Security > Authentication methods > Password protection > "
-            "Smart lockout > Lockout threshold ≤ 10."
+            "Entra admin center > Protection > Authentication methods > Password protection > "
+            "Smart lockout > Lockout threshold: set to 10 or fewer."
             if not compliant
             else ""
         ),

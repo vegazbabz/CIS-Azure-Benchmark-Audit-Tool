@@ -19,7 +19,7 @@
 
 A Python tool that audits an Azure tenant against the **[CIS Microsoft Azure Foundations Benchmark v5.0.0](https://www.cisecurity.org/benchmark/azure)** — the industry-standard hardening guide for Azure environments, published by the [Center for Internet Security (CIS)](https://www.cisecurity.org/).
 
-It requires no pip installs beyond the standard library — only Python 3.10+ and the Azure CLI.
+It has one optional pip dependency (`msal`) for automated evaluation of check 5.1.1. All other checks require only Python 3.10+ and the Azure CLI — no pip installs needed.
 
 Results are saved as checkpoints after each subscription completes, so a failed or interrupted run
 can be resumed without re-running completed work. Output is a self-contained HTML report with
@@ -38,7 +38,7 @@ are generated alongside the HTML automatically.
 | Azure CLI | Any recent version — <https://aka.ms/install-azure-cli> |
 | resource-graph extension | Installed automatically on first run |
 | Azure login | `az login` completed before running |
-| msal | `pip install -r requirements.txt` — required for check 5.1.1 (optional, see below) |
+| msal _(optional)_ | `pip install -r requirements.txt` — needed for automated evaluation of check 5.1.1; all other checks work without it |
 
 ### Azure permissions
 
@@ -262,6 +262,7 @@ python cis_azure_audit.py [options]
 | `-v`, `--verbose` | Verbose logging (sets `DEBUG`) |
 | `--debug` | Trace logging (sets `TRACE`) |
 | `--log-file` | Write full logs to a file in addition to the console |
+| `--exit-code` | Exit with code 2 if any FAIL or ERROR results are found — for use in CI/CD pipelines |
 
 ### Examples
 
@@ -714,7 +715,7 @@ python cis_azure_audit.py --suppressions prod-suppressions.toml
 > lacks a Key Vault data-plane role / access policy, the check returns ERROR with an actionable message
 > explaining exactly what is missing — compliance is unknown, not assumed clean.
 
-### Section 9 — Storage Services (21 of 21 · 24 automated)
+### Section 9 — Storage Services (24 of 24 · 24 automated)
 
 | Control | Title | Level |
 | --- | --- | --- |
@@ -863,8 +864,8 @@ will return ERROR. Test with:
 az rest --method get --url "https://graph.microsoft.com/v1.0/policies/authorizationPolicy"
 ```
 
-**Conditional Access policies (5.2.x)** — marked Manual in the benchmark and not checked by this
-tool. They require review in the Entra ID portal.
+**Conditional Access policies (5.2.1, 5.2.3)** — not checked by this tool; they require review in
+the Entra ID portal. Control 5.2.2 is included in the Section 5 table above as a Manual output.
 
 **Large tenants** — Resource Graph handles bulk data efficiently, and the permission preflight
 runs subscriptions in parallel. The main bottleneck at scale is per-subscription CLI calls.

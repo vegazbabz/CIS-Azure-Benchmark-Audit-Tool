@@ -291,8 +291,7 @@ def check_5_6() -> R:
                 1,
                 _SEC,
                 ERROR,
-                "Insufficient permissions to read directory settings. "
-                "Requires Directory.Read.All.",
+                "Insufficient permissions to read directory settings. " "Requires Directory.Read.All.",
                 "",
             )
         return R(_CTRL, _TITLE, 1, _SEC, ERROR, f"Graph API error: {str(data)[:200]}", "")
@@ -306,7 +305,15 @@ def check_5_6() -> R:
 
     if pw_entry is None:
         # Tenant uses platform defaults — lockout threshold is 10 (compliant).
-        return R(_CTRL, _TITLE, 1, _SEC, PASS, "Password protection settings not customised; platform default lockout threshold (10) applies.", "")
+        return R(
+            _CTRL,
+            _TITLE,
+            1,
+            _SEC,
+            PASS,
+            "Password protection settings not customised; platform default lockout threshold (10) applies.",
+            "",
+        )
 
     values = {v["name"]: v["value"] for v in pw_entry.get("values", [])}
     raw = values.get("LockoutThreshold")

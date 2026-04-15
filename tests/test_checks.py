@@ -619,12 +619,31 @@ class TestCheck6113(unittest.TestCase):
         self.assertEqual(result.status, FAIL)
 
 
+class TestCheck6115(unittest.TestCase):
+    """6.1.1.5 — NSG flow logs with Traffic Analytics (deprecated June 2025)."""
+
+    def test_returns_info_deprecation(self) -> None:
+        result = checks_s6.check_6_1_1_5(SID, SNAME)
+        self.assertEqual(result.status, INFO)
+        self.assertIn("30 Jun 2025", result.details)
+
+    def test_control_id_is_correct(self) -> None:
+        result = checks_s6.check_6_1_1_5(SID, SNAME)
+        self.assertEqual(result.control_id, "6.1.1.5")
+
+    def test_remediation_is_empty(self) -> None:
+        """No remediation possible — remediation field must be empty."""
+        result = checks_s6.check_6_1_1_5(SID, SNAME)
+        self.assertEqual(result.remediation, "")
+
+
 class TestCheck612Alerts(unittest.TestCase):
     """6.1.2.1–6.1.2.11 — Activity Log Alerts for critical operations."""
 
-    def _make_alert(self, op_name: str) -> dict:
+    def _make_alert(self, op_name: str, enabled: bool = True) -> dict:
         """Build a minimal alert dict with a single operationName condition."""
         return {
+            "enabled": enabled,
             "condition": {
                 "allOf": [
                     {"field": "operationName", "equals": op_name},
@@ -669,6 +688,28 @@ class TestCheck612Alerts(unittest.TestCase):
         statuses = {r.control_id: r.status for r in results}
         self.assertEqual(statuses["6.1.2.1"], PASS)
         self.assertEqual(statuses["6.1.2.2"], FAIL)
+
+    def test_disabled_alert_does_not_count_as_compliant(self) -> None:
+        """Regression: an alert rule with enabled=false must NOT satisfy the control."""
+        alerts = [self._make_alert("microsoft.authorization/policyassignments/write", enabled=False)]
+        with patch("checks.s6.az", return_value=(0, alerts)):
+            results = checks_s6.check_6_1_2_alerts(SID, SNAME)
+        statuses = {r.control_id: r.status for r in results}
+        # Alert exists but is disabled — must be FAIL, not PASS
+        self.assertEqual(statuses["6.1.2.1"], FAIL)
+
+    def test_disabled_service_health_alert_does_not_count(self) -> None:
+        """Regression: disabled ServiceHealth alert must not satisfy 6.1.2.11."""
+        alerts = [
+            {
+                "enabled": False,
+                "condition": {"allOf": [{"field": "category", "equals": "ServiceHealth"}]},
+            }
+        ]
+        with patch("checks.s6.az", return_value=(0, alerts)):
+            results = checks_s6.check_6_1_2_alerts(SID, SNAME)
+        statuses = {r.control_id: r.status for r in results}
+        self.assertEqual(statuses["6.1.2.11"], FAIL)
 
 
 # =============================================================================
@@ -788,101 +829,30 @@ class TestCheck72(unittest.TestCase):
 
 
 class TestCheck75(unittest.TestCase):
-    """7.5 — NSG flow log retention >= 90 days."""
+    """7.5 — NSG flow log retention >= 90 days (deprecated since June 2025)."""
 
-    def test_no_nsgs_returns_info(self) -> None:
-        with patch("checks.s7.az", return_value=(0, [])):
-            results = checks_s7.check_7_5(SID, SNAME)
+    def test_always_returns_info_deprecation(self) -> None:
+        """check_7_5 must return INFO with a deprecation notice unconditionally
+        because Microsoft blocked NSG flow log creation on 30 Jun 2025."""
+        results = checks_s7.check_7_5(SID, SNAME)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].status, INFO)
+        self.assertIn("30 Jun 2025", results[0].details)
+
+    def test_no_nsgs_still_returns_info(self) -> None:
+        """Absence of NSGs does not change the deprecation result."""
+        results = checks_s7.check_7_5(SID, SNAME)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].status, INFO)
 
-    def test_az_watcher_list_fails_returns_error(self) -> None:
-        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
-            if "nsg" in args:
-                return (0, [{"name": "nsg1"}])
-            return (1, "err")
+    def test_control_id_is_correct(self) -> None:
+        results = checks_s7.check_7_5(SID, SNAME)
+        self.assertEqual(results[0].control_id, "7.5")
 
-        with patch("checks.s7.az", side_effect=_az_side_effect):
-            results = checks_s7.check_7_5(SID, SNAME)
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].status, ERROR)
-
-    def test_no_watchers_returns_fail(self) -> None:
-        # No watchers → no flow logs possible → non-compliant (FAIL)
-        # check_7_6 separately covers the missing Network Watcher itself.
-        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
-            if "nsg" in args:
-                return (0, [{"name": "nsg1"}])
-            return (0, [])
-
-        with patch("checks.s7.az", side_effect=_az_side_effect):
-            results = checks_s7.check_7_5(SID, SNAME)
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].status, FAIL)
-
-    def test_flow_log_retention_90_days_enabled_returns_pass(self) -> None:
-        watcher = {"location": "eastus", "name": "watcher1"}
-        flow_log = {
-            "name": "fl1",
-            "retentionPolicy": {"days": 90, "enabled": True},
-        }
-
-        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
-            if "nsg" in args:
-                return (0, [{"name": "nsg1"}])
-            # Check for flow-log first — its args also contain "watcher" and "list"
-            if "flow-log" in args:
-                return (0, [flow_log])
-            if "watcher" in args and "list" in args:
-                return (0, [watcher])
-            return (1, "unexpected")
-
-        with patch("checks.s7.az", side_effect=_az_side_effect):
-            results = checks_s7.check_7_5(SID, SNAME)
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].status, PASS)
-
-    def test_flow_log_retention_below_90_returns_fail(self) -> None:
-        watcher = {"location": "eastus", "name": "watcher1"}
-        flow_log = {
-            "name": "fl1",
-            "retentionPolicy": {"days": 30, "enabled": True},
-        }
-
-        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
-            if "nsg" in args:
-                return (0, [{"name": "nsg1"}])
-            if "flow-log" in args:
-                return (0, [flow_log])
-            if "watcher" in args and "list" in args:
-                return (0, [watcher])
-            return (1, "unexpected")
-
-        with patch("checks.s7.az", side_effect=_az_side_effect):
-            results = checks_s7.check_7_5(SID, SNAME)
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].status, FAIL)
-
-    def test_flow_log_enabled_false_returns_fail(self) -> None:
-        watcher = {"location": "westus", "name": "watcher2"}
-        flow_log = {
-            "name": "fl2",
-            "retentionPolicy": {"days": 90, "enabled": False},
-        }
-
-        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
-            if "nsg" in args:
-                return (0, [{"name": "nsg1"}])
-            if "flow-log" in args:
-                return (0, [flow_log])
-            if "watcher" in args and "list" in args:
-                return (0, [watcher])
-            return (1, "unexpected")
-
-        with patch("checks.s7.az", side_effect=_az_side_effect):
-            results = checks_s7.check_7_5(SID, SNAME)
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].status, FAIL)
+    def test_remediation_is_empty(self) -> None:
+        """No remediation path is possible — remediation field must be empty."""
+        results = checks_s7.check_7_5(SID, SNAME)
+        self.assertEqual(results[0].remediation, "")
 
 
 class TestCheck79(unittest.TestCase):
@@ -975,7 +945,7 @@ class TestCheck81Defender(unittest.TestCase):
     def test_mixed_tiers_returns_mixed_statuses(self) -> None:
         call_count = [0]
 
-        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+        def _az_side_effect(args: list, *a: Any, **_: Any) -> tuple:
             call_count[0] += 1
             # Alternate between Standard and Free
             tier = "Standard" if call_count[0] % 2 == 1 else "Free"
@@ -1053,6 +1023,76 @@ class TestCheck83Keyvaults(unittest.TestCase):
         pub_results = [r for r in results if r.control_id == "8.3.7"]
         self.assertTrue(len(pub_results) > 0)
         self.assertEqual(pub_results[0].status, FAIL)
+
+    def test_rotation_policy_lifetime_actions_as_strings_does_not_crash(self) -> None:
+        """Regression: Azure may return lifetimeActions as a list of strings (not dicts)."""
+        vault = {
+            "name": "kv-str-actions",
+            "id": "/subscriptions/x/resourceGroups/rg/providers/Microsoft.KeyVault/vaults/kv4",
+            "rbac": True,
+            "purgeProtection": True,
+            "publicAccess": "Disabled",
+            "privateEps": 1,
+        }
+        td = _td("keyvaults", [vault])
+
+        keys = [{"name": "my-key", "expires": "2030-01-01", "enabled": True}]
+        # lifetimeActions is a list of strings — malformed response from Azure
+        rotation_policy = {"lifetimeActions": ["Notify", "Rotate"]}
+
+        def _az_side(_args: list, *_a: Any, **_: Any) -> tuple:
+            if "rotation-policy" in _args:
+                return (0, rotation_policy)
+            if "key" in _args and "list" in _args:
+                return (0, keys)
+            return (0, [])
+
+        with patch("checks.s8.az", side_effect=_az_side):
+            results = checks_s8.check_8_3_keyvaults(SID, SNAME, td)
+
+        # Must not raise; 8.3.9 should FAIL (no dict action found)
+        rot_results = [r for r in results if r.control_id == "8.3.9"]
+        self.assertTrue(len(rot_results) > 0)
+        self.assertEqual(rot_results[0].status, FAIL)
+
+    def test_rotation_policy_lifetime_actions_string_action_value(self) -> None:
+        """Regression: Azure may return lifetimeActions as dicts with a bare string
+        'action' field (e.g. {"action": "Rotate", "trigger": {...}}) rather than the
+        nested form {"action": {"type": "Rotate"}, ...}.  The check must not crash
+        and must recognise the policy as having a Rotate action."""
+        vault = {
+            "name": "kv-str-action-val",
+            "id": "/subscriptions/x/resourceGroups/rg/providers/Microsoft.KeyVault/vaults/kv5",
+            "rbac": True,
+            "purgeProtection": True,
+            "publicAccess": "Disabled",
+            "privateEps": 1,
+        }
+        td = _td("keyvaults", [vault])
+
+        keys = [{"name": "my-key", "expires": "2030-01-01", "enabled": True}]
+        # Azure returns the action as a plain string, not a nested dict
+        rotation_policy = {
+            "lifetimeActions": [
+                {"action": "Notify", "trigger": {"timeBeforeExpiry": "P30D"}},
+                {"action": "Rotate", "trigger": {"timeBeforeExpiry": "P7D"}},
+            ]
+        }
+
+        def _az_side(_args: list, *_a: Any, **_: Any) -> tuple:
+            if "rotation-policy" in _args:
+                return (0, rotation_policy)
+            if "key" in _args and "list" in _args:
+                return (0, keys)
+            return (0, [])
+
+        with patch("checks.s8.az", side_effect=_az_side):
+            results = checks_s8.check_8_3_keyvaults(SID, SNAME, td)
+
+        # Must not raise; 8.3.9 should PASS (Rotate action present)
+        rot_results = [r for r in results if r.control_id == "8.3.9"]
+        self.assertTrue(len(rot_results) > 0)
+        self.assertEqual(rot_results[0].status, PASS)
 
 
 class TestCheck841(unittest.TestCase):
@@ -1212,7 +1252,7 @@ class TestCheck9Storage(unittest.TestCase):
             "logging": {"read": True, "write": True, "delete": True},
         }
 
-        def _az_side_effect(args: list, *a: Any, **kw: Any) -> tuple:
+        def _az_side_effect(args: list, *a: Any, **_: Any) -> tuple:
             if "blob-service-properties" in args:
                 return (0, blob_svc)
             if "file-service-properties" in args:
@@ -1256,7 +1296,7 @@ class TestCheck9Storage(unittest.TestCase):
             "because bypass is not set to 'AzureServices' and PublicNetworkAccess is set to 'Disabled'."
         )
 
-        def _az_fw(_args: list, *a: Any, **kw: Any) -> tuple:
+        def _az_fw(_args: list, *a: Any, **_: Any) -> tuple:
             return (1, fw_error)
 
         with patch("checks.s9.az", side_effect=_az_fw):
@@ -1294,7 +1334,7 @@ class TestCheck9Storage(unittest.TestCase):
             " 'Microsoft.Storage/storageAccounts/blobServices/read'."
         )
 
-        def _az_auth(_args: list, *a: Any, **kw: Any) -> tuple:
+        def _az_auth(_args: list, *a: Any, **_: Any) -> tuple:
             return (1, auth_error)
 
         with patch("checks.s9.az", side_effect=_az_auth):
@@ -1336,7 +1376,7 @@ class TestCheck9Storage(unittest.TestCase):
             "logging": {"read": False, "write": False, "delete": False},
         }
 
-        def _az_side(args: list, *a: Any, **kw: Any) -> tuple:
+        def _az_side(args: list, *a: Any, **_: Any) -> tuple:
             if "blob-service-properties" in args:
                 return (0, blob_svc)
             if "blob" in args and "service-properties" in args:
@@ -1378,7 +1418,7 @@ class TestCheck9Storage(unittest.TestCase):
             "logging": {"read": True, "write": True, "delete": True},
         }
 
-        def _az_side(args: list, *a: Any, **kw: Any) -> tuple:
+        def _az_side(args: list, *a: Any, **_: Any) -> tuple:
             if "blob-service-properties" in args:
                 return (0, blob_svc)
             if "blob" in args and "service-properties" in args:

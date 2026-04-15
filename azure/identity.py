@@ -62,20 +62,16 @@ def get_signed_in_user_id() -> str | None:
 def list_role_names_for_user(
     user_id: str | None = None,
     subscription: str | None = None,
+    scope: str | None = None,
 ) -> tuple[int, Any]:
     """Return the names of roles assigned to the user (including inherited).
 
     Uses ``--assignee`` scoping when a user_id is provided; falls back to
     ``--all --include-inherited`` filtered to User principal type.
-    """
 
-    def _looks_like_guid(s: str) -> bool:
-        return bool(
-            re.match(
-                r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-                str(s),
-            )
-        )
+    ``scope`` takes precedence over ``subscription`` when both are provided and
+    is used to query a specific ARM scope (e.g. a management group).
+    """
 
     if user_id:
         args = [
@@ -87,7 +83,9 @@ def list_role_names_for_user(
             "--include-inherited",
             "--include-groups",
         ]
-        if subscription:
+        if scope:
+            args += ["--scope", scope]
+        elif subscription:
             args += ["--subscription", subscription]
         args += ["--query", "[].roleDefinitionName"]
         rc, out = az(args)
@@ -139,7 +137,11 @@ def check_user_permissions(sub_ids: list[str]) -> dict[str, Any]:
             rc, result = future.result()
             if rc == 0 and isinstance(result, list):
                 all_roles.update(result)
-                for r in result:
+                # Deduplicate per subscription: the same role can appear multiple
+                # times in a single result when it is assigned at several parent
+                # scopes (e.g. once at the subscription level and again inherited
+                # from a management group).  Count each role at most once per sub.
+                for r in set(result):
                     role_sub_count[r] = role_sub_count.get(r, 0) + 1
             elif rc != 0:
                 last_error = result
@@ -147,6 +149,25 @@ def check_user_permissions(sub_ids: list[str]) -> dict[str, Any]:
     except KeyboardInterrupt:
         pool.shutdown(wait=False, cancel_futures=True)
         raise
+
+    # Supplement with a tenant-root management-group scope query.
+    # Per-subscription queries (even with --include-inherited) do not reliably
+    # surface role assignments made at management-group scope via the ARM
+    # subscription API.  Querying the root MG scope directly ensures those
+    # assignments (e.g. Security Reader / Security Admin on Tenant Root Group)
+    # are included in the permission summary.
+    if user_id and sub_ids:
+        _, tenant_id_raw = az(["account", "show", "--query", "tenantId"])
+        if isinstance(tenant_id_raw, str) and tenant_id_raw.strip():
+            mg_scope = f"/providers/Microsoft.Management/managementGroups/{tenant_id_raw.strip()}"
+            rc_mg, result_mg = list_role_names_for_user(user_id, scope=mg_scope)
+            if rc_mg == 0 and isinstance(result_mg, list):
+                for r in set(result_mg):
+                    if r not in all_roles:
+                        # Role only visible at MG/tenant scope — it applies to
+                        # all subscriptions beneath it.
+                        role_sub_count[r] = total_subs
+                all_roles.update(result_mg)
 
     if not all_roles and last_error:
         warnings.append(f"Could not enumerate user roles: {last_error}")

@@ -98,6 +98,71 @@ class TestPermissionHelpers(unittest.TestCase):
         self.assertEqual(rc, 2)
         self.assertEqual(out, "boom")
 
+    @patch("azure.identity.az")
+    def test_list_roles_with_scope(self, mock_az: Any) -> None:
+        """Uses --scope instead of --subscription when scope is provided."""
+        mock_az.return_value = (0, ["Security Reader", "Security Admin"])
+        guid = "abcd1234-5678-1234-5678-abcdefabcdef"
+        mg_scope = "/providers/Microsoft.Management/managementGroups/tenant-id"
+        rc, roles = az_identity.list_role_names_for_user(guid, scope=mg_scope)
+        self.assertEqual(rc, 0)
+        self.assertListEqual(roles, ["Security Reader", "Security Admin"])
+        mock_az.assert_called_with(
+            [
+                "role",
+                "assignment",
+                "list",
+                "--assignee",
+                guid,
+                "--include-inherited",
+                "--include-groups",
+                "--scope",
+                mg_scope,
+                "--query",
+                "[].roleDefinitionName",
+            ]
+        )
+
+
+class TestCheckUserPermissions(unittest.TestCase):
+    """Covers check_user_permissions aggregation and edge cases."""
+
+    @patch("azure.identity.az")
+    def test_duplicate_roles_counted_once_per_sub(self, mock_az: Any) -> None:
+        """Role appearing twice in one sub's result (inherited + direct) counts as 1, not 2."""
+        # Call sequence: signed-in-user, sub1 roles, sub2 roles, tenantId, MG roles
+        mock_az.side_effect = [
+            (0, {"id": "uid-001"}),                          # get_signed_in_user_id
+            (0, ["Reader", "Reader", "Owner"]),              # sub1: Reader duplicated
+            (0, ["Reader", "Owner"]),                        # sub2
+            (0, "tenant-abc"),                               # account show --query tenantId
+            (0, []),                                         # MG scope query
+        ]
+        result = az_identity.check_user_permissions(["sub1", "sub2"])
+        # Reader assigned at 2 subs — must not exceed total_subs
+        self.assertLessEqual(result["role_sub_count"]["Reader"], result["total_subs"])
+        self.assertEqual(result["role_sub_count"]["Reader"], 2)
+
+    @patch("azure.identity.az")
+    def test_management_group_security_roles_detected(self, mock_az: Any) -> None:
+        """Security roles assigned only at tenant root MG are picked up by the MG query."""
+        mock_az.side_effect = [
+            (0, {"id": "uid-001"}),             # get_signed_in_user_id
+            (0, ["Reader", "Owner"]),            # sub1: no security role
+            (0, ["Reader"]),                     # sub2: no security role
+            (0, "tenant-abc"),                   # account show --query tenantId
+            (0, ["Security Reader", "Security Admin"]),  # MG scope: security roles present
+        ]
+        result = az_identity.check_user_permissions(["sub1", "sub2"])
+        self.assertIn("Security Reader", result["roles"])
+        self.assertIn("Security Admin", result["roles"])
+        # MG roles should be credited to all subscriptions
+        self.assertEqual(result["role_sub_count"]["Security Reader"], 2)
+        self.assertEqual(result["role_sub_count"]["Security Admin"], 2)
+        # all_clear should be True: has reader-equivalent AND security role
+        self.assertTrue(result["all_clear"])
+        self.assertEqual(result["warnings"], [])
+
 
 class TestPreflight(unittest.TestCase):
     """Covers preflight gate behavior before running a full audit."""
@@ -105,7 +170,7 @@ class TestPreflight(unittest.TestCase):
     @patch("builtins.print")
     @patch("cis_azure_audit.get_signed_in_user_id")
     @patch("cis_azure_audit.list_role_names_for_user")
-    def test_preflight_success(self, mock_list: Any, mock_user: Any, mock_print: Any) -> None:
+    def test_preflight_success(self, mock_list: Any, mock_user: Any, _mock_print: Any) -> None:
         """Preflight passes when Reader + Security Reader are present."""
         mock_user.return_value = "u"
 
@@ -123,7 +188,7 @@ class TestPreflight(unittest.TestCase):
     @patch("builtins.print")
     @patch("cis_azure_audit.get_signed_in_user_id")
     @patch("cis_azure_audit.list_role_names_for_user")
-    def test_preflight_missing(self, mock_list: Any, mock_user: Any, mock_print: Any) -> None:
+    def test_preflight_missing(self, mock_list: Any, mock_user: Any, _mock_print: Any) -> None:
         """Preflight exits with error when signed-in identity is unavailable."""
         mock_user.return_value = None
         import cis_azure_audit as mod
@@ -136,7 +201,7 @@ class TestPreflight(unittest.TestCase):
     @patch("builtins.print")
     @patch("cis_azure_audit.get_signed_in_user_id")
     @patch("cis_azure_audit.list_role_names_for_user")
-    def test_preflight_roles_missing(self, mock_list: Any, mock_user: Any, mock_print: Any) -> None:
+    def test_preflight_roles_missing(self, mock_list: Any, mock_user: Any, _mock_print: Any) -> None:
         """Preflight exits with error when no security-prefixed role exists."""
         mock_user.return_value = "u"
 
@@ -156,7 +221,7 @@ class TestPreflight(unittest.TestCase):
     @patch("builtins.print")
     @patch("cis_azure_audit.get_signed_in_user_id")
     @patch("cis_azure_audit.list_role_names_for_user")
-    def test_preflight_with_security_admin(self, mock_list: Any, mock_user: Any, mock_print: Any) -> None:
+    def test_preflight_with_security_admin(self, mock_list: Any, mock_user: Any, _mock_print: Any) -> None:
         """Preflight passes when Security Admin is present instead of Reader role variant."""
         mock_user.return_value = "u"
 
@@ -180,9 +245,9 @@ class TestPreflight(unittest.TestCase):
         self,
         mock_az: Any,
         mock_cpu: Any,
-        mock_subs: Any,
-        mock_audit: Any,
-        mock_html: Any,
+        _mock_subs: Any,
+        _mock_audit: Any,
+        _mock_html: Any,
     ) -> None:
         """--skip-preflight prevents check_user_permissions from being called in main()."""
         mock_az.side_effect = [
@@ -205,9 +270,9 @@ class TestPreflight(unittest.TestCase):
         self,
         mock_az: Any,
         mock_cpu: Any,
-        mock_subs: Any,
-        mock_audit: Any,
-        mock_html: Any,
+        _mock_subs: Any,
+        _mock_audit: Any,
+        _mock_html: Any,
     ) -> None:
         """SKIP_PREFLIGHT env var prevents check_user_permissions from being called in main()."""
         mock_az.side_effect = [

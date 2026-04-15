@@ -615,10 +615,23 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                         )
                     elif isinstance(pol, dict):
                         # A rotation policy is compliant if at least one lifetimeAction
-                        # has type == "Rotate" (as opposed to "Notify")
+                        # has type == "Rotate" (as opposed to "Notify").
+                        # Azure returns lifetimeActions in two different shapes depending
+                        # on the tenant/API version:
+                        #   - [{"action": {"type": "Rotate"}, "trigger": {...}}]  (dict action)
+                        #   - [{"action": "Rotate", "trigger": {...}}]            (string action)
+                        #   - ["Rotate", "Notify"]                                (flat strings)
+                        # All three must be handled without crashing.
+                        def _la_is_rotate(la: Any) -> bool:
+                            if not isinstance(la, dict):
+                                return False
+                            action = la.get("action")
+                            if isinstance(action, dict):
+                                return action.get("type", "").lower() == "rotate"
+                            return str(action or "").lower() == "rotate"
+
                         has_rotate = any(
-                            la.get("action", {}).get("type", "").lower() == "rotate"
-                            for la in pol.get("lifetimeActions", [])
+                            _la_is_rotate(la) for la in pol.get("lifetimeActions", [])
                         )
                         acc.append(
                             R(

@@ -116,21 +116,21 @@ def console_init(total: int) -> None:
     _console["total"] = total
     _console["last_len"] = 0
     with _lock:
-        sys.stdout.write(f"Progress: 0/{total}\n")
+        sys.stdout.write(f"  Progress: 0/{total}\n")
         sys.stdout.flush()
 
 
 def console_update(done: int, total: int, current: str = "") -> None:
-    """Update the single-line progress indicator in-place.
+    """Print a progress line for the current subscription.
 
     Called by worker threads to show overall progress and the current
-    subscription being processed.
+    subscription being processed.  Each call emits a fresh line because the
+    logging StreamHandler also writes to stdout; using \\r (in-place overwrite)
+    would just clobber log messages rather than updating the progress header.
     """
-    s = f"Progress: [{done}/{total}] {current}"
+    s = f"  Progress: [{done}/{total}] {current}"
     with _lock:
-        # Overwrite the previous line (pad with spaces to clear)
-        pad = max(0, _console.get("last_len", 0) - len(s))
-        sys.stdout.write("\r" + s + (" " * pad))
+        sys.stdout.write(s + "\n")
         sys.stdout.flush()
         _console["last_len"] = len(s)
 

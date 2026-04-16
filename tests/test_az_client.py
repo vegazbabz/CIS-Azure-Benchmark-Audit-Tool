@@ -324,7 +324,7 @@ class TestRateLimitCounter(unittest.TestCase):
         ]
         with patch("azure.client.subprocess.Popen") as mock_popen, patch("azure.client.time.sleep", lambda s: None):
 
-            def _side(cmd: list[str], **kw: Any) -> Any:
+            def _side(cmd: list[str], **_: Any) -> Any:
                 call_num = mock_popen.call_count - 1
                 rc_val, out_val, err_val = responses[call_num]
                 proc = MagicMock()

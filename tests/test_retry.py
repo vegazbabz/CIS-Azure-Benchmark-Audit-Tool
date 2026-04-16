@@ -26,7 +26,7 @@ class TestRunCmdWithRetries(unittest.TestCase):
 
     @patch("azure.client.logger")
     @patch("azure.client.time.sleep", lambda s: None)
-    def test_retry_on_429_then_success(self, mock_logger: Any) -> None:
+    def test_retry_on_429_then_success(self, _mock_logger: Any) -> None:
         # The helper should notice an HTTP 429 message, retry once, and then
         # return the successful result on the second attempt.  We patch
         # ``subprocess.Popen`` to simulate this sequence.
@@ -45,7 +45,7 @@ class TestRunCmdWithRetries(unittest.TestCase):
         # If the subprocess call times out repeatedly, the helper should back
         # off a few times and ultimately return an error code with a timeout
         # message.
-        def make_timeout_proc(*args: Any, **kwargs: Any) -> MagicMock:
+        def make_timeout_proc(*args: Any, **_: Any) -> MagicMock:
             proc = MagicMock()
             # First communicate() raises TimeoutExpired; second (drain call) returns empty
             proc.communicate.side_effect = [
@@ -65,7 +65,7 @@ class TestRunCmdWithRetries(unittest.TestCase):
         # When the az CLI binary is missing, ``subprocess.Popen`` raises
         # FileNotFoundError; the helper should propagate a friendly error
         # string instead of crashing.
-        def raise_fnf(*args: Any, **kwargs: Any) -> None:
+        def raise_fnf(*args: Any, **_: Any) -> None:
             raise FileNotFoundError()
 
         with patch("azure.client.subprocess.Popen", side_effect=raise_fnf):

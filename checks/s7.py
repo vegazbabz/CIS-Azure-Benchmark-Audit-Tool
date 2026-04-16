@@ -231,80 +231,37 @@ def check_7_5(sid: str, sname: str) -> list[R]:
     """
     7.5 — NSG flow log retention >= 90 days (Level 2)
 
-    NSG flow logs record source/destination IP, port, protocol, and allow/deny
-    decision for every IP flow through an NSG. They are critical for network
-    forensics after a security incident. The CIS benchmark requires retention
-    of at least 90 days.
+    ⚠️  DEPRECATED — Microsoft blocked creation of NEW NSG-level flow logs on
+    30 June 2025 and announced full retirement on 30 September 2027.  Existing
+    NSG flow logs cannot be created or modified; this control cannot be
+    satisfied on any current Azure subscription and will generate an
+    irremediable FAIL if assessed normally.
 
-    Implementation:
-      1. List all Network Watchers in the subscription
-      2. For each watcher, list its flow logs
-      3. For each flow log, check retention period >= 90 AND enabled == true
+    The recommended migration path is Virtual Network (VNet) flow logs (CIS 7.8),
+    which are the supported successor feature.  Auditors should assess 7.8
+    instead and treat 7.5 as not-applicable.
 
-    If no flow logs are found, returns FAIL with a message stating that flow
-    logging has not been enabled — absence of flow logs is non-compliant.
+    References:
+      https://azure.microsoft.com/updates/transition-to-vnet-flow-logs
     """
-    # If there are no NSGs at all, flow logs are N/A — same logic as 7.1–7.4.
-    rc_nsg, nsgs = az(["network", "nsg", "list"], sid, timeout=TIMEOUTS["default"])
-    if rc_nsg == 0 and not nsgs:
-        return [
-            _info("7.5", "NSG flow log retention > 90 days", 2, "7 - Networking Services", "No NSGs found.", sid, sname)
-        ]
-
-    rc, watchers = az(["network", "watcher", "list"], sid, timeout=TIMEOUTS["default"])
-    if rc != 0:
-        return [
-            _err("7.5", "NSG flow log retention > 90 days", 2, "7 - Networking Services", str(watchers), sid, sname)
-        ]
-
-    results = []
-    for watcher in watchers or []:
-        # Flow logs are listed per Network Watcher, scoped by location only
-        rc2, flows = az(
-            ["network", "watcher", "flow-log", "list", "--location", watcher.get("location", "")],
+    return [
+        R(
+            "7.5",
+            "NSG flow log retention > 90 days",
+            2,
+            "7 - Networking Services",
+            INFO,
+            (
+                "NSG flow log creation was blocked by Microsoft on 30 Jun 2025 "
+                "(full retirement: 30 Sep 2027). This control cannot be assessed "
+                "or remediated on current subscriptions. Assess CIS 7.8 "
+                "(VNet flow logs) instead."
+            ),
+            "",
             sid,
-            timeout=TIMEOUTS["default"],
+            sname,
         )
-        if rc2 != 0:
-            continue  # Skip this watcher if flow log list fails
-
-        for fl in flows or []:
-            fname = fl.get("name", "?")
-            ret = (fl.get("retentionPolicy") or {}).get("days", 0)
-            enabled = (fl.get("retentionPolicy") or {}).get("enabled", False)
-            # Both conditions must be true: enabled AND >= 90 days
-            ok = enabled and int(ret) >= 90
-            results.append(
-                R(
-                    "7.5",
-                    "NSG flow log retention > 90 days",
-                    2,
-                    "7 - Networking Services",
-                    PASS if ok else FAIL,
-                    f"Retention: {ret} days (enabled: {enabled}). Flow log: {fname}",
-                    "Network Watcher > Flow logs > Set retention >= 90 days" if not ok else "",
-                    sid,
-                    sname,
-                    fname,
-                )
-            )
-
-    if not results:
-        results.append(
-            R(
-                "7.5",
-                "NSG flow log retention > 90 days",
-                2,
-                "7 - Networking Services",
-                FAIL,
-                "No NSG flow logs found.",
-                "Network Watcher > Flow logs > Create a flow log for each NSG with retention >= 90 days"
-                " and Traffic Analytics enabled (CIS 6.1.1.5).",
-                sid,
-                sname,
-            )
-        )
-    return results
+    ]
 
 
 def check_7_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:

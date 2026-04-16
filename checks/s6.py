@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cis.config import PASS, FAIL, MANUAL, TIMEOUTS
+from cis.config import PASS, FAIL, INFO, MANUAL, TIMEOUTS
 from cis.models import R
 from cis.check_helpers import _err, _idx, _info
 from azure.helpers import az, az_rest
@@ -257,6 +257,41 @@ def check_6_1_1_4(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     return results
 
 
+def check_6_1_1_5(sid: str, sname: str) -> R:
+    """
+    6.1.1.5 — NSG flow logs configured with Traffic Analytics (Level 2)
+
+    ⚠️  DEPRECATED — Microsoft blocked creation of NEW NSG-level flow logs on
+    30 June 2025 and announced full retirement on 30 September 2027.  Existing
+    NSG flow logs are read-only; Traffic Analytics can no longer be enabled on
+    them.  This control cannot be satisfied on any current Azure subscription
+    and will generate an irremediable FAIL if assessed normally.
+
+    The recommended migration path is Virtual Network (VNet) flow logs
+    (CIS 7.8 / CIS 6.1.1.7), which support Traffic Analytics and are the
+    supported successor feature.
+
+    References:
+      https://azure.microsoft.com/updates/transition-to-vnet-flow-logs
+    """
+    return R(
+        "6.1.1.5",
+        "NSG flow logs configured with Traffic Analytics",
+        2,
+        "6 - Management & Governance",
+        INFO,
+        (
+            "NSG flow log creation was blocked by Microsoft on 30 Jun 2025 "
+            "(full retirement: 30 Sep 2027). This control cannot be assessed "
+            "or remediated on current subscriptions. Migrate to VNet flow logs "
+            "(CIS 7.8 / 6.1.1.7) which support Traffic Analytics."
+        ),
+        "",
+        sid,
+        sname,
+    )
+
+
 def check_6_1_1_6(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
     """
     6.1.1.6 — App Service resource logs enabled (Level 2)
@@ -486,10 +521,11 @@ def check_6_1_2_alerts(sid: str, sname: str) -> list[R]:
 
     results = []
     for ctrl, title, op in required:
-        # An alert is compliant if ANY alert has a condition block with
-        # field == "operationName" and equals == the target operation (case-insensitive)
+        # An alert is compliant if ANY *enabled* alert has a condition block with
+        # field == "operationName" and equals == the target operation (case-insensitive).
+        # Disabled alerts (enabled == false) must not count as compliant.
         found = any(
-            cond.get("field") == "operationName" and cond.get("equals", "").lower() == op
+            alert.get("enabled", True) and cond.get("field") == "operationName" and cond.get("equals", "").lower() == op
             for alert in alerts
             for cond in alert.get("condition", {}).get("allOf", [])
         )
@@ -514,7 +550,9 @@ def check_6_1_2_alerts(sid: str, sname: str) -> list[R]:
 
     # 6.1.2.11 — Service Health uses the "category" field, not "operationName"
     sh_found = any(
-        cond.get("field") == "category" and cond.get("equals", "").lower() == "servicehealth"
+        alert.get("enabled", True)
+        and cond.get("field") == "category"
+        and cond.get("equals", "").lower() == "servicehealth"
         for alert in alerts
         for cond in alert.get("condition", {}).get("allOf", [])
     )

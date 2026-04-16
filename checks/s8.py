@@ -627,7 +627,7 @@ def check_8_3_keyvaults(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                                 return False
                             action = la.get("action")
                             if isinstance(action, dict):
-                                return action.get("type", "").lower() == "rotate"
+                                return bool(action.get("type", "").lower() == "rotate")
                             return str(action or "").lower() == "rotate"
 
                         has_rotate = any(_la_is_rotate(la) for la in pol.get("lifetimeActions", []))

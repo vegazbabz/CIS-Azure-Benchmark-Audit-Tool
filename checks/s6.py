@@ -525,9 +525,7 @@ def check_6_1_2_alerts(sid: str, sname: str) -> list[R]:
         # field == "operationName" and equals == the target operation (case-insensitive).
         # Disabled alerts (enabled == false) must not count as compliant.
         found = any(
-            alert.get("enabled", True)
-            and cond.get("field") == "operationName"
-            and cond.get("equals", "").lower() == op
+            alert.get("enabled", True) and cond.get("field") == "operationName" and cond.get("equals", "").lower() == op
             for alert in alerts
             for cond in alert.get("condition", {}).get("allOf", [])
         )

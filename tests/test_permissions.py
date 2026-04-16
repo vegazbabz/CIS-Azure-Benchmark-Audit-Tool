@@ -132,11 +132,11 @@ class TestCheckUserPermissions(unittest.TestCase):
         """Role appearing twice in one sub's result (inherited + direct) counts as 1, not 2."""
         # Call sequence: signed-in-user, sub1 roles, sub2 roles, tenantId, MG roles
         mock_az.side_effect = [
-            (0, {"id": "uid-001"}),                          # get_signed_in_user_id
-            (0, ["Reader", "Reader", "Owner"]),              # sub1: Reader duplicated
-            (0, ["Reader", "Owner"]),                        # sub2
-            (0, "tenant-abc"),                               # account show --query tenantId
-            (0, []),                                         # MG scope query
+            (0, {"id": "uid-001"}),  # get_signed_in_user_id
+            (0, ["Reader", "Reader", "Owner"]),  # sub1: Reader duplicated
+            (0, ["Reader", "Owner"]),  # sub2
+            (0, "tenant-abc"),  # account show --query tenantId
+            (0, []),  # MG scope query
         ]
         result = az_identity.check_user_permissions(["sub1", "sub2"])
         # Reader assigned at 2 subs — must not exceed total_subs
@@ -147,10 +147,10 @@ class TestCheckUserPermissions(unittest.TestCase):
     def test_management_group_security_roles_detected(self, mock_az: Any) -> None:
         """Security roles assigned only at tenant root MG are picked up by the MG query."""
         mock_az.side_effect = [
-            (0, {"id": "uid-001"}),             # get_signed_in_user_id
-            (0, ["Reader", "Owner"]),            # sub1: no security role
-            (0, ["Reader"]),                     # sub2: no security role
-            (0, "tenant-abc"),                   # account show --query tenantId
+            (0, {"id": "uid-001"}),  # get_signed_in_user_id
+            (0, ["Reader", "Owner"]),  # sub1: no security role
+            (0, ["Reader"]),  # sub2: no security role
+            (0, "tenant-abc"),  # account show --query tenantId
             (0, ["Security Reader", "Security Admin"]),  # MG scope: security roles present
         ]
         result = az_identity.check_user_permissions(["sub1", "sub2"])

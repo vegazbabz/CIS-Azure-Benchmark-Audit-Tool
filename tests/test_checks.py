@@ -648,7 +648,7 @@ class TestCheck612Alerts(unittest.TestCase):
                 "allOf": [
                     {"field": "operationName", "equals": op_name},
                 ]
-            }
+            },
         }
 
     def test_no_alerts_all_fail(self) -> None:

@@ -120,59 +120,99 @@ def check_6_1_1_2(sid: str, sname: str) -> R:
 
 def check_6_1_1_3(sid: str, sname: str) -> R:
     """
-    6.1.1.3 — Activity log retention >= 365 days (Level 1)
+    6.1.1.3 — Activity log storage account is encrypted with CMK (Level 2)
 
-    Classic log profiles are the legacy mechanism for controlling activity log
-    retention.  Modern Azure deployments use diagnostic settings instead, but
-    the CIS benchmark still checks log profiles for backwards compatibility.
-
-    Data source: az monitor log-profiles list --subscription <sid>
-    A log profile with retentionPolicy.enabled == true must have days >= 365
-    (or 0, which means infinite retention).  If retention is disabled entirely
-    or no log profile exists at all, the check fails.
+    CIS 5.0.0 audits subscription diagnostic settings for storage-account
+    destinations, then verifies that those storage accounts use a customer-
+    managed key:
+      az monitor diagnostic-settings subscription list --subscription <id>
+      az storage account show --ids <storageAccountId> --query encryption
     """
-    rc, data = az(["monitor", "log-profiles", "list", "--subscription", sid], timeout=TIMEOUTS["default"])
+    rc, data = az(
+        [
+            "monitor",
+            "diagnostic-settings",
+            "subscription",
+            "list",
+            "--subscription",
+            sid,
+            "--query",
+            "value[*].storageAccountId",
+        ],
+        timeout=TIMEOUTS["default"],
+    )
     if rc != 0:
         return _err(
             "6.1.1.3",
-            "Activity log retention >= 365 days",
-            1,
+            "Activity log storage account encrypted with CMK",
+            2,
             "6 - Management & Governance",
             str(data),
             sid,
             sname,
         )
 
-    profiles = data if isinstance(data, list) else []
+    storage_ids = [str(item) for item in data if item] if isinstance(data, list) else []
 
-    if not profiles:
+    if not storage_ids:
         return R(
             "6.1.1.3",
-            "Activity log retention >= 365 days",
-            1,
+            "Activity log storage account encrypted with CMK",
+            2,
             "6 - Management & Governance",
-            FAIL,
-            "No activity log profile found. Retention not configured.",
-            "Monitor > Activity Log > Export Activity Log > Add diagnostic setting with retention >= 365 days",
+            INFO,
+            "No subscription diagnostic setting writes activity logs to a storage account.",
+            "",
             sid,
             sname,
         )
 
-    profile = profiles[0]
-    ret_policy = profile.get("retentionPolicy") or {}
-    enabled = ret_policy.get("enabled", False)
-    days = int(ret_policy.get("days", 0))
-    # Compliant if retention is disabled (infinite) or days >= 365
-    compliant = not enabled or days >= 365
+    failures: list[str] = []
+    errors: list[str] = []
+    for storage_id in storage_ids:
+        rc_enc, encryption = az(
+            ["storage", "account", "show", "--ids", storage_id, "--query", "encryption"],
+            sid,
+            timeout=TIMEOUTS["default"],
+        )
+        account_name = storage_id.rstrip("/").split("/")[-1]
+        if rc_enc != 0 or not isinstance(encryption, dict):
+            errors.append(f"{account_name}: {str(encryption)[:160]}")
+            continue
+
+        key_source = str(encryption.get("keySource", ""))
+        key_vault_props = encryption.get("keyVaultProperties")
+        if key_source.lower() != "microsoft.keyvault" or not key_vault_props:
+            failures.append(f"{account_name}: keySource={key_source or 'unset'}, keyVaultProperties not configured")
+
+    if errors:
+        return _err(
+            "6.1.1.3",
+            "Activity log storage account encrypted with CMK",
+            2,
+            "6 - Management & Governance",
+            "; ".join(errors),
+            sid,
+            sname,
+        )
 
     return R(
         "6.1.1.3",
-        "Activity log retention >= 365 days",
-        1,
+        "Activity log storage account encrypted with CMK",
+        2,
         "6 - Management & Governance",
-        PASS if compliant else FAIL,
-        f"Retention: {days} days (enabled: {enabled}).",
-        "Monitor > Activity Log > Export > Retention >= 365 days" if not compliant else "",
+        PASS if not failures else FAIL,
+        (
+            f"All {len(storage_ids)} activity-log storage account destination(s) use CMK encryption."
+            if not failures
+            else "Non-CMK activity-log storage account destination(s): " + "; ".join(failures)
+        ),
+        (
+            "Configure the activity-log storage account encryption key source to "
+            "Microsoft.KeyVault with keyVaultProperties."
+            if failures
+            else ""
+        ),
         sid,
         sname,
     )
@@ -259,7 +299,7 @@ def check_6_1_1_4(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
 
 def check_6_1_1_5(sid: str, sname: str) -> R:
     """
-    6.1.1.5 — NSG flow logs configured with Traffic Analytics (Level 2)
+    6.1.1.5 — NSG flow logs captured and sent to Log Analytics (Manual, Level 2)
 
     ⚠️  DEPRECATED — Microsoft blocked creation of NEW NSG-level flow logs on
     30 June 2025 and announced full retirement on 30 September 2027.  Existing
@@ -279,12 +319,13 @@ def check_6_1_1_5(sid: str, sname: str) -> R:
         "NSG flow logs configured with Traffic Analytics",
         2,
         "6 - Management & Governance",
-        INFO,
+        MANUAL,
         (
-            "NSG flow log creation was blocked by Microsoft on 30 Jun 2025 "
-            "(full retirement: 30 Sep 2027). This control cannot be assessed "
-            "or remediated on current subscriptions. Migrate to VNet flow logs "
-            "(CIS 7.8 / 6.1.1.7) which support Traffic Analytics."
+            "Manual verification required per CIS 5.0.0: in Network Watcher > Flow logs, "
+            "filter Flow log type to Network security group and confirm NSG flow logs "
+            "are configured to send to Log Analytics. Microsoft has blocked creation "
+            "of new NSG flow logs as of 30 Jun 2025; use this result as a manual review "
+            "item for existing deployments and migration planning."
         ),
         "",
         sid,

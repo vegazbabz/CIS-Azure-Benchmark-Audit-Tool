@@ -177,6 +177,11 @@ from checks.s8 import (
     check_8_5,
 )
 from checks.s9 import check_9_storage
+from checks.manual import (
+    check_databricks_manual_controls,
+    check_security_manual_controls,
+    check_vnet_flow_log_manual_control,
+)
 
 # Azure CLI helpers delegated to azure_helpers.py
 from azure.helpers import (
@@ -563,6 +568,10 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         # ── Section 2 — Azure Databricks ──────────────────────────────────
         ("2.1.1", lambda: check_2_1_1(sid, sname, td)),
         ("2.1.2", lambda: check_2_1_2(sid, sname, td)),
+        ("2.1.3", lambda: _from_batch("2.manual", lambda: check_databricks_manual_controls(sid, sname, td), "2.1.3")),
+        ("2.1.4", lambda: _from_batch("2.manual", lambda: check_databricks_manual_controls(sid, sname, td), "2.1.4")),
+        ("2.1.5", lambda: _from_batch("2.manual", lambda: check_databricks_manual_controls(sid, sname, td), "2.1.5")),
+        ("2.1.6", lambda: _from_batch("2.manual", lambda: check_databricks_manual_controls(sid, sname, td), "2.1.6")),
         ("2.1.7", lambda: check_2_1_7(sid, sname, td)),
         ("2.1.8", lambda: check_2_1_8(sid, sname, td)),
         ("2.1.9", lambda: check_2_1_9(sid, sname, td)),
@@ -581,6 +590,7 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("6.1.1.4", lambda: check_6_1_1_4(sid, sname, td)),
         ("6.1.1.5", lambda: [check_6_1_1_5(sid, sname)]),
         ("6.1.1.6", lambda: check_6_1_1_6(sid, sname, td)),
+        ("6.1.1.7", lambda: check_vnet_flow_log_manual_control(sid, sname, td)),
         ("6.1.2.1", lambda: _from_batch("6.1.2", lambda: check_6_1_2_alerts(sid, sname), "6.1.2.1")),
         ("6.1.2.2", lambda: _from_batch("6.1.2", lambda: check_6_1_2_alerts(sid, sname), "6.1.2.2")),
         ("6.1.2.3", lambda: _from_batch("6.1.2", lambda: check_6_1_2_alerts(sid, sname), "6.1.2.3")),
@@ -617,8 +627,13 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("8.1.1.1", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.1.1")),
         ("8.1.2.1", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.2.1")),
         ("8.1.3.1", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.3.1")),
+        ("8.1.3.2", lambda: _from_batch("8.manual", lambda: check_security_manual_controls(sid, sname), "8.1.3.2")),
+        ("8.1.3.3", lambda: [check_8_1_3_3(sid, sname)]),
+        ("8.1.3.4", lambda: _from_batch("8.manual", lambda: check_security_manual_controls(sid, sname), "8.1.3.4")),
+        ("8.1.3.5", lambda: _from_batch("8.manual", lambda: check_security_manual_controls(sid, sname), "8.1.3.5")),
         ("8.1.4.1", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.4.1")),
         ("8.1.5.1", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.5.1")),
+        ("8.1.5.2", lambda: _from_batch("8.manual", lambda: check_security_manual_controls(sid, sname), "8.1.5.2")),
         ("8.1.6.1", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.6.1")),
         ("8.1.7.1", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.7.1")),
         ("8.1.7.2", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.7.2")),
@@ -626,12 +641,14 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("8.1.7.4", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.7.4")),
         ("8.1.8.1", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.8.1")),
         ("8.1.9.1", lambda: _from_batch("8.1.defender", lambda: check_8_1_defender(sid, sname), "8.1.9.1")),
-        ("8.1.3.3", lambda: [check_8_1_3_3(sid, sname)]),
         ("8.1.10", lambda: [check_8_1_10(sid, sname)]),
+        ("8.1.11", lambda: _from_batch("8.manual", lambda: check_security_manual_controls(sid, sname), "8.1.11")),
         ("8.1.12", lambda: _from_batch("8.1.12-15", lambda: check_8_1_12_to_15(sid, sname), "8.1.12")),
         ("8.1.13", lambda: _from_batch("8.1.12-15", lambda: check_8_1_12_to_15(sid, sname), "8.1.13")),
         ("8.1.14", lambda: _from_batch("8.1.12-15", lambda: check_8_1_12_to_15(sid, sname), "8.1.14")),
         ("8.1.15", lambda: _from_batch("8.1.12-15", lambda: check_8_1_12_to_15(sid, sname), "8.1.15")),
+        ("8.1.16", lambda: _from_batch("8.manual", lambda: check_security_manual_controls(sid, sname), "8.1.16")),
+        ("8.2.1", lambda: _from_batch("8.manual", lambda: check_security_manual_controls(sid, sname), "8.2.1")),
         ("8.3.1", lambda: _from_batch("8.3", lambda: check_8_3_keyvaults(sid, sname, td), "8.3.1")),
         ("8.3.2", lambda: _from_batch("8.3", lambda: check_8_3_keyvaults(sid, sname, td), "8.3.2")),
         ("8.3.3", lambda: _from_batch("8.3", lambda: check_8_3_keyvaults(sid, sname, td), "8.3.3")),
@@ -652,9 +669,6 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
         ("9.2.1", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.1")),
         ("9.2.2", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.2")),
         ("9.2.3", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.3")),
-        ("9.2.4", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.4")),
-        ("9.2.5", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.5")),
-        ("9.2.6", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.2.6")),
         ("9.3.1.1", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.1.1")),
         ("9.3.1.2", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.1.2")),
         ("9.3.1.3", lambda: _from_batch("9", lambda: check_9_storage(sid, sname, td), "9.3.1.3")),

@@ -194,29 +194,28 @@ def check_5_1_3() -> R:
 
 def check_5_28() -> R:
     """
-    5.28 — Privileged users are protected by phishing-resistant MFA (Manual, Level 1)
+    5.28 — Passwordless authentication methods are considered (Manual, Level 2)
 
-    Requires manual verification in the Entra ID portal: confirm that all
-    privileged-role holders (Global Administrator, Security Administrator,
-    etc.) are enrolled in phishing-resistant MFA methods (FIDO2, Windows
-    Hello for Business, or certificate-based authentication).  The Graph
-    API does not expose the per-user MFA method strength requirement.
+    Requires manual verification in the Entra ID portal. The CIS benchmark
+    asks reviewers to consider passwordless methods such as FIDO2 security
+    keys, certificate-based authentication, and Windows Hello for Business.
     """
     return R(
         "5.28",
-        "Privileged users protected by phishing-resistant MFA",
-        1,
+        "Passwordless authentication methods are considered",
+        2,
         "5 - Identity Services",
         MANUAL,
-        "Manual verification required — review privileged-role MFA methods in the Entra ID portal.",
-        "Entra ID > Users > Per-user MFA, or Conditional Access > Grant > Require "
-        "authentication strength > Phishing-resistant MFA for all privileged roles.",
+        "Manual verification required — review whether passwordless authentication methods "
+        "are enabled and appropriate for the organization.",
+        "Entra ID > Protection > Authentication methods > Policies > enable and scope "
+        "approved passwordless authentication methods.",
     )
 
 
 def check_5_2_2() -> R:
     """
-    5.2.2 — Exclusionary geographic Conditional Access policy is considered (Manual, Level 1)
+    5.2.2 — Exclusionary geographic Conditional Access policy is considered (Manual, Level 2)
 
     There is no Azure CLI subcommand for Conditional Access Policies (per CIS
     benchmark documentation). Verification requires manual review of CA policies
@@ -225,7 +224,7 @@ def check_5_2_2() -> R:
     return R(
         "5.2.2",
         "Exclusionary geographic Conditional Access policy considered",
-        1,
+        2,
         "5 - Identity Services",
         MANUAL,
         "Manual verification required — confirm a Conditional Access policy exists "
@@ -263,20 +262,14 @@ def check_5_6() -> R:
     The Smart Lockout threshold controls how many failed sign-in attempts are
     allowed before an account is locked. CIS requires this to be ≤ 10.
 
-    The setting lives in the tenant-wide directory settings object with
-    templateId "5cf42378-d67d-4f36-ba46-e8b86229381d" (Password Rule Settings).
-    If the tenant has never customised password protection, the setting object
-    won't exist and the platform default of 10 applies — which is compliant.
-
-    API: GET https://graph.microsoft.com/beta/settings
-    Requires: Directory.Read.All
+    CIS 5.0.0 audits this setting through Microsoft Graph:
+      GET /v1.0/policies/authenticationMethodsPolicy
+      passwordProtection.lockoutThreshold
     """
     _CTRL = "5.6"
-    _TITLE = "Account lockout threshold is ≤ 10"
+    _TITLE = "Account lockout threshold is less than or equal to 10"
     _SEC = "5 - Identity Services"
-    _TEMPLATE = "5cf42378-d67d-4f36-ba46-e8b86229381d"
-
-    url = "https://graph.microsoft.com/beta/settings"
+    url = "https://graph.microsoft.com/v1.0/policies/authenticationMethodsPolicy"
 
     if msal_is_configured():
         rc, data = msal_rest(url)
@@ -291,7 +284,8 @@ def check_5_6() -> R:
                 1,
                 _SEC,
                 ERROR,
-                "Insufficient permissions to read directory settings. " "Requires Directory.Read.All.",
+                "Insufficient permissions to read authentication methods policy. "
+                "Requires Policy.ReadWrite.AuthenticationMethod or equivalent delegated access.",
                 "",
             )
         return R(_CTRL, _TITLE, 1, _SEC, ERROR, f"Graph API error: {str(data)[:200]}", "")
@@ -299,26 +293,10 @@ def check_5_6() -> R:
     if not isinstance(data, dict):
         return R(_CTRL, _TITLE, 1, _SEC, ERROR, "Unexpected response format.", "")
 
-    # Find the Password Rule Settings entry; absent means default (10) applies.
-    entries = data.get("value", [])
-    pw_entry = next((e for e in entries if e.get("templateId") == _TEMPLATE), None)
-
-    if pw_entry is None:
-        # Tenant uses platform defaults — lockout threshold is 10 (compliant).
-        return R(
-            _CTRL,
-            _TITLE,
-            1,
-            _SEC,
-            PASS,
-            "Password protection settings not customised; platform default lockout threshold (10) applies.",
-            "",
-        )
-
-    values = {v["name"]: v["value"] for v in pw_entry.get("values", [])}
-    raw = values.get("LockoutThreshold")
+    password_protection = data.get("passwordProtection") or {}
+    raw = password_protection.get("lockoutThreshold")
     if raw is None:
-        return R(_CTRL, _TITLE, 1, _SEC, PASS, "LockoutThreshold not set; platform default (10) applies.", "")
+        return R(_CTRL, _TITLE, 1, _SEC, PASS, "Lockout threshold not set; platform default (10) applies.", "")
 
     try:
         threshold = int(raw)

@@ -1250,9 +1250,7 @@ Examples:
 
     # ── Default output path: reports/<name>_<timestamp>.html ─────────────────
     if args.output is None:
-        _reports_dir = Path("reports")
-        _reports_dir.mkdir(exist_ok=True)
-        args.output = str(_reports_dir / f"cis_azure_audit_report_{start_time.strftime('%Y-%m-%dT%H%M')}.html")
+        args.output = str(Path("reports") / f"cis_azure_audit_report_{start_time.strftime('%Y-%m-%dT%H%M')}.html")
 
     setup_logging(
         args.log_level,

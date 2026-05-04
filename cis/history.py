@@ -71,6 +71,7 @@ def append_history(path: Path, entry: dict[str, Any]) -> None:
         history = history[-MAX_HISTORY:]
     tmp = path.with_suffix(".json.tmp")
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         tmp.write_text(json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8")
         os.replace(tmp, path)  # atomic on both Windows and POSIX; replaces if target exists
     except Exception as exc:

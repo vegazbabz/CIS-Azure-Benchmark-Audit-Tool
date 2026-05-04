@@ -111,6 +111,8 @@ from cis.helpers import (
     console_update,
     setup_logging,
 )
+from cis.result_utils import compliance_score, count_statuses, dedup_results
+from cis.tenant_checks import run_tenant_checks
 
 # Checkpoint save/load
 from cis.checkpoint import (
@@ -132,23 +134,7 @@ from cis.history import append_history, history_path_for, load_history
 
 # Check helpers and modular check functions
 from checks.s2 import check_2_1_1, check_2_1_2, check_2_1_7, check_2_1_8, check_2_1_9, check_2_1_10, check_2_1_11
-from checks.s3 import check_3_1_1
-from checks.s5 import (
-    check_5_1_1,
-    check_5_1_2,
-    check_5_1_3,
-    check_5_2_2,
-    check_5_28,
-    check_5_3_2,
-    check_5_3_3,
-    check_5_4,
-    check_5_6,
-    check_5_14,
-    check_5_15,
-    check_5_16,
-    check_5_23,
-    check_5_27,
-)
+from checks.s5 import check_5_3_3, check_5_23, check_5_27
 from checks.s6 import (
     check_6_1_1_1,
     check_6_1_1_2,
@@ -221,33 +207,10 @@ except Exception:
     HAS_RICH = False
     _rcon = None
 
-# Console emoji for terminal output (NOT HTML entities)
-_CONSOLE_ICON: dict[str, str] = {
-    PASS: "\u2705",
-    FAIL: "\u274c",
-    ERROR: "\u26a0\ufe0f",
-    INFO: "\u2139\ufe0f",
-    MANUAL: "\U0001f4cb",
-    SUPPRESSED: "\U0001f507",
-}
-
 
 def _dedup_results(results: list[R]) -> list[R]:
-    """Remove identical duplicate R instances while preserving order.
-
-    Duplicates can arise when Azure Resource Graph returns the same resource
-    row more than once (a known pagination quirk).  Two results are considered
-    identical when all five audit-meaningful fields match: control ID,
-    subscription ID, resource name, status, and detail text.
-    """
-    seen: set[tuple[str, ...]] = set()
-    out: list[R] = []
-    for r in results:
-        key = (r.control_id, r.subscription_id, r.resource, r.status, r.details)
-        if key not in seen:
-            seen.add(key)
-            out.append(r)
-    return out
+    """Compatibility wrapper for callers that import the old private helper."""
+    return dedup_results(results)
 
 
 def _print_control_catalog(level_filter: int | None = None) -> None:
@@ -870,27 +833,7 @@ def run_audit(
             all_results.extend(tenant_ckpt)
         else:
             LOGGER.info("   🔍 No tenant checkpoint found — re-running tenant checks (requires az login)...")
-            for fn in [
-                check_3_1_1,
-                check_5_1_1,
-                check_5_1_2,
-                check_5_1_3,
-                check_5_2_2,
-                check_5_28,
-                check_5_3_2,
-                check_5_4,
-                check_5_6,
-                check_5_14,
-                check_5_15,
-                check_5_16,
-            ]:
-                try:
-                    r = fn()
-                    all_results.append(r)
-                    icon = _CONSOLE_ICON.get(r.status, "?")
-                    LOGGER.info("    %-10s %s  %s", r.control_id, icon, r.status)
-                except Exception as e:
-                    LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
+            all_results.extend(run_tenant_checks())
         return all_results
 
     requested_parallel = max(1, parallel)
@@ -933,28 +876,7 @@ def run_audit(
         tenant_results = tenant_ckpt
     else:
         LOGGER.info("\n  [Tenant] Running tenant-level identity checks...")
-        tenant_results = []
-        for fn in [
-            check_3_1_1,
-            check_5_1_1,
-            check_5_1_2,
-            check_5_1_3,
-            check_5_2_2,
-            check_5_28,
-            check_5_3_2,
-            check_5_4,
-            check_5_6,
-            check_5_14,
-            check_5_15,
-            check_5_16,
-        ]:
-            try:
-                r = fn()
-                tenant_results.append(r)
-                icon = _CONSOLE_ICON.get(r.status, "?")
-                LOGGER.info("    %-10s %s  %s", r.control_id, icon, r.status)
-            except Exception as e:
-                LOGGER.warning("    ⚠️  ERROR in tenant check: %s", e)
+        tenant_results = run_tenant_checks()
 
         try:
             save_tenant_checkpoint(tenant_results)
@@ -1328,9 +1250,7 @@ Examples:
 
     # ── Default output path: reports/<name>_<timestamp>.html ─────────────────
     if args.output is None:
-        _reports_dir = Path("reports")
-        _reports_dir.mkdir(exist_ok=True)
-        args.output = str(_reports_dir / f"cis_azure_audit_report_{start_time.strftime('%Y-%m-%dT%H%M')}.html")
+        args.output = str(Path("reports") / f"cis_azure_audit_report_{start_time.strftime('%Y-%m-%dT%H%M')}.html")
 
     setup_logging(
         args.log_level,
@@ -1384,29 +1304,14 @@ Examples:
             all_results.extend(tenant_ckpt)
         else:
             LOGGER.info("   🔍 No tenant checkpoint found — re-running tenant checks (requires az login)...")
-            for fn in [
-                check_5_1_1,
-                check_5_1_2,
-                check_5_1_3,
-                check_5_28,
-                check_5_4,
-                check_5_14,
-                check_5_15,
-                check_5_16,
-            ]:
-                try:
-                    all_results.append(fn())
-                except Exception as e:
-                    LOGGER.warning("   ⚠️  Skipped tenant check %s: %s", fn.__name__, e)
+            all_results.extend(run_tenant_checks())
         if args.level:
             all_results = [r for r in all_results if r.level == args.level]
         all_results = _dedup_results(all_results)
         all_results = apply_suppressions(all_results, suppressions)
-        counts = {
-            s: sum(1 for r in all_results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL, SUPPRESSED]
-        }
+        counts = count_statuses(all_results)
         total = len(all_results)
-        score = round(counts[PASS] / max(total - counts[INFO] - counts[MANUAL] - counts[SUPPRESSED], 1) * 100, 1)
+        score = compliance_score(counts, total)
         elapsed = (datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds()
         mins, secs = divmod(int(elapsed), 60)
         elapsed_str = f"{mins}m {secs}s" if mins else f"{secs}s"
@@ -1502,7 +1407,7 @@ Examples:
                     count = role_sub_count.get(role, total_subs)
                     sub_label = f"({count}/{total_subs} subs)" if total_subs > 1 else ""
                     suffix = f"  {sub_label}" if sub_label else ""
-                    LOGGER.info("   Role: %s%s", role, suffix)
+                    LOGGER.info("   ✅ Role: %s%s", role, suffix)
                 if len(roles) > 5:
                     LOGGER.info("   ... and %d more roles", len(roles) - 5)
         for warning in preflight.get("warnings", []):
@@ -1537,9 +1442,9 @@ Examples:
     all_results = apply_suppressions(all_results, suppressions)
 
     # ── Final summary ─────────────────────────────────────────────────────────
-    counts = {s: sum(1 for r in all_results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL, SUPPRESSED]}
+    counts = count_statuses(all_results)
     total = len(all_results)
-    score = round(counts[PASS] / max(total - counts[INFO] - counts[MANUAL] - counts[SUPPRESSED], 1) * 100, 1)
+    score = compliance_score(counts, total)
 
     # Calculate elapsed time
     elapsed = (datetime.datetime.now(datetime.timezone.utc) - start_time).total_seconds()

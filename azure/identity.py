@@ -118,7 +118,7 @@ def list_role_names_for_user(
     return 0, out or []
 
 
-def check_user_permissions(sub_ids: list[str]) -> dict[str, Any]:
+def check_user_permissions(sub_ids: list[str], tenant_id: str | None = None) -> dict[str, Any]:
     """Run a preflight check on the signed-in user's permissions.
 
     Returns a dict with keys: user_id, roles, role_sub_count, total_subs,
@@ -165,7 +165,9 @@ def check_user_permissions(sub_ids: list[str]) -> dict[str, Any]:
     # assignments (e.g. Security Reader / Security Admin on Tenant Root Group)
     # are included in the permission summary.
     if user_id and sub_ids:
-        _, tenant_id_raw = az(["account", "show", "--query", "tenantId"])
+        tenant_id_raw: Any = tenant_id
+        if not tenant_id_raw:
+            _, tenant_id_raw = az(["account", "show", "--query", "tenantId"])
         if isinstance(tenant_id_raw, str) and tenant_id_raw.strip():
             mg_scope = f"/providers/Microsoft.Management/managementGroups/{tenant_id_raw.strip()}"
             rc_mg, result_mg = list_role_names_for_user(user_id, scope=mg_scope)

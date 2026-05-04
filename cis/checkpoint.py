@@ -17,6 +17,7 @@ from __future__ import annotations
 import datetime
 import json
 from dataclasses import asdict, replace
+from pathlib import Path
 from typing import Any
 
 from azure.client import _CLEAN_KV_AUTHZ_MSG
@@ -94,7 +95,13 @@ def _reclassify(r: R) -> R:
     return r
 
 
-def save_checkpoint(sid: str, sname: str, results: list[R], status: str = "completed") -> None:
+def save_checkpoint(
+    sid: str,
+    sname: str,
+    results: list[R],
+    status: str = "completed",
+    tenant_id: str | None = None,
+) -> None:
     """
     Write audit results for one subscription to a JSON checkpoint file.
 
@@ -120,6 +127,7 @@ def save_checkpoint(sid: str, sname: str, results: list[R], status: str = "compl
         "benchmark_version": BENCHMARK_VER,
         "subscription_id": sid,
         "subscription_name": sname,
+        "tenant_id": tenant_id or "",
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "status": status,
         "results": [asdict(r) for r in results],  # Convert dataclasses to dicts
@@ -135,7 +143,11 @@ def save_checkpoint(sid: str, sname: str, results: list[R], status: str = "compl
     tmp.replace(target)
 
 
-def load_checkpoints() -> dict[str, Any]:
+def _norm_tenant_id(tenant_id: str | None) -> str:
+    return (tenant_id or "").strip().lower()
+
+
+def load_checkpoints(tenant_id: str | None = None) -> dict[str, Any]:
     """
     Load all completed checkpoint files from CHECKPOINT_DIR.
 
@@ -152,6 +164,7 @@ def load_checkpoints() -> dict[str, Any]:
     if not _config.CHECKPOINT_DIR.exists():
         return {}
 
+    expected_tenant = _norm_tenant_id(tenant_id)
     loaded = {}
     for p in _config.CHECKPOINT_DIR.glob("*.json"):
         try:
@@ -160,6 +173,9 @@ def load_checkpoints() -> dict[str, Any]:
             sid = data.get("subscription_id", "")
             if not sid or sid.startswith("_"):
                 continue  # skip special non-subscription files (e.g. _tenant.json)
+            if expected_tenant and _norm_tenant_id(data.get("tenant_id")) != expected_tenant:
+                LOGGER.info("   ℹ️  Skipping checkpoint %s — tenant does not match selected --tenant.", p.name)
+                continue
             cp_ver = data.get("tool_version", "unknown")
             if cp_ver != VERSION:
                 LOGGER.warning(
@@ -221,17 +237,26 @@ def results_from_checkpoint(cp: dict[str, Any]) -> list[R]:
 # Tenant-level checks (Section 5 Entra ID checks) are not subscription-scoped
 # and therefore not stored in per-subscription checkpoint files.  A separate
 # _tenant.json checkpoint file saves them so that --report-only does not need
-# to make live Graph API calls on the second and subsequent invocations.
+# to make live Graph API calls on the second and subsequent invocations.  When
+# --tenant is supplied, the checkpoint filename includes that tenant ID so
+# report-only runs cannot accidentally reuse checks from another tenant.
 
 _TENANT_CHECKPOINT_ID = "_tenant"
 
 
-def save_tenant_checkpoint(results: list[R]) -> None:
+def _tenant_checkpoint_path(tenant_id: str | None) -> Path:
+    safe_tenant = _norm_tenant_id(tenant_id).replace("/", "_").replace("\\", "_")
+    filename = f"{_TENANT_CHECKPOINT_ID}_{safe_tenant}.json" if safe_tenant else f"{_TENANT_CHECKPOINT_ID}.json"
+    return _config.CHECKPOINT_DIR / filename
+
+
+def save_tenant_checkpoint(results: list[R], tenant_id: str | None = None) -> None:
     """Write tenant-level (Entra ID) check results to a dedicated checkpoint file.
 
     Uses the same atomic write pattern as save_checkpoint.  The file is stored
-    in CHECKPOINT_DIR as _tenant.json and is skipped by load_checkpoints() so
-    it does not appear as a subscription entry in the audit summary.
+    in CHECKPOINT_DIR as _tenant.json or _tenant_<tenant>.json and is skipped
+    by load_checkpoints() so it does not appear as a subscription entry in the
+    audit summary.
     """
     _config.CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
     data = {
@@ -239,18 +264,19 @@ def save_tenant_checkpoint(results: list[R]) -> None:
         "benchmark_version": BENCHMARK_VER,
         "subscription_id": _TENANT_CHECKPOINT_ID,
         "subscription_name": "Tenant (Entra ID)",
+        "tenant_id": tenant_id or "",
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "status": "completed",
         "results": [asdict(r) for r in results],
     }
-    target = _config.CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json"
-    tmp = _config.CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json.tmp"
+    target = _tenant_checkpoint_path(tenant_id)
+    tmp = target.with_suffix(".json.tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     tmp.replace(target)
 
 
-def load_tenant_checkpoint() -> list[R] | None:
+def load_tenant_checkpoint(tenant_id: str | None = None) -> list[R] | None:
     """Load tenant-level results from checkpoint.
 
     Returns None (caller should re-run live tenant checks) when:
@@ -262,7 +288,7 @@ def load_tenant_checkpoint() -> list[R] | None:
     API calls, so the operator understands why Graph API calls are being made
     in --report-only mode.
     """
-    path = _config.CHECKPOINT_DIR / f"{_TENANT_CHECKPOINT_ID}.json"
+    path = _tenant_checkpoint_path(tenant_id)
     if not path.exists():
         return None
     try:
@@ -277,6 +303,15 @@ def load_tenant_checkpoint() -> list[R] | None:
             "   \u26a0\ufe0f  Tenant checkpoint was written by tool v%s (current: v%s) — re-running tenant checks.",
             cp_ver,
             VERSION,
+        )
+        return None
+    expected_tenant = _norm_tenant_id(tenant_id)
+    if expected_tenant and _norm_tenant_id(data.get("tenant_id")) != expected_tenant:
+        LOGGER.warning(
+            "   ⚠️  Tenant checkpoint %s was written for tenant %s, not selected tenant %s — re-running tenant checks.",
+            path.name,
+            data.get("tenant_id", "<unknown>") or "<unknown>",
+            tenant_id,
         )
         return None
     return results_from_checkpoint(data)

@@ -181,6 +181,37 @@ class TestCheckUserPermissions(unittest.TestCase):
         self.assertTrue(result["all_clear"])
         self.assertTrue(any("data-plane" in warning for warning in result["warnings"]))
 
+    @patch("azure.identity.az")
+    def test_explicit_tenant_used_for_management_group_scope(self, mock_az: Any) -> None:
+        """--tenant scopes the tenant-root management group lookup without relying on az account show."""
+        mock_az.side_effect = [
+            (0, {"id": "uid-001"}),  # get_signed_in_user_id
+            (0, ["Reader", "Security Reader"]),
+            (0, ["Key Vault Reader", "Storage Blob Data Reader"]),
+        ]
+
+        result = az_identity.check_user_permissions(["sub1"], tenant_id="tenant-explicit")
+
+        self.assertTrue(result["all_clear"])
+        called_args = [call.args[0] for call in mock_az.call_args_list]
+        self.assertNotIn(["account", "show", "--query", "tenantId"], called_args)
+        self.assertIn(
+            [
+                "role",
+                "assignment",
+                "list",
+                "--assignee",
+                "uid-001",
+                "--include-inherited",
+                "--include-groups",
+                "--scope",
+                "/providers/Microsoft.Management/managementGroups/tenant-explicit",
+                "--query",
+                "[].roleDefinitionName",
+            ],
+            called_args,
+        )
+
 
 class TestPreflight(unittest.TestCase):
     """Covers preflight gate behavior before running a full audit."""

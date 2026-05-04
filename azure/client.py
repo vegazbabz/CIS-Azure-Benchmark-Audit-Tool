@@ -1,8 +1,8 @@
 """az_client.py — Low-level Azure CLI subprocess layer.
 
 Provides:
-- az(args, sub, timeout)       — run any az command, returns (rc, parsed_json)
-- az_rest(url, timeout)        — call az rest, returns (rc, parsed_json)
+- az(args, sub, timeout)            — run any az command, returns (rc, parsed_json)
+- az_rest(url, timeout, sub=None)   — call az rest, returns (rc, parsed_json)
 - graph_query(query, sub_ids)  — paginated Resource Graph query
 - get_and_reset_rate_limit_retry_count() — throttle-signal for the orchestrator
 - is_firewall_error(msg)       — detect firewall-blocked responses
@@ -20,6 +20,7 @@ import sys
 import threading
 import time
 import urllib.parse
+import urllib.request
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -300,7 +301,59 @@ def get_and_reset_rate_limit_retry_count() -> int:
         return count
 
 
-def az_rest(url: str, timeout: int = 25) -> tuple[int, Any]:
+def _configured_audit_tenant() -> str:
+    """Return the explicit audit tenant set by the CLI, if any."""
+    try:
+        from cis.config import AUDIT_TENANT_ID
+    except Exception:
+        return ""
+    return AUDIT_TENANT_ID.strip()
+
+
+def _az_rest_graph_with_tenant(url: str, tenant_id: str, timeout: int) -> tuple[int, Any]:
+    """Call Microsoft Graph with an access token acquired for ``tenant_id``."""
+    token_cmd = [
+        AZ,
+        "account",
+        "get-access-token",
+        "--tenant",
+        tenant_id,
+        "--resource",
+        "https://graph.microsoft.com",
+        "--output",
+        "json",
+    ]
+    rc, stdout, stderr = _run_cmd_with_retries(token_cmd, timeout=timeout)
+    if rc != 0:
+        return rc, (stderr or "").strip()
+    try:
+        token_payload = json.loads(stdout or "{}")
+    except json.JSONDecodeError as exc:
+        return 1, f"Could not parse Graph token response: {exc}"
+    token = token_payload.get("accessToken")
+    if not token:
+        return 1, "Graph token response did not include an accessToken"
+
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8")
+            return 0, json.loads(body) if body.strip() else None
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        logger.debug("tenant-scoped Graph call HTTP %d for %s: %s", exc.code, url, body[:300])
+        return 1, body
+    except Exception as exc:
+        return 1, str(exc)
+
+
+def az_rest(url: str, timeout: int = 25, sub: str | None = None) -> tuple[int, Any]:
     """Call an Azure REST or Microsoft Graph endpoint via ``az rest``.
 
     For Graph URLs (https://graph.microsoft.com/...) the ``--resource`` flag
@@ -315,6 +368,10 @@ def az_rest(url: str, timeout: int = 25) -> tuple[int, Any]:
     like "'$skiptoken' is not recognized as an internal or external command".
     Splitting the parameters out avoids any ``&`` in the raw command line.
     """
+    tenant_id = _configured_audit_tenant()
+    if tenant_id and url.startswith("https://graph.microsoft.com/"):
+        return _az_rest_graph_with_tenant(url, tenant_id, timeout)
+
     parsed = urllib.parse.urlparse(url)
     query_params = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
     base_url = urllib.parse.urlunparse(parsed._replace(query="")) if query_params else url
@@ -322,6 +379,8 @@ def az_rest(url: str, timeout: int = 25) -> tuple[int, Any]:
     cmd = [AZ, "rest", "--method", "get", "--url", base_url, "--output", "json"]
     if url.startswith("https://graph.microsoft.com/"):
         cmd += ["--resource", "https://graph.microsoft.com"]
+    if sub:
+        cmd += ["--subscription", sub]
     if query_params:
         cmd += ["--uri-parameters"] + [f"{k}={v}" for k, v in query_params]
     rc, stdout, stderr = _run_cmd_with_retries(cmd, timeout=timeout)

@@ -49,10 +49,11 @@ class TestSaveCheckpoint(unittest.TestCase):
         self.assertFalse((self._dir / "sub-1.json.tmp").exists())
 
     def test_file_content_is_valid_json(self) -> None:
-        save_checkpoint("sub-1", "Sub One", _sample_results())
+        save_checkpoint("sub-1", "Sub One", _sample_results(), tenant_id="tenant-1")
         data = json.loads((self._dir / "sub-1.json").read_text(encoding="utf-8"))
         self.assertEqual(data["subscription_id"], "sub-1")
         self.assertEqual(data["subscription_name"], "Sub One")
+        self.assertEqual(data["tenant_id"], "tenant-1")
         self.assertEqual(data["status"], "completed")
         self.assertEqual(data["tool_version"], VERSION)
         self.assertEqual(data["benchmark_version"], BENCHMARK_VER)
@@ -137,6 +138,17 @@ class TestLoadCheckpoints(unittest.TestCase):
         self._write("sub-1", extra={"tool_version": "0.0.0"})
         result = load_checkpoints()
         self.assertIn("sub-1", result)
+
+    def test_tenant_filter_skips_other_tenants(self) -> None:
+        self._write("sub-1", extra={"tenant_id": "tenant-1"})
+        self._write("sub-2", extra={"tenant_id": "tenant-2"})
+        result = load_checkpoints(tenant_id="tenant-1")
+        self.assertEqual(set(result), {"sub-1"})
+
+    def test_tenant_filter_skips_legacy_unscoped_checkpoints(self) -> None:
+        self._write("sub-1")
+        result = load_checkpoints(tenant_id="tenant-1")
+        self.assertEqual(result, {})
 
 
 class TestResultsFromCheckpoint(unittest.TestCase):
@@ -233,25 +245,26 @@ class TestSaveTenantCheckpoint(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_creates_tenant_json_file(self) -> None:
-        save_tenant_checkpoint(_tenant_results())
-        self.assertTrue((self._dir / "_tenant.json").exists())
+        save_tenant_checkpoint(_tenant_results(), tenant_id="tenant-1")
+        self.assertTrue((self._dir / "_tenant_tenant-1.json").exists())
 
     def test_no_tmp_file_left_behind(self) -> None:
-        save_tenant_checkpoint(_tenant_results())
-        self.assertFalse((self._dir / "_tenant.json.tmp").exists())
+        save_tenant_checkpoint(_tenant_results(), tenant_id="tenant-1")
+        self.assertFalse((self._dir / "_tenant_tenant-1.json.tmp").exists())
 
     def test_file_content_is_valid_json(self) -> None:
-        save_tenant_checkpoint(_tenant_results())
-        data = json.loads((self._dir / "_tenant.json").read_text(encoding="utf-8"))
+        save_tenant_checkpoint(_tenant_results(), tenant_id="tenant-1")
+        data = json.loads((self._dir / "_tenant_tenant-1.json").read_text(encoding="utf-8"))
         self.assertEqual(data["subscription_id"], "_tenant")
+        self.assertEqual(data["tenant_id"], "tenant-1")
         self.assertEqual(data["status"], "completed")
         self.assertEqual(data["tool_version"], VERSION)
         self.assertEqual(len(data["results"]), 2)
 
     def test_round_trip(self) -> None:
         originals = _tenant_results()
-        save_tenant_checkpoint(originals)
-        loaded = load_tenant_checkpoint()
+        save_tenant_checkpoint(originals, tenant_id="tenant-1")
+        loaded = load_tenant_checkpoint(tenant_id="tenant-1")
         self.assertIsNotNone(loaded)
         assert loaded is not None
         self.assertEqual(len(loaded), 2)
@@ -259,8 +272,8 @@ class TestSaveTenantCheckpoint(unittest.TestCase):
         self.assertEqual(loaded[1].status, "MANUAL")
 
     def test_empty_results_round_trip(self) -> None:
-        save_tenant_checkpoint([])
-        loaded = load_tenant_checkpoint()
+        save_tenant_checkpoint([], tenant_id="tenant-1")
+        loaded = load_tenant_checkpoint(tenant_id="tenant-1")
         self.assertIsNotNone(loaded)
         assert loaded is not None
         self.assertEqual(loaded, [])
@@ -268,8 +281,8 @@ class TestSaveTenantCheckpoint(unittest.TestCase):
     def test_creates_directory_if_missing(self) -> None:
         nested = self._dir / "nested" / "checkpoints"
         with patch.object(cis_config, "CHECKPOINT_DIR", nested):
-            save_tenant_checkpoint(_tenant_results())
-        self.assertTrue((nested / "_tenant.json").exists())
+            save_tenant_checkpoint(_tenant_results(), tenant_id="tenant-1")
+        self.assertTrue((nested / "_tenant_tenant-1.json").exists())
 
 
 class TestLoadTenantCheckpoint(unittest.TestCase):
@@ -293,12 +306,16 @@ class TestLoadTenantCheckpoint(unittest.TestCase):
         self.assertIsNone(load_tenant_checkpoint())
 
     def test_version_mismatch_returns_none(self) -> None:
-        save_tenant_checkpoint(_tenant_results())
-        path = self._dir / "_tenant.json"
+        save_tenant_checkpoint(_tenant_results(), tenant_id="tenant-1")
+        path = self._dir / "_tenant_tenant-1.json"
         data = json.loads(path.read_text(encoding="utf-8"))
         data["tool_version"] = "0.0.0-old"
         path.write_text(json.dumps(data), encoding="utf-8")
-        self.assertIsNone(load_tenant_checkpoint())
+        self.assertIsNone(load_tenant_checkpoint(tenant_id="tenant-1"))
+
+    def test_tenant_mismatch_returns_none(self) -> None:
+        save_tenant_checkpoint(_tenant_results(), tenant_id="tenant-1")
+        self.assertIsNone(load_tenant_checkpoint(tenant_id="tenant-2"))
 
     def test_load_checkpoints_skips_tenant_file(self) -> None:
         """load_checkpoints must not surface _tenant.json as a subscription entry."""

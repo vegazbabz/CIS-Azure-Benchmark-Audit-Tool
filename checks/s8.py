@@ -111,7 +111,7 @@ def check_8_1_3_3(sid: str, sname: str) -> R:
         f"https://management.azure.com/subscriptions/{sid}/"
         f"providers/Microsoft.Security/settings?api-version=2022-05-01"
     )
-    rc, data = az_rest(url, timeout=TIMEOUTS["default"])
+    rc, data = az_rest(url, timeout=TIMEOUTS["default"], sub=sid)
     if rc != 0:
         return _err(
             "8.1.3.3",
@@ -160,7 +160,7 @@ def check_8_1_10(sid: str, sname: str) -> R:
         f"providers/Microsoft.Security/serverVulnerabilityAssessmentsSettings?"
         f"api-version=2023-05-01"
     )
-    rc, data = az_rest(url, timeout=TIMEOUTS["default"])
+    rc, data = az_rest(url, timeout=TIMEOUTS["default"], sub=sid)
     if rc != 0:
         return _err(
             "8.1.10", "Defender configured to check VM OS updates", 1, "8 - Security Services", str(data), sid, sname
@@ -262,7 +262,7 @@ def check_8_1_12_to_15(sid: str, sname: str) -> list[R]:
         f"providers/Microsoft.Security/securityContacts"
         f"?api-version=2023-12-01-preview"
     )
-    rc2, cdata = az_rest(url, timeout=TIMEOUTS["default"])
+    rc2, cdata = az_rest(url, timeout=TIMEOUTS["default"], sub=sid)
     contact_items = cdata.get("value") or [] if rc2 == 0 and isinstance(cdata, dict) else []
 
     # 8.1.14 — Alert notification state must be "On"

@@ -58,6 +58,7 @@ REQUIREMENTS
 USAGE
 ──────
   python cis_azure_audit.py                           # all subscriptions
+  python cis_azure_audit.py --tenant "<tenant-id>"    # all subscriptions in one tenant
   python cis_azure_audit.py -s "Production"           # one subscription
   python cis_azure_audit.py -s "Dev" "Test" "Prod"   # multiple subscriptions
   python cis_azure_audit.py --parallel 5              # 5 concurrent workers
@@ -724,8 +725,17 @@ def audit_subscription(sub: dict[str, Any], td: dict[str, Any], progress: str = 
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _filter_history_for_tenant(history: list[dict[str, Any]], tenant_id: str | None) -> list[dict[str, Any]]:
+    """Keep trend entries for the selected tenant when tenant metadata exists."""
+    selected = (tenant_id or "").strip().lower()
+    if not selected:
+        return history
+    return [h for h in history if str(h.get("tenant_id", "")).lower() == selected]
+
+
 def get_subscriptions(
     filter_subs: str | list[str] | None = None,
+    tenant_id: str | None = None,
 ) -> list[dict[str, str]]:
     """
     List enabled Azure subscriptions, optionally filtered to a specific set.
@@ -735,6 +745,8 @@ def get_subscriptions(
     filter_subs : None              — return all enabled subscriptions
                   "single-name"     — return one subscription by name or ID
                   ["a", "b", "c"]  — return multiple subscriptions by name or ID
+    tenant_id   : Optional tenant GUID. When supplied, only subscriptions in
+                  that tenant are considered.
 
     Matching is exact (case-sensitive) on either subscription name or GUID.
     Partial name matches are not supported to avoid ambiguity.
@@ -742,12 +754,21 @@ def get_subscriptions(
     Exits with a clear error message if any requested subscription is not found,
     listing the available subscription names to help correct typos.
     """
-    rc, data = az(["account", "list", "--query", "[?state=='Enabled'].{id:id, name:name}"])
+    rc, data = az(["account", "list", "--query", "[?state=='Enabled'].{id:id, name:name, tenantId:tenantId}"])
     if rc != 0:
         LOGGER.error("❌ Could not list subscriptions: %s", data)
         sys.exit(1)
 
     subs = data if isinstance(data, list) else []
+    selected_tenant = (tenant_id or "").strip().lower()
+    if selected_tenant:
+        all_enabled = subs
+        subs = [s for s in all_enabled if str(s.get("tenantId", "")).lower() == selected_tenant]
+        if not subs:
+            available = sorted({str(s.get("tenantId", "")) for s in all_enabled if s.get("tenantId")})
+            LOGGER.error("❌ No enabled subscriptions found for tenant: %s", tenant_id)
+            LOGGER.error("   Available enabled tenant IDs: %s", available or ["<none>"])
+            sys.exit(1)
 
     if not filter_subs:
         return subs  # No filter — return all enabled subscriptions
@@ -767,7 +788,8 @@ def get_subscriptions(
 
     if not_found:
         LOGGER.error("❌ Subscription(s) not found: %s", not_found)
-        LOGGER.error("   Available: %s", [s["name"] for s in subs])
+        scope = f" in tenant {tenant_id}" if tenant_id else ""
+        LOGGER.error("   Available%s: %s", scope, [s["name"] for s in subs])
         sys.exit(1)
 
     return filtered
@@ -790,6 +812,7 @@ def run_audit(
     executor_mode: str = DEFAULT_EXECUTOR,
     adaptive_concurrency: bool = True,
     quiet: bool = False,
+    tenant_id: str | None = None,
 ) -> list[R]:
     """
     Orchestrate the full audit across all subscriptions.
@@ -814,12 +837,13 @@ def run_audit(
     resume               : If True, skip subscriptions with existing checkpoints
     executor_mode        : "thread" (default) or "process"
     adaptive_concurrency : If True, reduce/increase workers based on throttling
+    tenant_id            : Explicit audit tenant, used to scope checkpoints
 
     Returns
     ───────
     Flat list of all R instances across all subscriptions + tenant checks.
     """
-    checkpoints = load_checkpoints() if resume else {}
+    checkpoints = load_checkpoints(tenant_id=tenant_id) if resume else {}
     if checkpoints:
         LOGGER.info(
             "\n💾 %d subscription(s) were already audited in a previous run — loading saved results.", len(checkpoints)
@@ -841,13 +865,18 @@ def run_audit(
         LOGGER.info(
             "✅ All subscriptions were already audited — nothing new to scan. Use --fresh to re-audit from scratch."
         )
-        tenant_ckpt = load_tenant_checkpoint()
+        tenant_ckpt = load_tenant_checkpoint(tenant_id=tenant_id)
         if tenant_ckpt is not None:
             LOGGER.info("   💾 Loaded tenant checks from checkpoint (%d results).", len(tenant_ckpt))
             all_results.extend(tenant_ckpt)
         else:
             LOGGER.info("   🔍 No tenant checkpoint found — re-running tenant checks (requires az login)...")
-            all_results.extend(run_tenant_checks())
+            tenant_results = run_tenant_checks()
+            all_results.extend(tenant_results)
+            try:
+                save_tenant_checkpoint(tenant_results, tenant_id=tenant_id)
+            except Exception as _ckpt_err:
+                LOGGER.warning("⚠️  Could not save tenant checkpoint (audit will continue): %s", _ckpt_err)
         return all_results
 
     requested_parallel = max(1, parallel)
@@ -884,7 +913,7 @@ def run_audit(
     # These checks target the Entra ID tenant, not any individual subscription.
     # Run them ONCE here rather than inside the per-subscription loop to avoid
     # duplicate results when auditing multiple subscriptions.
-    tenant_ckpt = load_tenant_checkpoint() if resume else None
+    tenant_ckpt = load_tenant_checkpoint(tenant_id=tenant_id) if resume else None
     if tenant_ckpt is not None:
         LOGGER.info("\n  💾 Loaded tenant checks from checkpoint (%d results).", len(tenant_ckpt))
         tenant_results = tenant_ckpt
@@ -893,7 +922,7 @@ def run_audit(
         tenant_results = run_tenant_checks()
 
         try:
-            save_tenant_checkpoint(tenant_results)
+            save_tenant_checkpoint(tenant_results, tenant_id=tenant_id)
         except Exception as _ckpt_err:
             LOGGER.warning("⚠️  Could not save tenant checkpoint (audit will continue): %s", _ckpt_err)
 
@@ -992,10 +1021,10 @@ def run_audit(
 
                     if err:
                         LOGGER.error("  ❌ [%d/%d] Failed:    %s — %s", n, _total, sub["name"], err)
-                        save_checkpoint(sub["id"], sub["name"], [], status="failed")
+                        save_checkpoint(sub["id"], sub["name"], [], status="failed", tenant_id=tenant_id)
                     else:
                         all_results.extend(sub_results)
-                        save_checkpoint(sub["id"], sub["name"], sub_results)
+                        save_checkpoint(sub["id"], sub["name"], sub_results, tenant_id=tenant_id)
 
                     completed_in_todo += 1
                     LOGGER.debug("  ✅ [%d/%d] Completed: %s", completed_in_todo, _total, sub["name"])
@@ -1132,6 +1161,7 @@ def main() -> None:
         epilog="""
 Examples:
   python cis_azure_audit.py
+  python cis_azure_audit.py --tenant "00000000-0000-0000-0000-000000000000"
   python cis_azure_audit.py -s "Production"
   python cis_azure_audit.py -s "Dev" "Test" "Prod"
   python cis_azure_audit.py --parallel 5
@@ -1147,6 +1177,14 @@ Examples:
         version=f"%(prog)s {_cfg.version_full()}",
     )
 
+    parser.add_argument(
+        "--tenant",
+        metavar="TENANT_ID",
+        help=(
+            "Tenant ID to audit. When supplied, subscription discovery is limited to this tenant "
+            "and tenant-level Graph checks/checkpoints are scoped to it."
+        ),
+    )
     parser.add_argument(
         "--subscription",
         "-s",
@@ -1251,6 +1289,8 @@ Examples:
     )
 
     args = parser.parse_args()
+    selected_tenant = (args.tenant or "").strip()
+    _cfg.AUDIT_TENANT_ID = selected_tenant
 
     if args.fresh and args.report_only:
         parser.error(
@@ -1304,7 +1344,7 @@ Examples:
     # ── Report-only: skip all Azure calls, load checkpoints directly ──────────
     if args.report_only:
         LOGGER.info("\n📊 Report-only mode...")
-        checkpoints = load_checkpoints()
+        checkpoints = load_checkpoints(tenant_id=selected_tenant or None)
         all_results = []
         for sub_id, cp in checkpoints.items():
             all_results.extend(results_from_checkpoint(cp))
@@ -1312,13 +1352,18 @@ Examples:
         # Load tenant check results from checkpoint if available.  Falls back
         # to re-running live checks (which make Graph API calls) if no checkpoint
         # exists — this happens on the first --report-only run after a fresh audit.
-        tenant_ckpt = load_tenant_checkpoint()
+        tenant_ckpt = load_tenant_checkpoint(tenant_id=selected_tenant or None)
         if tenant_ckpt is not None:
             LOGGER.info("   💾 Loaded tenant checks from checkpoint (%d results).", len(tenant_ckpt))
             all_results.extend(tenant_ckpt)
         else:
             LOGGER.info("   🔍 No tenant checkpoint found — re-running tenant checks (requires az login)...")
-            all_results.extend(run_tenant_checks())
+            tenant_results = run_tenant_checks()
+            all_results.extend(tenant_results)
+            try:
+                save_tenant_checkpoint(tenant_results, tenant_id=selected_tenant or None)
+            except Exception as _ckpt_err:
+                LOGGER.warning("⚠️  Could not save tenant checkpoint (audit will continue): %s", _ckpt_err)
         if args.level:
             all_results = [r for r in all_results if r.level == args.level]
         all_results = _dedup_results(all_results)
@@ -1336,14 +1381,18 @@ Examples:
         # Build scope_info from az account show (best-effort, may fail if not logged in)
         _rc, _acc = az(["account", "show", "--query", "{user:user.name, tenant:tenantId, caller_type:user.type}"])
         scope_info = {
-            "tenant": _acc.get("tenant", "") if isinstance(_acc, dict) else "",
+            "tenant": selected_tenant or (_acc.get("tenant", "") if isinstance(_acc, dict) else ""),
             "user": _acc.get("user", "") if isinstance(_acc, dict) else "",
             "caller_type": _acc.get("caller_type", "") if isinstance(_acc, dict) else "",
-            "scope_label": "All subscriptions (from checkpoint data)",
+            "scope_label": (
+                f"All subscriptions in tenant {selected_tenant} (from checkpoint data)"
+                if selected_tenant
+                else "All subscriptions (from checkpoint data)"
+            ),
             "subscriptions": sub_names,
             "level_filter": args.level,
         }
-        run_history = load_history(history_path_for(args.output))
+        run_history = _filter_history_for_tenant(load_history(history_path_for(args.output)), selected_tenant)
         generate_html(all_results, args.output, scope_info, run_history, sub_timestamps)
         if args.open:
             _html_path = Path(args.output).resolve()
@@ -1388,10 +1437,15 @@ Examples:
         sys.exit(1)
     _cfg.CALLER_TYPE = acc.get("caller_type", "user") or "user"
     LOGGER.info("✅ Authenticated as: %s (%s)", acc.get("user"), _cfg.CALLER_TYPE)
-    LOGGER.info("✅ Tenant: %s", acc.get("tenant"))
+    if selected_tenant:
+        LOGGER.info("✅ Selected tenant: %s", selected_tenant)
+        if acc.get("tenant") and str(acc.get("tenant")).lower() != selected_tenant.lower():
+            LOGGER.info("   Azure CLI default tenant: %s", acc.get("tenant"))
+    else:
+        LOGGER.info("✅ Tenant: %s", acc.get("tenant"))
 
     # ── Resolve subscriptions ─────────────────────────────────────────────────
-    subs = get_subscriptions(args.subscription)
+    subs = get_subscriptions(args.subscription, tenant_id=selected_tenant or None)
     LOGGER.info("\n📋 Subscriptions (%d):", len(subs))
     for s in subs:
         LOGGER.info("   • %s  (%s)", s["name"], s["id"])
@@ -1408,9 +1462,9 @@ Examples:
             )
             with _pf_prog:
                 _pf_prog.add_task("", total=None, n=len(subs))
-                preflight = check_user_permissions([s["id"] for s in subs])
+                preflight = check_user_permissions([s["id"] for s in subs], tenant_id=selected_tenant or None)
         else:
-            preflight = check_user_permissions([s["id"] for s in subs])
+            preflight = check_user_permissions([s["id"] for s in subs], tenant_id=selected_tenant or None)
         if preflight.get("user_id"):
             LOGGER.info("   User: %s", acc.get("user") or preflight["user_id"])
             roles = preflight.get("roles", [])
@@ -1445,6 +1499,7 @@ Examples:
         executor_mode=args.executor,
         adaptive_concurrency=not args.no_adaptive_concurrency,
         quiet=args.quiet,
+        tenant_id=selected_tenant or None,
     )
 
     # ── Level filter ──────────────────────────────────────────────────────────
@@ -1486,26 +1541,37 @@ Examples:
                 "total": total,
                 "subscriptions": [s["name"] for s in subs],
                 "level_filter": args.level,
+                "tenant_id": selected_tenant or acc.get("tenant", ""),
             },
         )
-        run_history = load_history(hist_path)
+        run_history = _filter_history_for_tenant(load_history(hist_path), selected_tenant)
     else:
         run_history = []
 
     # ── Generate HTML report ──────────────────────────────────────────────────
     scope_info = {
-        "tenant": acc.get("tenant", ""),
+        "tenant": selected_tenant or acc.get("tenant", ""),
         "user": acc.get("user", ""),
         "caller_type": _cfg.CALLER_TYPE,
         "scope_label": (
-            "All subscriptions (tenant-wide)"
-            if args.subscription is None
-            else f"Selected: {', '.join(args.subscription)}"
+            f"All subscriptions in tenant {selected_tenant}"
+            if selected_tenant and args.subscription is None
+            else (
+                "All subscriptions (tenant-wide)"
+                if args.subscription is None
+                else (
+                    f"Selected in tenant {selected_tenant}: {', '.join(args.subscription)}"
+                    if selected_tenant
+                    else f"Selected: {', '.join(args.subscription)}"
+                )
+            )
         ),
         "subscriptions": [s["name"] for s in subs],
         "level_filter": args.level,
     }
-    sub_timestamps = {cp["subscription_name"]: cp["timestamp"] for cp in load_checkpoints().values()}
+    sub_timestamps = {
+        cp["subscription_name"]: cp["timestamp"] for cp in load_checkpoints(tenant_id=selected_tenant or None).values()
+    }
     generate_html(all_results, args.output, scope_info, run_history, sub_timestamps)
     if args.open:
         _html_path = Path(args.output).resolve()

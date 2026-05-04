@@ -635,7 +635,7 @@ def check_6_1_3_1(sid: str, sname: str) -> R:
         f"https://management.azure.com/subscriptions/{sid}/"
         f"providers/microsoft.insights/components?api-version=2020-02-02"
     )
-    rc, data = az_rest(url, timeout=TIMEOUTS["default"])
+    rc, data = az_rest(url, timeout=TIMEOUTS["default"], sub=sid)
     if rc != 0:
         return _err(
             "6.1.3.1", "Application Insights configured", 2, "6 - Management & Governance", str(data), sid, sname

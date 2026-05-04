@@ -244,6 +244,7 @@ python cis_azure_audit.py [options]
 
 | Option | Description |
 | --- | --- |
+| `--tenant` | Audit only subscriptions in the specified tenant ID, and scope tenant-level Graph checks/checkpoints to that tenant |
 | `-s`, `--subscription` | Audit one or more subscriptions by name or GUID. Multiple values follow a single flag: `-s Sub1 Sub2 Sub3` |
 | `-o`, `--output` | Output HTML filename (default: `reports/cis_azure_audit_report_<timestamp>.html`) |
 | `--output-dir` | Directory for all output files (HTML, JSON, CSV, checkpoints) |
@@ -270,11 +271,14 @@ python cis_azure_audit.py [options]
 # Audit all subscriptions
 python cis_azure_audit.py
 
+# Audit all enabled subscriptions in one tenant
+python cis_azure_audit.py --tenant "00000000-0000-0000-0000-000000000000"
+
 # Audit a single subscription by name
 python cis_azure_audit.py -s "Production"
 
-# Audit multiple subscriptions
-python cis_azure_audit.py -s "Production" "Staging"
+# Audit multiple subscriptions inside one tenant
+python cis_azure_audit.py --tenant "00000000-0000-0000-0000-000000000000" -s "Production" "Staging"
 
 # Run faster with more parallel workers
 python cis_azure_audit.py --parallel 5
@@ -293,6 +297,9 @@ python cis_azure_audit.py --fresh
 
 # Regenerate the HTML report without re-running any checks
 python cis_azure_audit.py --report-only
+
+# Regenerate a report from tenant-scoped checkpoints
+python cis_azure_audit.py --tenant "00000000-0000-0000-0000-000000000000" --report-only
 
 # Level 1 controls only
 python cis_azure_audit.py --level 1

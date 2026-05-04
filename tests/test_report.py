@@ -95,6 +95,14 @@ class TestGenerateHtml(unittest.TestCase):
         generate_html(_results(), out2)
         self.assertTrue(Path(out2).exists())
 
+    def test_output_parent_directory_created_for_all_report_files(self) -> None:
+        out_nested = Path(self._tmp.name) / "nested" / "reports" / "report.html"
+        generate_html(_results(), str(out_nested))
+
+        self.assertTrue(out_nested.exists())
+        self.assertTrue(out_nested.with_suffix(".json").exists())
+        self.assertTrue(out_nested.with_suffix(".csv").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

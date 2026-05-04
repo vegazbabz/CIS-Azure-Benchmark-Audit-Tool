@@ -91,6 +91,11 @@ class TestAppendHistory(unittest.TestCase):
         tmp = self._path.with_suffix(".json.tmp")
         self.assertFalse(tmp.exists())
 
+    def test_creates_parent_directory(self) -> None:
+        nested_path = Path(self._tmp.name) / "nested" / "reports" / "history.json"
+        append_history(nested_path, _entry())
+        self.assertTrue(nested_path.exists())
+
     def test_round_trip(self) -> None:
         e = _entry(72.5)
         append_history(self._path, e)

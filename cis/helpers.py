@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import sys
 import threading
+from pathlib import Path
 from typing import Any
 
 from cis.config import INTERNET_SRCS, TRACE_LEVEL
@@ -95,6 +96,8 @@ def setup_logging(
     root_logger.addHandler(console_handler)
 
     if log_file:
+        log_path = Path(log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setLevel(effective_level)
         file_handler.setFormatter(

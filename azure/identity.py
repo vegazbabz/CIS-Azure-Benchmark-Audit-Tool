@@ -14,6 +14,15 @@ from typing import Any
 
 from azure.client import az
 
+_KEY_VAULT_DATA_PLANE_ROLE_PREFIXES = ("key vault",)
+_STORAGE_DATA_PLANE_ROLE_PREFIXES = (
+    "storage blob data",
+    "storage file data",
+    "storage queue data",
+    "storage table data",
+)
+_STORAGE_DATA_PLANE_ROLES = frozenset({"storage account key operator service role"})
+
 logger = logging.getLogger(__name__)
 
 
@@ -184,6 +193,10 @@ def check_user_permissions(sub_ids: list[str]) -> dict[str, Any]:
 
     has_reader = any(r in roles_lower for r in ["reader", "contributor", "owner", "user access administrator"])
     has_security = any(r.startswith("security") for r in roles_lower)
+    has_key_vault_data_plane = any(r.startswith(_KEY_VAULT_DATA_PLANE_ROLE_PREFIXES) for r in roles_lower)
+    has_storage_data_plane = any(
+        r.startswith(_STORAGE_DATA_PLANE_ROLE_PREFIXES) or r in _STORAGE_DATA_PLANE_ROLES for r in roles_lower
+    )
 
     if not has_reader:
         warnings.append(
@@ -194,6 +207,19 @@ def check_user_permissions(sub_ids: list[str]) -> dict[str, Any]:
         warnings.append(
             "User does not have a 'Security Reader' or 'Security Admin' role. "
             "Some security-specific checks (8.1, 8.2, etc.) may be skipped or show as ERROR."
+        )
+
+    if not has_key_vault_data_plane or not has_storage_data_plane:
+        missing = []
+        if not has_key_vault_data_plane:
+            missing.append("Key Vault data-plane")
+        if not has_storage_data_plane:
+            missing.append("Storage data-plane")
+        warnings.append(
+            "No recognized " + " or ".join(missing) + " role was found in enumerated role assignments. "
+            "Control-plane Reader access is enough to run most checks, but Key Vault key/secret/certificate "
+            "and storage service data-plane checks may report ERROR until the audit identity has matching data-plane "
+            "RBAC roles or Key Vault access policies."
         )
 
     return {

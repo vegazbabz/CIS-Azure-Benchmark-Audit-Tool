@@ -151,7 +151,10 @@ class TestCheckUserPermissions(unittest.TestCase):
             (0, ["Reader", "Owner"]),  # sub1: no security role
             (0, ["Reader"]),  # sub2: no security role
             (0, "tenant-abc"),  # account show --query tenantId
-            (0, ["Security Reader", "Security Admin"]),  # MG scope: security roles present
+            (
+                0,
+                ["Security Reader", "Security Admin", "Key Vault Reader", "Storage Blob Data Reader"],
+            ),  # MG scope: security and data-plane roles present
         ]
         result = az_identity.check_user_permissions(["sub1", "sub2"])
         self.assertIn("Security Reader", result["roles"])
@@ -162,6 +165,21 @@ class TestCheckUserPermissions(unittest.TestCase):
         # all_clear should be True: has reader-equivalent AND security role
         self.assertTrue(result["all_clear"])
         self.assertEqual(result["warnings"], [])
+
+    @patch("azure.identity.az")
+    def test_missing_data_plane_roles_adds_advisory_warning(self, mock_az: Any) -> None:
+        """Reader/Security roles pass control-plane preflight but still warn about data-plane gaps."""
+        mock_az.side_effect = [
+            (0, {"id": "uid-001"}),  # get_signed_in_user_id
+            (0, ["Reader", "Security Reader"]),
+            (0, "tenant-abc"),
+            (0, []),
+        ]
+
+        result = az_identity.check_user_permissions(["sub1"])
+
+        self.assertTrue(result["all_clear"])
+        self.assertTrue(any("data-plane" in warning for warning in result["warnings"]))
 
 
 class TestPreflight(unittest.TestCase):

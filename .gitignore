@@ -16,6 +16,11 @@ reports/
 *.csv
 cis_checkpoints/
 run
+manual-test-*/
+manual-test*/
+**/cis_checkpoints/
+**/reports/
+CIS_Microsoft_Azure_Foundations_Benchmark_v*.pdf
 
 # ── Sample report (synthetic data only — safe to commit) ─────────────────────
 !docs/sample_report.html
@@ -28,6 +33,11 @@ _*.js
 compare_*.py
 err.txt
 out.txt
+*-debug.txt
+debug-*.txt
+pytest-out.txt
+vulture-out.txt
+vulture-err.txt
 
 # ── Local notes / AI session files ────────────────────────────────────────────
 *improvements.txt

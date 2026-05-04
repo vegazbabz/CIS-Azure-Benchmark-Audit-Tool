@@ -18,6 +18,7 @@ from typing import Any
 from cis.config import BENCHMARK_VER, LOGGER, VERSION, FAIL, INFO, MANUAL, PASS, ERROR, SUPPRESSED
 from cis.helpers import _ctrl_sort_key
 from cis.models import R
+from cis.result_utils import STATUS_ORDER, compliance_score, count_statuses
 
 # Visual style for each status type used in table rows and badges.
 # Format: (text_hex_colour, background_hex_colour, emoji)
@@ -62,13 +63,12 @@ def generate_html(
     history    : Optional list of past run summaries for the trend chart
     """
     # ── Counts and score ──────────────────────────────────────────────────────
-    counts = {s: sum(1 for r in results if r.status == s) for s in [PASS, FAIL, ERROR, INFO, MANUAL, SUPPRESSED]}
+    counts = count_statuses(results)
     total = len(results)
 
     # Compliance score excludes INFO (not applicable), MANUAL (human review),
     # and SUPPRESSED (accepted risk — counted separately, not as a pass or fail).
-    denom = max(total - counts[INFO] - counts[MANUAL] - counts[SUPPRESSED], 1)  # Avoid division by zero
-    score = round(counts[PASS] / denom * 100, 1)
+    score = compliance_score(counts, total)
     score_col = "#16a34a" if score >= 80 else "#d97706" if score >= 60 else "#dc2626"
 
     # ── L1 / L2 breakdown ─────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ def generate_html(
         if not sn:
             continue
         if sn not in sub_stats:
-            sub_stats[sn] = {PASS: 0, FAIL: 0, ERROR: 0, INFO: 0, MANUAL: 0, SUPPRESSED: 0}
+            sub_stats[sn] = {status: 0 for status in STATUS_ORDER}
         sub_stats[sn][r.status] = sub_stats[sn].get(r.status, 0) + 1
 
     def _sub_score(s: dict[str, int]) -> float:
@@ -235,7 +235,9 @@ def generate_html(
     )
 
     # ── Generate JSON and CSV export files alongside the HTML ─────────────────
-    base = Path(output).with_suffix("")
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    base = output_path.with_suffix("")
 
     json_data = [
         {
@@ -902,6 +904,6 @@ footer {{ text-align: center; padding: 1.5rem; color: #94a3b8; font-size: .8rem;
 </body>
 </html>"""
 
-    with open(output, "w", encoding="utf-8") as fh:
+    with open(output_path, "w", encoding="utf-8") as fh:
         fh.write(page)
-    LOGGER.info("\n\u2705 Report saved: %s", Path(output).resolve())
+    LOGGER.info("\n\u2705 Report saved: %s", output_path.resolve())

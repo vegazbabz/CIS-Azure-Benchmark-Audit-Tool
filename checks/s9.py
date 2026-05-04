@@ -38,9 +38,6 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
       Requires: az storage account blob-service-properties show
       Checks: 9.2.1 (blob soft delete), 9.2.2 (container soft delete),
               9.2.3 (blob versioning)
-      Also requires: az storage blob service-properties show (data-plane)
-      Checks: 9.2.4 (blob logging read), 9.2.5 (blob logging write),
-              9.2.6 (blob logging delete)
 
     Group 3 — File service properties
       Requires: az storage account file-service-properties show
@@ -80,9 +77,6 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 "9.2.1",
                 "9.2.2",
                 "9.2.3",  # Blob service
-                "9.2.4",
-                "9.2.5",
-                "9.2.6",  # Blob logging
                 "9.3.1.1",
                 "9.3.1.2",
                 "9.3.1.3",  # Key management / keys
@@ -101,9 +95,6 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
             ]
             _STORAGE_LEVELS: dict[str, int] = {
                 "9.2.3": 2,
-                "9.2.4": 2,
-                "9.2.5": 2,
-                "9.2.6": 2,
                 "9.3.1.3": 2,
                 "9.3.2.1": 2,
                 "9.3.3.1": 2,
@@ -453,91 +444,6 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 )
             )
 
-            # 9.2.4/5/6 — Blob logging (Read/Write/Delete) [L2]
-            # Classic storage logging is only available via the data-plane API
-            # (az storage blob service-properties show), not the management-plane
-            # blob-service-properties endpoint used above.
-            rc_log, log_props = az(
-                [
-                    "storage",
-                    "blob",
-                    "service-properties",
-                    "show",
-                    "--account-name",
-                    aname,
-                    "--auth-mode",
-                    "login",
-                ],
-                sid,
-                timeout=TIMEOUTS["storage_svc"],
-            )
-
-            if rc_log == 0 and isinstance(log_props, dict):
-                blog = log_props.get("logging") or {}
-                for cid, title, label, flag in [
-                    ("9.2.4", "Storage logging enabled for Blob Service read requests", "read", bool(blog.get("read"))),
-                    (
-                        "9.2.5",
-                        "Storage logging enabled for Blob Service write requests",
-                        "write",
-                        bool(blog.get("write")),
-                    ),
-                    (
-                        "9.2.6",
-                        "Storage logging enabled for Blob Service delete requests",
-                        "delete",
-                        bool(blog.get("delete")),
-                    ),
-                ]:
-                    acc_results.append(
-                        R(
-                            cid,
-                            title,
-                            2,
-                            "9 - Storage Services",
-                            PASS if flag else FAIL,
-                            f"Blob logging {label}: {flag}",
-                            (
-                                "Storage Account > Monitoring > Diagnostic settings"
-                                f" > Enable {label.capitalize()} logging"
-                                if not flag
-                                else ""
-                            ),
-                            sid,
-                            sname,
-                            aname,
-                        )
-                    )
-            else:
-                _log_err = str(log_props)
-                if is_notapplicable_error(_log_err):
-                    _log_status = INFO
-                    _log_detail = "Blob service not supported for this account type"
-                elif is_authz_error(_log_err):
-                    _log_status = ERROR
-                    _log_detail = _CLEAN_STORAGE_AUTHZ_MSG
-                else:
-                    _log_status = ERROR
-                    _log_detail = _friendly_error(_log_err)
-                for cid, title in [
-                    ("9.2.4", "Storage logging enabled for Blob Service read requests"),
-                    ("9.2.5", "Storage logging enabled for Blob Service write requests"),
-                    ("9.2.6", "Storage logging enabled for Blob Service delete requests"),
-                ]:
-                    acc_results.append(
-                        R(
-                            cid,
-                            title,
-                            2,
-                            "9 - Storage Services",
-                            _log_status,
-                            f"Account '{aname}': {_log_detail}",
-                            "",
-                            sid,
-                            sname,
-                            aname,
-                        )
-                    )
         else:
             # API call failed — emit result for all three blob checks.
             _blob_err = str(blob_props)
@@ -559,9 +465,6 @@ def check_9_storage(sid: str, sname: str, td: dict[str, Any]) -> list[R]:
                 ("9.2.1", "Blob soft delete enabled", 1),
                 ("9.2.2", "Container soft delete enabled", 1),
                 ("9.2.3", "Blob versioning enabled", 2),
-                ("9.2.4", "Storage logging enabled for Blob Service read requests", 2),
-                ("9.2.5", "Storage logging enabled for Blob Service write requests", 2),
-                ("9.2.6", "Storage logging enabled for Blob Service delete requests", 2),
             ]:
                 acc_results.append(
                     R(

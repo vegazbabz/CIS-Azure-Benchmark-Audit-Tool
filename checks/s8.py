@@ -116,7 +116,7 @@ def check_8_1_3_3(sid: str, sname: str) -> R:
         return _err(
             "8.1.3.3",
             "Endpoint protection (WDATP) component enabled",
-            1,
+            2,
             "8 - Security Services",
             str(data),
             sid,
@@ -131,7 +131,7 @@ def check_8_1_3_3(sid: str, sname: str) -> R:
     return R(
         "8.1.3.3",
         "Endpoint protection (WDATP) component enabled",
-        1,
+        2,
         "8 - Security Services",
         PASS if enabled else FAIL,
         f"Microsoft Defender for Endpoint integration: {'Enabled' if enabled else 'Disabled'}.",

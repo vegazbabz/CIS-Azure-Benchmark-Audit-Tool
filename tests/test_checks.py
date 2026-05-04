@@ -7,7 +7,7 @@ from typing import Any
 import unittest
 from unittest.mock import patch
 
-from cis.config import ERROR, FAIL, INFO, MANUAL, PASS
+from cis.config import CONTROL_CATALOG, ERROR, FAIL, INFO, MANUAL, PASS
 
 import checks.s2 as checks_s2
 import checks.s5 as checks_s5
@@ -15,6 +15,13 @@ import checks.s6 as checks_s6
 import checks.s7 as checks_s7
 import checks.s8 as checks_s8
 import checks.s9 as checks_s9
+from checks.manual import (
+    check_databricks_manual_controls,
+    check_security_manual_controls,
+    check_tenant_identity_manual_controls,
+    check_tenant_logging_manual_controls,
+    check_vnet_flow_log_manual_control,
+)
 
 SID = "sub-test-1234"
 SNAME = "Test Sub"
@@ -340,13 +347,79 @@ class TestCheck513(unittest.TestCase):
         self.assertEqual(result.status, MANUAL)
 
 
+class TestCheck56(unittest.TestCase):
+    """5.6 — Account lockout threshold is less than or equal to 10."""
+
+    def test_threshold_10_returns_pass(self) -> None:
+        with patch(
+            "checks.s5.az_rest",
+            return_value=(0, {"passwordProtection": {"lockoutThreshold": 10}}),
+        ):
+            result = checks_s5.check_5_6()
+        self.assertEqual(result.status, PASS)
+
+    def test_threshold_above_10_returns_fail(self) -> None:
+        with patch(
+            "checks.s5.az_rest",
+            return_value=(0, {"passwordProtection": {"lockoutThreshold": 12}}),
+        ):
+            result = checks_s5.check_5_6()
+        self.assertEqual(result.status, FAIL)
+        self.assertIn("12", result.details)
+
+
 class TestCheck528(unittest.TestCase):
-    """5.28 — Privileged users protected by phishing-resistant MFA (Manual)."""
+    """5.28 — Passwordless authentication methods considered (Manual)."""
 
     def test_returns_manual(self) -> None:
         result = checks_s5.check_5_28()
         self.assertEqual(result.control_id, "5.28")
         self.assertEqual(result.status, MANUAL)
+        self.assertEqual(result.level, 2)
+        self.assertIn("Passwordless", result.title)
+
+
+class TestManualControls(unittest.TestCase):
+    """Manual controls missing from earlier CIS 5.0.0 coverage."""
+
+    def test_databricks_manual_controls_return_info_without_workspaces(self) -> None:
+        results = check_databricks_manual_controls(SID, SNAME, _td("databricks", []))
+        self.assertEqual([r.control_id for r in results], ["2.1.3", "2.1.4", "2.1.5", "2.1.6"])
+        self.assertTrue(all(r.status == INFO for r in results))
+
+    def test_databricks_manual_controls_return_manual_per_workspace(self) -> None:
+        results = check_databricks_manual_controls(SID, SNAME, _td("databricks", [{"name": "ws1"}]))
+        self.assertEqual([r.control_id for r in results], ["2.1.3", "2.1.4", "2.1.5", "2.1.6"])
+        self.assertTrue(all(r.status == MANUAL for r in results))
+        self.assertTrue(all(r.resource == "ws1" for r in results))
+
+    def test_tenant_manual_control_sets_include_expected_pdf_ids(self) -> None:
+        identity_ids = {r.control_id for r in check_tenant_identity_manual_controls()}
+        logging_ids = {r.control_id for r in check_tenant_logging_manual_controls()}
+        self.assertIn("5.2.1", identity_ids)
+        self.assertIn("5.26", identity_ids)
+        self.assertEqual(logging_ids, {"6.1.1.8", "6.1.1.9", "6.1.1.10"})
+
+    def test_vnet_flow_log_manual_control(self) -> None:
+        results = check_vnet_flow_log_manual_control(SID, SNAME, _td("vnets", [{"name": "vnet1"}]))
+        self.assertEqual(results[0].control_id, "6.1.1.7")
+        self.assertEqual(results[0].status, MANUAL)
+
+    def test_security_manual_controls_include_expected_pdf_ids(self) -> None:
+        ids = {r.control_id for r in check_security_manual_controls(SID, SNAME)}
+        self.assertEqual(ids, {"8.1.3.2", "8.1.3.4", "8.1.3.5", "8.1.5.2", "8.1.11", "8.1.16", "8.2.1"})
+
+    def test_manual_results_use_catalog_metadata(self) -> None:
+        catalog = {cid: (title, level, section) for cid, level, section, title, _ in CONTROL_CATALOG}
+        results = []
+        results.extend(check_databricks_manual_controls(SID, SNAME, _td("databricks", [{"name": "ws1"}])))
+        results.extend(check_tenant_identity_manual_controls())
+        results.extend(check_tenant_logging_manual_controls())
+        results.extend(check_vnet_flow_log_manual_control(SID, SNAME, _td("vnets", [{"name": "vnet1"}])))
+        results.extend(check_security_manual_controls(SID, SNAME))
+
+        for result in results:
+            self.assertEqual((result.title, result.level, result.section), catalog[result.control_id])
 
 
 class TestCheck523(unittest.TestCase):
@@ -586,45 +659,48 @@ class TestCheck6112(unittest.TestCase):
 
 
 class TestCheck6113(unittest.TestCase):
-    """6.1.1.3 — Activity log retention >= 365 days."""
+    """6.1.1.3 — Activity log storage account encrypted with CMK."""
 
     def test_az_fails_returns_error(self) -> None:
         with patch("checks.s6.az", return_value=(1, "cli error")):
             result = checks_s6.check_6_1_1_3(SID, SNAME)
         self.assertEqual(result.status, ERROR)
         self.assertEqual(result.control_id, "6.1.1.3")
+        self.assertEqual(result.level, 2)
 
-    def test_no_profile_returns_fail(self) -> None:
+    def test_no_storage_destination_returns_info(self) -> None:
         with patch("checks.s6.az", return_value=(0, [])):
             result = checks_s6.check_6_1_1_3(SID, SNAME)
-        self.assertEqual(result.status, FAIL)
+        self.assertEqual(result.status, INFO)
 
-    def test_retention_disabled_returns_pass(self) -> None:
-        """Retention disabled means infinite retention — compliant."""
-        profiles = [{"retentionPolicy": {"enabled": False, "days": 0}}]
-        with patch("checks.s6.az", return_value=(0, profiles)):
+    def test_cmk_encrypted_storage_destination_returns_pass(self) -> None:
+        storage_id = f"/subscriptions/{SID}/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/logsa"
+        encryption = {"keySource": "Microsoft.Keyvault", "keyVaultProperties": {"keyName": "k"}}
+        with patch("checks.s6.az", side_effect=[(0, [storage_id]), (0, encryption)]):
             result = checks_s6.check_6_1_1_3(SID, SNAME)
         self.assertEqual(result.status, PASS)
 
-    def test_retention_365_days_returns_pass(self) -> None:
-        profiles = [{"retentionPolicy": {"enabled": True, "days": 365}}]
-        with patch("checks.s6.az", return_value=(0, profiles)):
-            result = checks_s6.check_6_1_1_3(SID, SNAME)
-        self.assertEqual(result.status, PASS)
-
-    def test_retention_less_than_365_returns_fail(self) -> None:
-        profiles = [{"retentionPolicy": {"enabled": True, "days": 90}}]
-        with patch("checks.s6.az", return_value=(0, profiles)):
+    def test_platform_encrypted_storage_destination_returns_fail(self) -> None:
+        storage_id = f"/subscriptions/{SID}/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/logsa"
+        encryption = {"keySource": "Microsoft.Storage", "keyVaultProperties": None}
+        with patch("checks.s6.az", side_effect=[(0, [storage_id]), (0, encryption)]):
             result = checks_s6.check_6_1_1_3(SID, SNAME)
         self.assertEqual(result.status, FAIL)
+        self.assertIn("Microsoft.Storage", result.details)
+
+    def test_storage_encryption_lookup_error_returns_error(self) -> None:
+        storage_id = f"/subscriptions/{SID}/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/logsa"
+        with patch("checks.s6.az", side_effect=[(0, [storage_id]), (1, "denied")]):
+            result = checks_s6.check_6_1_1_3(SID, SNAME)
+        self.assertEqual(result.status, ERROR)
 
 
 class TestCheck6115(unittest.TestCase):
-    """6.1.1.5 — NSG flow logs with Traffic Analytics (deprecated June 2025)."""
+    """6.1.1.5 — NSG flow logs sent to Log Analytics (Manual)."""
 
-    def test_returns_info_deprecation(self) -> None:
+    def test_returns_manual(self) -> None:
         result = checks_s6.check_6_1_1_5(SID, SNAME)
-        self.assertEqual(result.status, INFO)
+        self.assertEqual(result.status, MANUAL)
         self.assertIn("30 Jun 2025", result.details)
 
     def test_control_id_is_correct(self) -> None:
@@ -1302,7 +1378,7 @@ class TestCheck9Storage(unittest.TestCase):
         with patch("checks.s9.az", side_effect=_az_fw):
             results = checks_s9.check_9_storage(SID, SNAME, td)
 
-        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3", "9.2.4", "9.2.5", "9.2.6"}
+        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3"}
         file_ctrl_ids = {"9.1.1", "9.1.2", "9.1.3"}
         for r in results:
             if r.control_id in blob_ctrl_ids or r.control_id in file_ctrl_ids:
@@ -1340,7 +1416,7 @@ class TestCheck9Storage(unittest.TestCase):
         with patch("checks.s9.az", side_effect=_az_auth):
             results = checks_s9.check_9_storage(SID, SNAME, td)
 
-        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3", "9.2.4", "9.2.5", "9.2.6"}
+        blob_ctrl_ids = {"9.2.1", "9.2.2", "9.2.3"}
         file_ctrl_ids = {"9.1.1", "9.1.2", "9.1.3"}
         for r in results:
             if r.control_id in blob_ctrl_ids or r.control_id in file_ctrl_ids:
@@ -1348,10 +1424,10 @@ class TestCheck9Storage(unittest.TestCase):
                 self.assertNotIn("Key Vault", r.details)
                 self.assertIn("Reader", r.remediation)
 
-    def test_blob_logging_disabled_returns_fail_for_924_925_926(self) -> None:
-        """Data-plane blob logging not enabled — 9.2.4/5/6 should FAIL."""
+    def test_no_non_cis_924_925_926_results(self) -> None:
+        """CIS Azure Foundations Benchmark 5.0.0 has no 9.2.4/5/6 controls."""
         account = {
-            "name": "nolog",
+            "name": "blobok",
             "resourceGroup": "rg",
             "subscriptionId": SID,
             "httpsOnly": True,
@@ -1372,65 +1448,16 @@ class TestCheck9Storage(unittest.TestCase):
             "containerDeleteRetentionPolicy": {"enabled": True, "days": 7},
             "isVersioningEnabled": True,
         }
-        blob_log_off = {
-            "logging": {"read": False, "write": False, "delete": False},
-        }
 
         def _az_side(args: list, *a: Any, **_: Any) -> tuple:
             if "blob-service-properties" in args:
                 return (0, blob_svc)
-            if "blob" in args and "service-properties" in args:
-                return (0, blob_log_off)
             return (0, [])
 
         with patch("checks.s9.az", side_effect=_az_side):
             results = checks_s9.check_9_storage(SID, SNAME, td)
-        log_results = {r.control_id: r for r in results if r.control_id in ("9.2.4", "9.2.5", "9.2.6")}
-        for cid in ("9.2.4", "9.2.5", "9.2.6"):
-            self.assertIn(cid, log_results, f"{cid} not found in results")
-            self.assertEqual(log_results[cid].status, FAIL, f"{cid} expected FAIL")
-
-    def test_blob_logging_enabled_returns_pass_for_924_925_926(self) -> None:
-        """Data-plane blob logging enabled — 9.2.4/5/6 should PASS."""
-        account = {
-            "name": "logon",
-            "resourceGroup": "rg",
-            "subscriptionId": SID,
-            "httpsOnly": True,
-            "publicAccess": "Disabled",
-            "crossTenant": False,
-            "blobAnon": False,
-            "defaultAction": "Deny",
-            "bypass": "AzureServices",
-            "minTls": "TLS1_2",
-            "keyAccess": False,
-            "oauthDefault": True,
-            "sku": "Standard_GRS",
-            "privateEps": 1,
-        }
-        td = _td("storage", [account])
-        blob_svc = {
-            "deleteRetentionPolicy": {"enabled": True, "days": 7},
-            "containerDeleteRetentionPolicy": {"enabled": True, "days": 7},
-            "isVersioningEnabled": True,
-        }
-        blob_log_on = {
-            "logging": {"read": True, "write": True, "delete": True},
-        }
-
-        def _az_side(args: list, *a: Any, **_: Any) -> tuple:
-            if "blob-service-properties" in args:
-                return (0, blob_svc)
-            if "blob" in args and "service-properties" in args:
-                return (0, blob_log_on)
-            return (0, [])
-
-        with patch("checks.s9.az", side_effect=_az_side):
-            results = checks_s9.check_9_storage(SID, SNAME, td)
-        log_results = {r.control_id: r for r in results if r.control_id in ("9.2.4", "9.2.5", "9.2.6")}
-        for cid in ("9.2.4", "9.2.5", "9.2.6"):
-            self.assertIn(cid, log_results, f"{cid} not found in results")
-            self.assertEqual(log_results[cid].status, PASS, f"{cid} expected PASS")
+        ids = {r.control_id for r in results}
+        self.assertFalse({"9.2.4", "9.2.5", "9.2.6"} & ids)
 
 
 if __name__ == "__main__":

@@ -23,10 +23,11 @@ from checks.s5 import (
     check_5_16,
     check_5_28,
 )
+from checks.manual import check_tenant_identity_manual_controls, check_tenant_logging_manual_controls
 from cis.config import ERROR, FAIL, INFO, LOGGER, MANUAL, PASS, SUPPRESSED
 from cis.models import R
 
-TenantCheck = Callable[[], R]
+TenantCheck = Callable[[], R | list[R]]
 
 TENANT_CHECKS: tuple[TenantCheck, ...] = (
     check_3_1_1,
@@ -34,6 +35,7 @@ TENANT_CHECKS: tuple[TenantCheck, ...] = (
     check_5_1_2,
     check_5_1_3,
     check_5_2_2,
+    check_tenant_identity_manual_controls,
     check_5_28,
     check_5_3_2,
     check_5_4,
@@ -41,6 +43,7 @@ TENANT_CHECKS: tuple[TenantCheck, ...] = (
     check_5_14,
     check_5_15,
     check_5_16,
+    check_tenant_logging_manual_controls,
 )
 
 _STATUS_ICON: dict[str, str] = {
@@ -63,8 +66,10 @@ def run_tenant_checks(log_each: bool = True) -> list[R]:
             LOGGER.warning("    \u26a0\ufe0f  ERROR in tenant check %s: %s", check.__name__, exc)
             continue
 
-        results.append(result)
+        items = result if isinstance(result, list) else [result]
+        results.extend(items)
         if log_each:
-            icon = _STATUS_ICON.get(result.status, "?")
-            LOGGER.info("    %-10s %s  %s", result.control_id, icon, result.status)
+            for item in items:
+                icon = _STATUS_ICON.get(item.status, "?")
+                LOGGER.info("    %-10s %s  %s", item.control_id, icon, item.status)
     return results

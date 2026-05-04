@@ -2,6 +2,6 @@
 # Versions pinned to match local toolchain — update deliberately, not silently
 black==26.3.1
 flake8==7.3.0
-mypy==1.19.1
+mypy==1.20.0
 # rich is only needed if you want to run the interactive progress bar locally
 rich

@@ -103,6 +103,11 @@ LOGGER = logging.getLogger("cis_audit")
 # endpoints whose required scopes are not available in the az CLI app token.
 GRAPH_AUTH: dict[str, str] = {}
 
+# ── Audit tenant scope (set from --tenant at startup) ────────────────────────
+# Empty string preserves the Azure CLI's current tenant context. When set, Graph
+# token acquisition and tenant-scoped checkpoint loading use this tenant.
+AUDIT_TENANT_ID: str = ""
+
 # ── Caller identity (set at startup from az account show) ────────────────────
 # Either "user" or "servicePrincipal".  Used by checks to tailor error messages
 # so remediation guidance matches the authentication method in use.

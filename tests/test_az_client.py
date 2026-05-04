@@ -233,6 +233,34 @@ class TestAzRest(unittest.TestCase):
         self.assertIn(url, cmd_used)
         self.assertIn("get", cmd_used)
 
+    def test_arm_rest_accepts_subscription_context(self) -> None:
+        payload = json.dumps({})
+        with patch("azure.client._run_cmd_with_retries", return_value=_ok(stdout=payload)) as m:
+            az_client.az_rest("https://management.azure.com/foo", sub="sub-123")
+        cmd_used = m.call_args[0][0]
+        self.assertIn("--subscription", cmd_used)
+        self.assertIn("sub-123", cmd_used)
+
+    @patch("azure.client.urllib.request.urlopen")
+    @patch("azure.client._run_cmd_with_retries")
+    def test_graph_rest_uses_selected_tenant_token(self, mock_run: Any, mock_urlopen: Any) -> None:
+        token_payload = json.dumps({"accessToken": "token-for-tenant"})
+        mock_run.return_value = _ok(stdout=token_payload)
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps({"value": []}).encode("utf-8")
+        mock_urlopen.return_value = response
+
+        with patch("cis.config.AUDIT_TENANT_ID", "tenant-123"):
+            rc, data = az_client.az_rest("https://graph.microsoft.com/v1.0/policies/authorizationPolicy")
+
+        self.assertEqual(rc, 0)
+        self.assertEqual(data, {"value": []})
+        token_cmd = mock_run.call_args[0][0]
+        self.assertIn("--tenant", token_cmd)
+        self.assertIn("tenant-123", token_cmd)
+        request = mock_urlopen.call_args[0][0]
+        self.assertEqual(request.headers["Authorization"], "Bearer token-for-tenant")
+
 
 # ---------------------------------------------------------------------------
 # graph_query()

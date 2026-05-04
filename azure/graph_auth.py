@@ -52,9 +52,9 @@ def is_configured() -> bool:
 
 def _get_tenant_id() -> str:
     """Return tenant ID from config/env or fall back to ``az account show``."""
-    from cis.config import GRAPH_AUTH
+    from cis.config import AUDIT_TENANT_ID, GRAPH_AUTH
 
-    tid = GRAPH_AUTH.get("tenant_id") or os.environ.get("CIS_GRAPH_TENANT_ID")
+    tid = AUDIT_TENANT_ID or GRAPH_AUTH.get("tenant_id") or os.environ.get("CIS_GRAPH_TENANT_ID")
     if tid:
         return tid
 

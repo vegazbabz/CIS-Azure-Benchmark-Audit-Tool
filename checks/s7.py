@@ -443,7 +443,7 @@ def check_7_9(sid: str, sname: str) -> list[R]:
     check vpnClientConfiguration.vpnAuthenticationTypes == ["AAD"].
     """
     url = f"/subscriptions/{sid}" "/providers/Microsoft.Network/virtualNetworkGateways" "?api-version=2024-05-01"
-    rc, data = az_rest(url, timeout=TIMEOUTS["default"])
+    rc, data = az_rest(url, timeout=TIMEOUTS["default"], sub=sid)
     if rc != 0:
         return [
             _err(

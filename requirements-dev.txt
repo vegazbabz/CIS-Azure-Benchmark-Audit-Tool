@@ -1,7 +1,7 @@
 # development dependencies for linting, formatting, and type checking
 # Versions pinned to match local toolchain — update deliberately, not silently
-black==26.3.1
+black==26.5.1
 flake8==7.3.0
-mypy==1.20.0
+mypy==2.1.0
 # rich is only needed if you want to run the interactive progress bar locally
 rich
